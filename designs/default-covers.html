@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FlowCloudAI 默认封面 · 连续世界线</title>
+    <style>
+        /* 独立设计稿：受控渐变 + 一份共享连续线稿，无外部资源。 */
+        :root {
+            color-scheme: dark;
+            --page: #111418;
+            --panel: #1a1e24;
+            --panel-soft: #20252d;
+            --border: #303640;
+            --text: #f2f4f7;
+            --text-2: #a7b0bd;
+            --text-3: #737e8d;
+            --accent: #82b7e8;
+            --star: #f1c75b;
+            --shadow: 0 16px 38px rgb(0 0 0 / 22%);
+            --cover-a-weight: 100%;
+            --cover-b-weight: 100%;
+            --cover-glow-weight: 58%;
+            --cover-line-ink: rgb(255 255 255 / 14%);
+            --cover-mark-ink: rgb(255 255 255 / 18%);
+            --cover-vignette: rgb(4 8 12 / 14%);
+            --font-art: "STXingkai", "华文行楷", "KaiTi", "楷体", serif;
+            --font-heading: "Noto Serif SC", "Source Han Serif SC", "STSong", serif;
+        }
+
+        :root[data-theme="light"] {
+            color-scheme: light;
+            --page: #f7f9fb;
+            --panel: #ffffff;
+            --panel-soft: #f2f6fa;
+            --border: #d7dee7;
+            --text: #17212d;
+            --text-2: #526273;
+            --text-3: #7a8999;
+            --accent: #176ea6;
+            --star: #c77c0c;
+            --shadow: 0 12px 28px rgb(32 52 72 / 9%);
+            --cover-a-weight: 96%;
+            --cover-b-weight: 92%;
+            --cover-glow-weight: 52%;
+            --cover-line-ink: rgb(255 255 255 / 28%);
+            --cover-mark-ink: rgb(255 255 255 / 23%);
+            --cover-vignette: rgb(4 8 12 / 10%);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--page);
+            color: var(--text);
+            font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        }
+
+        button { font: inherit; }
+
+        .svg-defs {
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 48px));
+            margin: 0 auto;
+            padding: 52px 0 80px;
+        }
+
+        .topbar,
+        .section-head,
+        .card-title-row,
+        .hero-meta {
+            display: flex;
+            align-items: center;
+        }
+
+        .topbar {
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 44px;
+        }
+
+        .eyebrow,
+        .section-kicker {
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 8px 0 8px;
+            font-family: var(--font-art);
+            font-size: clamp(34px, 5vw, 56px);
+            font-weight: 400;
+            line-height: 1;
+            letter-spacing: .02em;
+        }
+
+        .lead {
+            max-width: 680px;
+            margin: 0;
+            color: var(--text-2);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .theme-button {
+            flex: none;
+            min-height: 42px;
+            padding: 0 16px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--panel);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .theme-button:hover { border-color: var(--accent); }
+        .theme-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+
+        section { margin-top: 46px; }
+
+        .section-head {
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .section-head h2 {
+            margin: 4px 0 0;
+            font-family: var(--font-heading);
+            font-size: 20px;
+        }
+
+        .section-note {
+            margin: 0;
+            color: var(--text-3);
+            font-size: 12px;
+        }
+
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .project-card,
+        .entry-card,
+        .hero-shell {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .project-card,
+        .entry-card { border-radius: 16px; }
+
+        .project-card {
+            transition: border-color 160ms ease, transform 160ms ease;
+        }
+
+        .project-card:hover {
+            transform: translateY(-2px);
+            border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+        }
+
+        .cover {
+            --cover-a: #9a8b3b;
+            --cover-b: #314127;
+            --cover-glow: #ddc968;
+            --line-x: 0%;
+            --line-y: 0%;
+            --line-scale: 1;
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            background: linear-gradient(
+                145deg,
+                color-mix(in srgb, var(--cover-a) var(--cover-a-weight), white),
+                color-mix(in srgb, var(--cover-b) var(--cover-b-weight), white)
+            );
+        }
+
+        .cover::before,
+        .cover::after {
+            position: absolute;
+            inset: 0;
+            content: "";
+            pointer-events: none;
+        }
+
+        .cover::before {
+            z-index: 0;
+            background: radial-gradient(110% 120% at 8% 0%, color-mix(in srgb, var(--cover-glow) var(--cover-glow-weight), transparent), transparent 58%);
+        }
+
+        .cover::after {
+            z-index: 2;
+            background: linear-gradient(90deg, transparent 50%, var(--cover-vignette));
+        }
+
+        .project-cover { height: 132px; }
+
+        .cover-lines {
+            position: absolute;
+            z-index: 1;
+            top: -12%;
+            left: -10%;
+            width: 120%;
+            height: 124%;
+            overflow: visible;
+            color: var(--cover-line-ink);
+            transform: translate(var(--line-x), var(--line-y)) scale(var(--line-scale));
+            transform-origin: center;
+            pointer-events: none;
+        }
+
+        .cover-mark {
+            position: absolute;
+            z-index: 3;
+            right: 15px;
+            bottom: -8px;
+            color: var(--cover-mark-ink);
+            font-family: var(--font-art);
+            font-size: 66px;
+            font-weight: 400;
+            line-height: 1;
+            letter-spacing: -.08em;
+            user-select: none;
+        }
+
+        .project-body { padding: 14px 16px 16px; }
+
+        .card-title-row {
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .project-title,
+        .entry-title {
+            overflow: hidden;
+            margin: 0;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .project-title { font-size: 16px; }
+
+        .project-title,
+        .entry-title {
+            font-family: var(--font-heading);
+            font-weight: 700;
+        }
+
+        .star {
+            border: 0;
+            background: none;
+            color: var(--star);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .project-meta,
+        .entry-meta {
+            margin: 7px 0 0;
+            color: var(--text-3);
+            font-size: 12px;
+        }
+
+        .hero-shell { border-radius: 20px; }
+        .hero-cover { min-height: 270px; }
+
+        .hero-cover .cover-lines {
+            top: -8%;
+            left: -5%;
+            width: 110%;
+            height: 116%;
+            color: var(--cover-line-ink);
+        }
+
+        :root[data-theme="light"] .hero-cover {
+            --cover-a-weight: 100%;
+            --cover-b-weight: 100%;
+            --cover-line-ink: rgb(255 255 255 / 23%);
+            --cover-mark-ink: rgb(255 255 255 / 16%);
+            --cover-vignette: rgb(4 8 12 / 14%);
+        }
+
+        .hero-cover .cover-mark {
+            right: 28px;
+            bottom: -20px;
+            font-size: clamp(120px, 18vw, 190px);
+            color: rgb(255 255 255 / 14%);
+        }
+
+        .hero-copy {
+            position: absolute;
+            z-index: 4;
+            left: 30px;
+            bottom: 25px;
+            max-width: min(560px, calc(100% - 60px));
+            color: #fff;
+        }
+
+        .hero-copy h3 {
+            margin: 4px 0 6px;
+            font-family: var(--font-art);
+            font-size: clamp(28px, 5vw, 46px);
+            font-weight: 400;
+            letter-spacing: .02em;
+        }
+
+        .hero-meta { gap: 12px; color: rgb(255 255 255 / 72%); font-size: 13px; }
+
+        .entry-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .entry-cover {
+            position: relative;
+            display: block;
+            height: 104px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--entry-color) 28%, transparent), transparent 48%),
+                color-mix(in srgb, var(--entry-color) 14%, var(--panel-soft));
+        }
+
+        .entry-icon {
+            position: absolute;
+            z-index: 2;
+            top: 18px;
+            left: 18px;
+            display: grid;
+            width: 48px;
+            height: 48px;
+            place-items: center;
+            border: 1px solid color-mix(in srgb, var(--entry-color) 38%, transparent);
+            border-radius: 15px;
+            background: color-mix(in srgb, var(--entry-color) 18%, var(--panel));
+            color: var(--entry-color);
+            font-size: 21px;
+            font-weight: 700;
+        }
+
+        .entry-mark {
+            position: absolute;
+            right: 10px;
+            bottom: -12px;
+            color: color-mix(in srgb, var(--entry-color) 26%, transparent);
+            font-family: var(--font-art);
+            font-size: 76px;
+            font-weight: 400;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .entry-body { padding: 12px 14px 14px; }
+        .entry-title { font-size: 14px; }
+
+        .entry-type {
+            display: inline-flex;
+            margin-top: 9px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--entry-color) 14%, transparent);
+            color: var(--entry-color);
+            font-size: 11px;
+            font-weight: 650;
+        }
+
+        .rule-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            overflow: hidden;
+            margin-top: 48px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--border);
+        }
+
+        .rule {
+            min-height: 92px;
+            padding: 18px;
+            background: var(--panel-soft);
+        }
+
+        .rule strong { display: block; font-size: 13px; }
+        .rule span { display: block; margin-top: 7px; color: var(--text-3); font-size: 11px; line-height: 1.55; }
+
+        @media (max-width: 860px) {
+            .project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .rule-strip { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 580px) {
+            .page { width: min(100% - 28px, 1180px); padding-top: 28px; }
+            .topbar { align-items: flex-start; margin-bottom: 34px; }
+            .lead { font-size: 13px; }
+            .theme-button { min-height: 38px; padding-inline: 12px; font-size: 12px; }
+            .section-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+            .project-grid { grid-template-columns: 1fr; }
+            .project-cover { height: 116px; }
+            .hero-cover { min-height: 220px; }
+            .hero-copy { left: 20px; bottom: 20px; max-width: calc(100% - 40px); }
+            .hero-meta { flex-wrap: wrap; }
+            .entry-grid { gap: 10px; }
+            .entry-cover { height: 88px; }
+            .rule-strip { grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .project-card { transition: none; }
+        }
+    </style>
+</head>
+<body>
+<svg class="svg-defs" aria-hidden="true">
+    <defs>
+        <!-- 路径跨越左右边界，以大尺度缓弯形成连续世界线。 -->
+        <symbol id="world-lines" viewBox="0 0 800 320">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M-60 38 C70 4 164 88 284 52 S524 2 860 78"/>
+                <path d="M-70 78 C82 35 176 126 302 82 S548 36 870 118"/>
+                <path d="M-80 126 C64 78 188 168 330 118 S590 82 880 160"/>
+                <path d="M-72 178 C96 122 208 214 360 162 S622 126 872 206"/>
+                <path d="M-60 228 C112 174 244 260 398 208 S664 176 860 252"/>
+                <path d="M-50 276 C124 226 286 304 438 260 S690 226 850 294"/>
+                <path d="M88 330 C164 270 248 262 326 300 S506 330 604 276 S740 246 836 270"/>
+            </g>
+        </symbol>
+    </defs>
+</svg>
+
+<main class="page">
+    <header class="topbar">
+        <div>
+            <div class="eyebrow">FlowCloudAI · Default covers</div>
+            <h1>连续世界线</h1>
+            <p class="lead">用受控渐变建立项目身份，用一组稀疏、连续的大曲线表达地图与世界边界。</p>
+        </div>
+        <button class="theme-button" type="button" id="themeToggle">切换浅色界面</button>
+    </header>
+
+    <section>
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">01 · 项目卡片</div>
+                <h2>同一线稿，不同世界身份</h2>
+            </div>
+            <p class="section-note">ID 决定色板与裁切；名称只决定首字</p>
+        </div>
+        <div class="project-grid">
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-1" data-name="远星大陆" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">远星大陆</h3><button class="star" aria-label="取消标星远星大陆">★</button></div>
+                    <p class="project-meta">32 词条 · 4.2 万字</p>
+                </div>
+            </article>
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-2" data-name="镜湖编年史" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">镜湖编年史</h3><button class="star" aria-label="标星镜湖编年史">☆</button></div>
+                    <p class="project-meta">18 词条 · 2.1 万字</p>
+                </div>
+            </article>
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-7" data-name="北境诸王" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">北境诸王</h3><button class="star" aria-label="标星北境诸王">☆</button></div>
+                    <p class="project-meta">57 词条 · 9.8 万字</p>
+                </div>
+            </article>
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-8" data-name="Aetheria" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">Aetheria</h3><button class="star" aria-label="标星 Aetheria">☆</button></div>
+                    <p class="project-meta">23 词条 · 3.3 万字</p>
+                </div>
+            </article>
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-5" data-name="雾鸦港" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">雾鸦港</h3><button class="star" aria-label="标星雾鸦港">☆</button></div>
+                    <p class="project-meta">9 词条 · 1.1 万字</p>
+                </div>
+            </article>
+            <article class="project-card">
+                <div class="cover project-cover" data-cover-id="project-6" data-name="云海残卷" aria-hidden="true"></div>
+                <div class="project-body">
+                    <div class="card-title-row"><h3 class="project-title">云海残卷</h3><button class="star" aria-label="标星云海残卷">☆</button></div>
+                    <p class="project-meta">41 词条 · 6.7 万字</p>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">02 · 项目 Hero</div>
+                <h2>放大后仍保持同一身份</h2>
+            </div>
+            <p class="section-note">封面颜色不随界面明暗改变</p>
+        </div>
+        <div class="hero-shell">
+            <div class="cover hero-cover" data-cover-id="project-1" data-name="远星大陆">
+                <div class="hero-copy">
+                    <div class="eyebrow" style="color:rgb(255 255 255 / 70%)">世界观项目</div>
+                    <h3>远星大陆</h3>
+                    <div class="hero-meta"><span>32 个词条</span><span>最后更新于今天 14:20</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">03 · 词条卡片</div>
+                <h2>保持克制，不复制项目纹理</h2>
+            </div>
+            <p class="section-note">类型色 + 图标 + 标题首字，符号自动跳过</p>
+        </div>
+        <div class="entry-grid">
+            <article class="entry-card" style="--entry-color:#7db6dc">
+                <div class="entry-cover" data-entry-title="星落城" aria-hidden="true"><span class="entry-icon">地</span></div>
+                <div class="entry-body"><h3 class="entry-title">星落城</h3><span class="entry-type">地点</span><p class="entry-meta">更新于今天</p></div>
+            </article>
+            <article class="entry-card" style="--entry-color:#7db6dc">
+                <div class="entry-cover" data-entry-title="《镜湖》" aria-hidden="true"><span class="entry-icon">地</span></div>
+                <div class="entry-body"><h3 class="entry-title">《镜湖》</h3><span class="entry-type">地点</span><p class="entry-meta">更新于昨天</p></div>
+            </article>
+            <article class="entry-card" style="--entry-color:#c49372">
+                <div class="entry-cover" data-entry-title="Aetheria 旅人" aria-hidden="true"><span class="entry-icon">人</span></div>
+                <div class="entry-body"><h3 class="entry-title">Aetheria 旅人</h3><span class="entry-type">角色</span><p class="entry-meta">更新于 8 月 4 日</p></div>
+            </article>
+            <article class="entry-card" style="--entry-color:#84b78e">
+                <div class="entry-cover" data-entry-title="《潮汐罗盘》" aria-hidden="true"><span class="entry-icon">物</span></div>
+                <div class="entry-body"><h3 class="entry-title">《潮汐罗盘》</h3><span class="entry-type">物品</span><p class="entry-meta">更新于 7 月 29 日</p></div>
+            </article>
+        </div>
+    </section>
+
+    <div class="rule-strip" aria-label="设计规则">
+        <div class="rule"><strong>一份线稿</strong><span>共享 SVG symbol，不叠第二层纹理。</span></div>
+        <div class="rule"><strong>受控色板</strong><span>哈希只做选择，不在整个色环随机。</span></div>
+        <div class="rule"><strong>身份稳定</strong><span>项目 ID 定颜色，改名不会换封面。</span></div>
+        <div class="rule"><strong>标题结合</strong><span>取首个字母或数字，自动跳过《》等符号。</span></div>
+    </div>
+</main>
+
+<script>
+    const palettes = [
+        ['#a99b43', '#30442c', '#e8d77a'],
+        ['#b96955', '#56362f', '#efaa8b'],
+        ['#b58a50', '#4b472b', '#e4c67e'],
+        ['#a34d91', '#4c2748', '#db8bc9'],
+        ['#627eb8', '#2c365e', '#9fb8eb'],
+        ['#478f84', '#244b49', '#8ccfc2'],
+        ['#8e6aae', '#3f315b', '#c4a2df'],
+        ['#a7585c', '#4d2c35', '#dd9294'],
+    ];
+
+    function fnv1a(value) {
+        let hash = 0x811c9dc5;
+        for (let index = 0; index < value.length; index += 1) {
+            hash ^= value.charCodeAt(index);
+            hash = Math.imul(hash, 0x01000193) >>> 0;
+        }
+        return hash;
+    }
+
+    function monogram(name) {
+        return name.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? '✦';
+    }
+
+    function decorateCover(cover) {
+        const hash = fnv1a(cover.dataset.coverId);
+        const [start, end, glow] = palettes[hash % palettes.length];
+        cover.style.setProperty('--cover-a', start);
+        cover.style.setProperty('--cover-b', end);
+        cover.style.setProperty('--cover-glow', glow);
+        cover.style.setProperty('--line-x', `${((hash >>> 8) % 17) - 8}%`);
+        cover.style.setProperty('--line-y', `${((hash >>> 16) % 13) - 6}%`);
+        cover.style.setProperty('--line-scale', String(1 + ((hash >>> 24) % 4) * .04));
+
+        const lines = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        lines.classList.add('cover-lines');
+        lines.setAttribute('viewBox', '0 0 800 320');
+        lines.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        lines.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '#world-lines');
+        lines.append(use);
+        cover.prepend(lines);
+
+        const mark = document.createElement('span');
+        mark.className = 'cover-mark';
+        mark.textContent = monogram(cover.dataset.name);
+        mark.setAttribute('aria-hidden', 'true');
+        cover.append(mark);
+    }
+
+    document.querySelectorAll('[data-cover-id]').forEach(decorateCover);
+
+    document.querySelectorAll('[data-entry-title]').forEach((cover) => {
+        const mark = document.createElement('span');
+        mark.className = 'entry-mark';
+        mark.textContent = monogram(cover.dataset.entryTitle);
+        cover.append(mark);
+    });
+
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+        const root = document.documentElement;
+        const light = root.dataset.theme !== 'light';
+        root.dataset.theme = light ? 'light' : 'dark';
+        themeToggle.textContent = light ? '切换深色界面' : '切换浅色界面';
+    });
+</script>
+</body>
+</html>
