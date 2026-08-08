@@ -20,6 +20,7 @@ import FcworldProgressDialog from '../../../features/projects/components/Fcworld
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
 import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
+import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
 import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {
@@ -44,7 +45,7 @@ import {
     MobileMoreIcon,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {formatProjectDate, parseProjectDateMs} from '../../../features/projects/projectDisplay'
 import {
     collectDashboardTargets,
     FilterCheckIcon,
@@ -459,7 +460,6 @@ export default function MobileHome({
     )
 
     const renderWorldCard = (project: Project) => {
-        const image = toProjectImageSrc(project.cover_path)
         const meta = `${entryCounts[project.id] ?? 0} 词条 · 更新于 ${formatProjectDate(project.updated_at ?? project.created_at)}`
         if (displayMode === 'list') {
             return (
@@ -482,13 +482,24 @@ export default function MobileHome({
                 className="mobile-page__card mobile-project-card mobile-home-world-card"
                 title={project.name}
                 description={project.description || '你的世界在等你回来，继续补全新的角色、地点和事件。'}
-                image={image}
-                imageSlot={!image ? (
+                imageSlot={project.cover_path ? (
+                    <ProjectCoverImage
+                        projectId={project.id}
+                        coverPath={project.cover_path}
+                        alt={project.name}
+                        fallback={(
+                            <ProjectDefaultCover
+                                projectId={project.id}
+                                projectName={project.name}
+                            />
+                        )}
+                    />
+                ) : (
                     <ProjectDefaultCover
                         projectId={project.id}
                         projectName={project.name}
                     />
-                ) : undefined}
+                )}
                 imageHeight="8.5rem"
                 extraInfo={<span className="mobile-project-card__meta">{meta}</span>}
                 variant="shadow"

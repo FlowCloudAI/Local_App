@@ -16,11 +16,12 @@ import FcworldProgressDialog from '../../../features/projects/components/Fcworld
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
 import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
+import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {formatProjectDate} from '../../../features/projects/projectDisplay'
 import {MobileAddIcon} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileProjectList.css'
@@ -287,20 +288,30 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                         <div className="mobile-page__empty">没有匹配的项目</div>
                     ) : (
                         filtered.map(project => {
-                            const image = toProjectImageSrc(project.cover_path)
                             return (
                                 <Card
                                     key={project.id}
                                     className="mobile-page__card mobile-project-card"
                                     title={project.name}
                                     description={project.description || '暂无描述'}
-                                    image={image}
-                                    imageSlot={!image ? (
+                                    imageSlot={project.cover_path ? (
+                                        <ProjectCoverImage
+                                            projectId={project.id}
+                                            coverPath={project.cover_path}
+                                            alt={project.name}
+                                            fallback={(
+                                                <ProjectDefaultCover
+                                                    projectId={project.id}
+                                                    projectName={project.name}
+                                                />
+                                            )}
+                                        />
+                                    ) : (
                                         <ProjectDefaultCover
                                             projectId={project.id}
                                             projectName={project.name}
                                         />
-                                    ) : undefined}
+                                    )}
                                     imageHeight="8.5rem"
                                     extraInfo={
                                         <span className="mobile-project-card__meta">

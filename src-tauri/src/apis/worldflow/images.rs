@@ -8,6 +8,7 @@ use std::io::BufWriter;
 use crate::android_file_import::{copy_android_file_uri_to_dir, is_android_file_uri};
 
 const COVER_THUMB_MAX_EDGE: u32 = 640;
+const PROJECT_COVER_THUMB_MAX_EDGE: u32 = 1280;
 const COVER_THUMB_JPEG_QUALITY: u8 = 82;
 
 fn build_entry_images_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
@@ -81,6 +82,27 @@ pub(super) fn entry_cover_thumbnail_path(
     )))
 }
 
+fn project_cover_thumbnail_path(
+    paths: &PathsState,
+    project_id: &Uuid,
+    source_path: &Path,
+) -> Result<PathBuf, String> {
+    if is_valid_cover_thumbnail(source_path) {
+        return Ok(source_path.to_path_buf());
+    }
+    if source_path.as_os_str().is_empty() {
+        return Err("项目封面路径为空，无法生成缩略图".to_string());
+    }
+    if !source_path.exists() {
+        return Err(format!("项目封面文件不存在: {:?}", source_path));
+    }
+
+    Ok(build_entry_thumbnails_dir(paths, project_id)?.join(format!(
+        "project_cover_{:016x}.jpg",
+        cover_thumbnail_hash(source_path)
+    )))
+}
+
 fn is_valid_cover_thumbnail(path: &Path) -> bool {
     let is_jpeg = path
         .extension()
@@ -93,12 +115,11 @@ fn is_valid_cover_thumbnail(path: &Path) -> bool {
     is_jpeg && in_thumbs_dir && path.exists()
 }
 
-pub(super) fn create_entry_cover_thumbnail(
-    paths: &PathsState,
-    project_id: &Uuid,
+fn create_cover_thumbnail(
     source_path: &Path,
+    thumb_path: PathBuf,
+    max_edge: u32,
 ) -> Result<PathBuf, String> {
-    let thumb_path = entry_cover_thumbnail_path(paths, project_id, source_path)?;
     let thumbs_dir = thumb_path
         .parent()
         .ok_or_else(|| format!("无法解析缩略图目录: {:?}", thumb_path))?;
@@ -116,7 +137,7 @@ pub(super) fn create_entry_cover_thumbnail(
         return Err(format!("主图尺寸无效: {:?}", source_path));
     }
 
-    let scale = (COVER_THUMB_MAX_EDGE as f64 / width.max(height) as f64).min(1.0);
+    let scale = (max_edge as f64 / width.max(height) as f64).min(1.0);
     let target_width = ((width as f64 * scale).round() as u32).max(1);
     let target_height = ((height as f64 * scale).round() as u32).max(1);
     let resized = if target_width == width && target_height == height {
@@ -134,6 +155,27 @@ pub(super) fn create_entry_cover_thumbnail(
         .map_err(|e| format!("写入缩略图失败 {:?}: {}", thumb_path, e))?;
 
     Ok(thumb_path)
+}
+
+pub(super) fn create_entry_cover_thumbnail(
+    paths: &PathsState,
+    project_id: &Uuid,
+    source_path: &Path,
+) -> Result<PathBuf, String> {
+    let thumb_path = entry_cover_thumbnail_path(paths, project_id, source_path)?;
+    create_cover_thumbnail(source_path, thumb_path, COVER_THUMB_MAX_EDGE)
+}
+
+fn create_project_cover_thumbnail(
+    paths: &PathsState,
+    project_id: &Uuid,
+    source_path: &Path,
+) -> Result<PathBuf, String> {
+    let thumb_path = project_cover_thumbnail_path(paths, project_id, source_path)?;
+    if thumb_path == source_path {
+        return Ok(thumb_path);
+    }
+    create_cover_thumbnail(source_path, thumb_path, PROJECT_COVER_THUMB_MAX_EDGE)
 }
 
 pub(super) fn use_derived_cover_thumbnails(
@@ -510,6 +552,69 @@ pub async fn db_ensure_project_cover_thumbnails(
 }
 
 #[tauri::command]
+pub async fn db_ensure_project_cover_thumbnail(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, PathsState>,
+    project_id: String,
+) -> Result<Option<String>, String> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
+    let project = db
+        .get_project(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(source_path) = project.cover_image.map(PathBuf::from) else {
+        return Ok(None);
+    };
+    let thumb_path = match project_cover_thumbnail_path(paths.inner(), &project_id, &source_path) {
+        Ok(path) => path,
+        Err(error) => {
+            log::warn!(
+                "[cover_thumbnail] 无法派生项目封面缩略图路径: project_id={} path={:?} error={}",
+                project_id,
+                source_path,
+                error
+            );
+            return Ok(None);
+        }
+    };
+    if thumb_path.exists() {
+        return Ok(Some(thumb_path.to_string_lossy().to_string()));
+    }
+
+    let job_lock = {
+        let mut jobs = state.thumbnail_jobs.lock().await;
+        jobs.entry(thumb_path.clone())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    };
+    let guard = job_lock.lock().await;
+    if thumb_path.exists() {
+        drop(guard);
+        return Ok(Some(thumb_path.to_string_lossy().to_string()));
+    }
+
+    let paths_state = paths.inner().clone();
+    let source_path_for_task = source_path.clone();
+    let result = match tauri::async_runtime::spawn_blocking(move || {
+        create_project_cover_thumbnail(&paths_state, &project_id, &source_path_for_task)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            drop(guard);
+            clear_thumbnail_job(state.inner(), &thumb_path, &job_lock).await;
+            return Err(format!("生成项目封面缩略图任务失败: {error}"));
+        }
+    };
+
+    drop(guard);
+    clear_thumbnail_job(state.inner(), &thumb_path, &job_lock).await;
+    result.map(|path| Some(path.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
 pub async fn db_ensure_entry_cover_thumbnail(
     state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
@@ -576,4 +681,33 @@ pub async fn db_ensure_entry_cover_thumbnail(
     clear_thumbnail_job(state.inner(), &thumb_path, &job_lock).await;
 
     result.map(|path| Some(path.to_string_lossy().to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_cover_thumbnail_limits_long_edge() {
+        let temp = tempfile::tempdir().expect("应创建临时目录");
+        let project_id = Uuid::now_v7();
+        let project_images = temp
+            .path()
+            .join("images")
+            .join(project_id.to_string());
+        std::fs::create_dir_all(&project_images).expect("应创建项目图片目录");
+        let source_path = project_images.join("cover.png");
+        image::DynamicImage::new_rgb8(1600, 800)
+            .save(&source_path)
+            .expect("应写入测试封面");
+        let paths = PathsState {
+            db_path: temp.path().join("worldflow.db"),
+            plugins_path: temp.path().join("plugins"),
+        };
+
+        let thumbnail = create_project_cover_thumbnail(&paths, &project_id, &source_path)
+            .expect("应生成项目封面缩略图");
+
+        assert_eq!(image::image_dimensions(thumbnail).unwrap(), (1280, 640));
+    }
 }

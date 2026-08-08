@@ -660,6 +660,9 @@ export const import_remote_images = (projectId: string, urls: string[]) =>
 export const db_ensure_project_cover_thumbnails = (projectId: string) =>
     command<CoverThumbnailMigrationSummary>('db_ensure_project_cover_thumbnails', {projectId})
 
+export const db_ensure_project_cover_thumbnail = (projectId: string) =>
+    command<string | null>('db_ensure_project_cover_thumbnail', {projectId})
+
 export const db_ensure_entry_cover_thumbnail = (projectId: string, entryId: string) =>
     command<string | null>('db_ensure_entry_cover_thumbnail', {projectId, entryId})
 

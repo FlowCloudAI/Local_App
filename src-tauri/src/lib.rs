@@ -467,6 +467,7 @@ pub fn run() {
             db_optimize_fts,
             import_entry_images,
             db_ensure_entry_cover_thumbnail,
+            db_ensure_project_cover_thumbnail,
             db_ensure_project_cover_thumbnails,
             open_entry_image_path,
             // 标签模式

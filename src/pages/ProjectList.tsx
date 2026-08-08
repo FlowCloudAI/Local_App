@@ -27,6 +27,7 @@ import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
 import ProjectDefaultCover from '../features/projects/ProjectDefaultCover'
+import ProjectCoverImage from '../features/projects/components/ProjectCoverImage'
 import {useProjectImportController} from '../features/projects/hooks/useProjectImportController'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {invalidateProjectList, useProjectListStore} from '../features/projects/projectListStore'
@@ -51,7 +52,6 @@ import {
     buildProjectExportFileName,
     formatProjectDate,
     parseProjectDateMs,
-    toProjectImageSrc,
 } from '../features/projects/projectDisplay'
 import {formatProjectStatCount} from './projectListHomeModel'
 import '../shared/ui/layout/WorkspaceScaffold.css'
@@ -629,7 +629,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const resumeTarget = continueItem
     const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
     const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
-    const resumeCover = toProjectImageSrc(asOptionalString(resumeProject?.cover_path))
+    const resumeCoverPath = asOptionalString(resumeProject?.cover_path)
     const resumeEntry = resumeTarget?.type === 'entry' && continueKey
         ? entryByTargetKey.get(continueKey) ?? null
         : null
@@ -855,14 +855,27 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
                                         <Card
                                             className="project-home-resume-card"
-                                            image={resumeCover}
-                                            imageSlot={!resumeCover ? (
+                                            imageSlot={resumeCoverPath ? (
+                                                <ProjectCoverImage
+                                                    projectId={resumeProject?.id ?? resumeProjectId ?? resumeTarget.id}
+                                                    coverPath={resumeCoverPath}
+                                                    alt={resumeProject?.name ?? resumeTarget.title}
+                                                    eager
+                                                    fallback={(
+                                                        <ProjectDefaultCover
+                                                            projectId={resumeProject?.id ?? resumeTarget.id}
+                                                            projectName={resumeProject?.name ?? resumeTarget.title}
+                                                            variant="hero"
+                                                        />
+                                                    )}
+                                                />
+                                            ) : (
                                                 <ProjectDefaultCover
                                                     projectId={resumeProject?.id ?? resumeTarget.id}
                                                     projectName={resumeProject?.name ?? resumeTarget.title}
                                                     variant="hero"
                                                 />
-                                            ) : undefined}
+                                            )}
                                             imageHeight="var(--fc-home-resume-cover-height)"
                                             tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
                                             title={resumeTarget.title}
@@ -979,7 +992,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const coverPath = asOptionalString(project.cover_path)
                                         const updatedAt = asOptionalString(project.updated_at)
                                         const createdAt = asOptionalString(project.created_at)
-                                        const image = toProjectImageSrc(coverPath)
                                         const timestampLabel = formatProjectDate(updatedAt ?? createdAt)
                                         const isStarred = starredProjectIdSet.has(project.id)
                                         const stats = projectStatsById.get(project.id)
@@ -1003,13 +1015,24 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                         event.preventDefault()
                                                         onOpenProject?.(project)
                                                     }}
-                                                    image={image}
-                                                    imageSlot={!image ? (
+                                                    imageSlot={coverPath ? (
+                                                        <ProjectCoverImage
+                                                            projectId={project.id}
+                                                            coverPath={coverPath}
+                                                            alt={project.name}
+                                                            fallback={(
+                                                                <ProjectDefaultCover
+                                                                    projectId={project.id}
+                                                                    projectName={project.name}
+                                                                />
+                                                            )}
+                                                        />
+                                                    ) : (
                                                         <ProjectDefaultCover
                                                             projectId={project.id}
                                                             projectName={project.name}
                                                         />
-                                                    ) : undefined}
+                                                    )}
                                                     imageHeight="var(--fc-home-project-card-height)"
                                                     title={project.name}
                                                     tag={(

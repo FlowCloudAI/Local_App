@@ -176,6 +176,11 @@ const handlers: Record<string, (args: Args) => unknown> = {
         return project
     },
     db_get_project_stats: (args) => buildProjectStats(readString(args, 'projectId')),
+    db_ensure_project_cover_thumbnail: (args) => {
+        const projectId = readString(args, 'projectId')
+        const project = db.projects.find(item => item.id === projectId)
+        return project?.cover_path ?? project?.cover_image ?? null
+    },
 
     // ── 分类 ────────────────────────────────────────────────────────────────
     db_list_categories: (args) => {
