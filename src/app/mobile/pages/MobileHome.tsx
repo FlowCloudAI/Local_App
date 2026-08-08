@@ -458,7 +458,7 @@ export default function MobileHome({
         return (
             <Card
                 key={project.id}
-                className="mobile-page__card mobile-project-card mobile-home-world-card"
+                className="mobile-page__card mobile-home-world-card"
                 title={project.name}
                 description={countLabel}
                 imageSlot={project.cover_path ? (
@@ -471,7 +471,10 @@ export default function MobileHome({
                 ) : (
                     <ProjectDefaultCover projectId={project.id} projectName={project.name}/>
                 )}
-                imageHeight="5rem"
+                imageHeight="11.25rem"
+                contentAreaRatio={0.46}
+                overlayStartOpacity={0.06}
+                overlayEndOpacity={0.94}
                 extraInfo={recentEntry ? (
                     <button
                         type="button"
@@ -591,18 +594,19 @@ export default function MobileHome({
                         <span>{loadingWorlds ? '正在同步' : `${worldProjects.length} 个`}</span>
                     </div>
 
-                    <Input
-                        placeholder="搜索世界"
-                        value={searchText}
-                        onValueChange={value => {
-                            setSearchText(value)
-                            setWorldPage(1)
-                        }}
-                        className="mobile-home-worlds__search"
-                        radius="full"
-                        size="lg"
-                        allowClear
-                    />
+                    {projects.length > WORLD_PAGE_SIZE || searchText ? (
+                        <Input
+                            placeholder="搜索世界"
+                            value={searchText}
+                            onValueChange={value => {
+                                setSearchText(value)
+                                setWorldPage(1)
+                            }}
+                            className="mobile-home-worlds__search"
+                            radius="full"
+                            allowClear
+                        />
+                    ) : null}
 
                     {worldError && projects.length === 0 ? (
                         <div className="mobile-page__error" role="alert">

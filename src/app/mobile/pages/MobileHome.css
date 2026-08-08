@@ -22,6 +22,8 @@
 
 .mobile-home__title {
     margin: 0;
+    font-size: calc(var(--fc-font-size-title-sm) + var(--fc-space-sm));
+    line-height: 1.1;
 }
 
 .mobile-home__content {
@@ -108,10 +110,10 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.35rem;
-    border: var(--mobile-border);
-    border-radius: var(--fc-radius-full);
+    border: 1px dashed var(--fc-color-border);
+    border-radius: var(--mobile-radius-field);
     background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-control-soft);
+    box-shadow: none;
 }
 
 .mobile-home__idea-form .fc-input {
@@ -198,24 +200,17 @@
 }
 
 .mobile-home-world-card.fc-card {
-    --fc-card-media-height: 5rem;
-
     height: var(--mobile-home-world-card-height);
     min-height: var(--mobile-home-world-card-height);
-    border: var(--mobile-border-strong);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-card);
+    background: var(--fc-color-bg-tertiary);
+    box-shadow: var(--mobile-shadow-subtle);
     overflow: hidden;
 }
 
-.mobile-home-world-card.fc-card[data-has-media="true"]::before {
-    display: none;
-}
-
 .mobile-home-world-card .fc-card__image-wrapper {
-    flex: 0 0 5rem;
-    min-height: 5rem;
+    min-height: var(--mobile-home-world-card-height);
 }
 
 .mobile-home-world-card .fc-card__image {
@@ -223,24 +218,12 @@
 }
 
 .mobile-home-world-card .fc-card__content {
-    position: relative;
-    inset: auto;
-    display: flex;
-    flex: 1 1 auto;
-    justify-content: flex-start;
     gap: 0.2rem;
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    box-sizing: border-box;
     padding: 0.65rem 0.75rem 0.75rem;
-    background: var(--mobile-surface-raised);
-    color: var(--fc-color-text);
 }
 
 .mobile-home-world-card .fc-card__title {
     overflow: hidden;
-    color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
     font-weight: var(--mobile-font-weight-heading);
     text-overflow: ellipsis;
@@ -250,7 +233,6 @@
 .mobile-home-world-card .fc-card__description,
 .mobile-home-world-card .fc-card__extra-info {
     overflow: hidden;
-    color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     line-height: 1.35;
     text-overflow: ellipsis;
@@ -263,7 +245,6 @@
 
 .mobile-home-world-card .fc-card__extra-info {
     margin-top: 0;
-    color: var(--fc-color-text-tertiary);
     font-weight: var(--fc-font-weight-medium);
 }
 
@@ -288,7 +269,7 @@ button.mobile-home-world-card__recent {
 .mobile-home-world-card.fc-card--hoverable:hover,
 .mobile-home-world-card.fc-card--hoverable:active {
     transform: none;
-    box-shadow: var(--mobile-shadow-card);
+    box-shadow: var(--mobile-shadow-subtle);
 }
 
 .mobile-home-world-card.fc-card--hoverable:hover .fc-card__image {
@@ -337,10 +318,14 @@ button.mobile-home-world-card__recent {
 }
 
 .mobile-home__tip p {
+    display: -webkit-box;
+    overflow: hidden;
     margin: 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .mobile-home__tip button {
