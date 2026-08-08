@@ -159,9 +159,9 @@
 .project-home-resume-card.fc-card {
   --fc-card-overlay-background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--fc-gray-1000) 98%, transparent),
-    color-mix(in srgb, var(--fc-gray-1000) 94%, transparent) 48%,
-    color-mix(in srgb, var(--fc-gray-1000) 62%, transparent) 72%,
+    color-mix(in srgb, var(--fc-gray-1000) 90%, transparent),
+    color-mix(in srgb, var(--fc-gray-1000) 82%, transparent) 48%,
+    color-mix(in srgb, var(--fc-gray-1000) 38%, transparent) 72%,
     transparent 100%
   );
 
@@ -348,8 +348,8 @@
   --fc-card-overlay-background: linear-gradient(
     180deg,
     transparent,
-    color-mix(in srgb, var(--fc-gray-1000) 58%, transparent) 34%,
-    color-mix(in srgb, var(--fc-gray-1000) 96%, transparent)
+    color-mix(in srgb, var(--fc-gray-1000) 72%, transparent) 28%,
+    color-mix(in srgb, var(--fc-gray-1000) 98%, transparent)
   );
 
   height: 100%;
@@ -518,8 +518,8 @@
   .project-home-resume-card.fc-card {
     --fc-card-overlay-background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--fc-gray-1000) 72%, transparent),
-      color-mix(in srgb, var(--fc-gray-1000) 96%, transparent)
+      color-mix(in srgb, var(--fc-gray-1000) 52%, transparent),
+      color-mix(in srgb, var(--fc-gray-1000) 86%, transparent)
     );
   }
 
