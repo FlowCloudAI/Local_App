@@ -162,17 +162,7 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
             className="pe-entry-placeholder"
             style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
         >
-            <div className="pe-entry-placeholder__icon">
-                {entryType ? (
-                    <EntryTypeIcon entryType={entryType}
-                                   className="pe-entry-placeholder__type-icon"/>
-                ) : (
-                    <span className="pe-entry-placeholder__mark">{coverMark}</span>
-                )}
-            </div>
-            <div className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                {coverMark}
-            </div>
+            <span className="pe-entry-placeholder__mark">{coverMark}</span>
         </div>
     )
     const cardTag = isStarred || entryType ? (

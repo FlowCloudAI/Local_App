@@ -150,44 +150,13 @@
         );
 }
 
-.mobile-entry-card__placeholder-icon {
-    position: absolute;
-    z-index: 2;
-    top: var(--fc-space-lg);
-    left: var(--fc-space-lg);
-    width: 3rem;
-    height: 3rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--mobile-radius-field);
-    background: color-mix(in srgb, var(--mobile-entry-card-color) 16%, var(--fc-color-bg-elevated));
-    border: 1px solid color-mix(in srgb, var(--mobile-entry-card-color) 28%, transparent);
-    color: var(--mobile-entry-card-color);
-    box-shadow: var(--fc-shadow-xs);
-}
-
-.mobile-entry-card__placeholder-type-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-}
-
 .mobile-entry-card__placeholder-mark {
-    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
-    font-size: 1.7rem;
-    font-weight: var(--fc-font-weight-normal);
-    line-height: 1;
-}
-
-.mobile-entry-card__placeholder-ghost {
     position: absolute;
-    right: var(--fc-space-md);
-    bottom: calc(var(--fc-space-md) * -1);
     z-index: 1;
-    display: block;
-    color: color-mix(in srgb, var(--mobile-entry-card-color) 28%, transparent);
+    top: var(--fc-space-3xl);
+    right: var(--fc-space-lg);
+    color: color-mix(in srgb, var(--mobile-entry-card-color) 72%, var(--fc-color-text-on-primary));
+    opacity: 0.34;
     font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
     font-size: 4.75rem;
     font-weight: var(--fc-font-weight-normal);

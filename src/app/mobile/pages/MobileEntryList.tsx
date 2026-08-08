@@ -368,16 +368,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                             const coverMark = getMeaningfulCoverMark(entry.title)
                             const coverFallback = (
                                 <span className="mobile-entry-card__placeholder">
-                                    <span className="mobile-entry-card__placeholder-icon">
-                                        {et ? (
-                                            <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
-                                        ) : (
-                                            <span className="mobile-entry-card__placeholder-mark">{coverMark}</span>
-                                        )}
-                                    </span>
-                                    <span className="mobile-entry-card__placeholder-ghost">
-                                        {coverMark}
-                                    </span>
+                                    <span className="mobile-entry-card__placeholder-mark">{coverMark}</span>
                                 </span>
                             )
                             return (
