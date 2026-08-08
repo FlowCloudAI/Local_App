@@ -19,17 +19,8 @@
     object-fit: cover;
     border: var(--mobile-border-strong);
     border-radius: var(--mobile-radius-floating);
-    background: var(--mobile-surface-muted);
+    background-color: var(--mobile-surface-muted);
     box-shadow: var(--mobile-shadow-cover);
-}
-
-.mobile-project-home__cover--empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fc-color-primary);
-    font-size: 3rem;
-    font-weight: var(--mobile-font-weight-display);
 }
 
 .mobile-project-home__title-row {

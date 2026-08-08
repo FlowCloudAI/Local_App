@@ -1748,28 +1748,36 @@
 .pe-entry-placeholder {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     overflow: hidden;
     background:
-        radial-gradient(circle at 25% 25%, color-mix(in srgb, var(--entry-accent-color) 36%, transparent), transparent 28%),
-        linear-gradient(135deg, color-mix(in srgb, var(--entry-accent-color) 16%, var(--fc-color-bg-elevated)), var(--fc-color-bg-tertiary));
+        radial-gradient(
+            circle at 20% 10%,
+            color-mix(in srgb, var(--entry-accent-color) 28%, transparent),
+            transparent 48%
+        ),
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--entry-accent-color) 16%, var(--fc-color-bg-elevated)),
+            color-mix(in srgb, var(--entry-accent-color) 7%, var(--fc-color-bg-elevated))
+        );
 }
 
 .pe-entry-placeholder__icon {
-    position: relative;
-    z-index: 1;
-    width: 4.5rem;
-    height: 4.5rem;
+    position: absolute;
+    z-index: 2;
+    top: var(--fc-space-xl);
+    left: var(--fc-space-xl);
+    width: calc(var(--fc-space-3xl) + var(--fc-space-sm));
+    height: calc(var(--fc-space-3xl) + var(--fc-space-sm));
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1.4rem;
-    background: color-mix(in srgb, var(--entry-accent-color) 20%, color-mix(in srgb, var(--fc-color-text-on-primary) 14%, transparent));
-    border: 1px solid color-mix(in srgb, var(--entry-accent-color) 38%, color-mix(in srgb, var(--fc-color-text-on-primary) 20%, transparent));
-    color: var(--fc-color-text-on-primary);
-    box-shadow: var(--fc-shadow-lg);
+    border: 1px solid color-mix(in srgb, var(--entry-accent-color) 38%, transparent);
+    border-radius: var(--fc-radius-xl);
+    background: color-mix(in srgb, var(--entry-accent-color) 18%, var(--fc-color-bg-elevated));
+    color: var(--entry-accent-color);
+    box-shadow: var(--fc-shadow-xs);
 }
 
 .pe-entry-placeholder__type-icon {
@@ -1780,18 +1788,19 @@
 }
 
 .pe-entry-placeholder__mark {
-    font-size: clamp(2.6rem, 7vw, 3.8rem);
-    font-weight: 600;
+    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-size: clamp(2.4rem, 7vw, 3.4rem);
+    font-weight: var(--fc-font-weight-normal);
     line-height: 1;
-    color: var(--fc-color-text-on-primary);
+    color: var(--entry-accent-color);
 }
 
 .pe-entry-placeholder__mark--ghost {
     position: absolute;
-    right: 0.85rem;
-    bottom: 0.55rem;
-    z-index: 0;
+    right: var(--fc-space-lg);
+    bottom: calc(var(--fc-space-md) * -1);
+    z-index: 1;
     font-size: clamp(4.4rem, 11vw, 6.2rem);
-    color: color-mix(in srgb, var(--fc-color-text-on-primary) 8%, transparent);
+    color: color-mix(in srgb, var(--entry-accent-color) 26%, transparent);
     user-select: none;
 }

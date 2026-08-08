@@ -15,6 +15,7 @@ import {
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
+import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {type MobilePage} from '../usePageStack'
@@ -294,6 +295,12 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                                     title={project.name}
                                     description={project.description || '暂无描述'}
                                     image={image}
+                                    imageSlot={!image ? (
+                                        <ProjectDefaultCover
+                                            projectId={project.id}
+                                            projectName={project.name}
+                                        />
+                                    ) : undefined}
                                     imageHeight="8.5rem"
                                     extraInfo={
                                         <span className="mobile-project-card__meta">

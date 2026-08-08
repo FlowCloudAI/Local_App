@@ -1,0 +1,148 @@
+/* 项目默认封面的颜色仅引用 flowcloudai-ui 语义令牌；亮暗主题只调整线稿与题字透明度。 */
+
+.fc-default-cover {
+    --fc-default-cover-start: var(--fc-color-primary);
+    --fc-default-cover-end: var(--fc-color-purple);
+    --fc-default-cover-line-opacity: 0.28;
+    --fc-default-cover-mark-opacity: 0.23;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    isolation: isolate;
+    background:
+        linear-gradient(
+            90deg,
+            transparent 58%,
+            color-mix(in srgb, var(--fc-color-bg-overlay) 54%, transparent)
+        ),
+        radial-gradient(
+            circle at 14% 4%,
+            color-mix(in srgb, var(--fc-default-cover-start) 56%, var(--fc-color-text-on-primary)),
+            transparent 48%
+        ),
+        linear-gradient(118deg, var(--fc-default-cover-start), var(--fc-default-cover-end));
+    pointer-events: none;
+    user-select: none;
+}
+
+[data-theme="dark"] .fc-default-cover {
+    --fc-default-cover-line-opacity: 0.14;
+    --fc-default-cover-mark-opacity: 0.18;
+}
+
+.fc-default-cover[data-palette="0"] {
+    --fc-default-cover-start: var(--fc-color-warning);
+    --fc-default-cover-end: var(--fc-color-success);
+}
+
+.fc-default-cover[data-palette="1"] {
+    --fc-default-cover-start: var(--fc-color-orange);
+    --fc-default-cover-end: var(--fc-color-danger);
+}
+
+.fc-default-cover[data-palette="2"] {
+    --fc-default-cover-start: var(--fc-color-warning);
+    --fc-default-cover-end: var(--fc-color-orange);
+}
+
+.fc-default-cover[data-palette="3"] {
+    --fc-default-cover-start: var(--fc-color-pink);
+    --fc-default-cover-end: var(--fc-color-purple);
+}
+
+.fc-default-cover[data-palette="4"] {
+    --fc-default-cover-start: var(--fc-color-info);
+    --fc-default-cover-end: var(--fc-color-purple);
+}
+
+.fc-default-cover[data-palette="5"] {
+    --fc-default-cover-start: var(--fc-color-teal);
+    --fc-default-cover-end: var(--fc-color-success);
+}
+
+.fc-default-cover[data-palette="6"] {
+    --fc-default-cover-start: var(--fc-color-purple);
+    --fc-default-cover-end: var(--fc-color-primary);
+}
+
+.fc-default-cover[data-palette="7"] {
+    --fc-default-cover-start: var(--fc-color-danger);
+    --fc-default-cover-end: var(--fc-color-pink);
+}
+
+.fc-default-cover::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    background: var(--fc-color-text-on-primary);
+    opacity: var(--fc-default-cover-line-opacity);
+    mask-image: url("../../assets/default-cover-contours.svg");
+    mask-repeat: no-repeat;
+    mask-size: cover;
+    mask-position: center;
+}
+
+.fc-default-cover[data-composition="1"]::before {
+    mask-position: left center;
+}
+
+.fc-default-cover[data-composition="2"]::before {
+    mask-position: right center;
+}
+
+.fc-default-cover[data-composition="3"]::before {
+    mask-position: center 68%;
+}
+
+.fc-default-cover__mark {
+    position: absolute;
+    z-index: 2;
+    right: var(--fc-space-lg);
+    bottom: calc(var(--fc-space-sm) * -1);
+    color: var(--fc-color-text-on-primary);
+    opacity: var(--fc-default-cover-mark-opacity);
+    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-size: clamp(3.5rem, 6vw, 5rem);
+    font-weight: var(--fc-font-weight-normal);
+    line-height: 1;
+}
+
+.fc-default-cover__copy {
+    display: none;
+}
+
+.fc-default-cover--hero .fc-default-cover__copy {
+    position: absolute;
+    z-index: 3;
+    left: var(--fc-space-xl);
+    bottom: var(--fc-space-xl);
+    display: flex;
+    max-width: calc(100% - var(--fc-space-3xl));
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-on-primary);
+}
+
+.fc-default-cover--hero .fc-default-cover__copy small {
+    font-size: var(--fc-font-size-caption);
+    font-weight: var(--fc-font-weight-semibold);
+    letter-spacing: 0.08em;
+}
+
+.fc-default-cover--hero .fc-default-cover__copy strong {
+    overflow: hidden;
+    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-size: clamp(2rem, 7vw, 3rem);
+    font-weight: var(--fc-font-weight-normal);
+    line-height: var(--fc-line-height-tight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-default-cover--hero .fc-default-cover__mark {
+    right: var(--fc-space-xl);
+    bottom: calc(var(--fc-space-xl) * -1);
+    font-size: clamp(7rem, 18vw, 12rem);
+}

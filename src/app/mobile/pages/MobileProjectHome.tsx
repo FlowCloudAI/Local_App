@@ -404,6 +404,7 @@ export default function MobileProjectHome({
             )}
 
             <ProjectHomeHero
+                projectId={project.id}
                 projectName={project.name}
                 description={project.description}
                 image={image}

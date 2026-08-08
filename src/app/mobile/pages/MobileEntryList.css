@@ -135,16 +135,26 @@
 
 .mobile-entry-card__placeholder {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     overflow: hidden;
-    background: color-mix(in srgb, var(--mobile-entry-card-color) 14%, var(--fc-color-bg-secondary));
+    background:
+        radial-gradient(
+            circle at 20% 10%,
+            color-mix(in srgb, var(--mobile-entry-card-color) 26%, transparent),
+            transparent 48%
+        ),
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--mobile-entry-card-color) 15%, var(--fc-color-bg-elevated)),
+            color-mix(in srgb, var(--mobile-entry-card-color) 6%, var(--fc-color-bg-elevated))
+        );
 }
 
 .mobile-entry-card__placeholder-icon {
-    position: relative;
-    z-index: 1;
+    position: absolute;
+    z-index: 2;
+    top: var(--fc-space-lg);
+    left: var(--fc-space-lg);
     width: 3rem;
     height: 3rem;
     display: inline-flex;
@@ -165,13 +175,24 @@
 }
 
 .mobile-entry-card__placeholder-mark {
+    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
     font-size: 1.7rem;
-    font-weight: var(--fc-font-weight-semibold);
+    font-weight: var(--fc-font-weight-normal);
     line-height: 1;
 }
 
 .mobile-entry-card__placeholder-ghost {
-    display: none;
+    position: absolute;
+    right: var(--fc-space-md);
+    bottom: calc(var(--fc-space-md) * -1);
+    z-index: 1;
+    display: block;
+    color: color-mix(in srgb, var(--mobile-entry-card-color) 28%, transparent);
+    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-size: 4.75rem;
+    font-weight: var(--fc-font-weight-normal);
+    line-height: 1;
+    user-select: none;
 }
 
 .mobile-entry-card .fc-card__tag {

@@ -26,6 +26,7 @@ import {saveAppSettings} from '../features/settings/appSettingsStore'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
+import ProjectDefaultCover from '../features/projects/ProjectDefaultCover'
 import {useProjectImportController} from '../features/projects/hooks/useProjectImportController'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {invalidateProjectList, useProjectListStore} from '../features/projects/projectListStore'
@@ -856,7 +857,11 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                             className="project-home-resume-card"
                                             image={resumeCover}
                                             imageSlot={!resumeCover ? (
-                                                <div className="project-home-resume-placeholder" aria-hidden="true" />
+                                                <ProjectDefaultCover
+                                                    projectId={resumeProject?.id ?? resumeTarget.id}
+                                                    projectName={resumeProject?.name ?? resumeTarget.title}
+                                                    variant="hero"
+                                                />
                                             ) : undefined}
                                             imageHeight="var(--fc-home-resume-cover-height)"
                                             tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
@@ -1000,8 +1005,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                     }}
                                                     image={image}
                                                     imageSlot={!image ? (
-                                                        <div className="project-list-placeholder">
-                                                        </div>
+                                                        <ProjectDefaultCover
+                                                            projectId={project.id}
+                                                            projectName={project.name}
+                                                        />
                                                     ) : undefined}
                                                     imageHeight="var(--fc-home-project-card-height)"
                                                     title={project.name}

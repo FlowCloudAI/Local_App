@@ -27,6 +27,7 @@ import {saveAppSettings} from '../../../settings/appSettingsStore'
 import EntryCoverImage from '../../../entries/components/EntryCoverImage'
 import {buildInternalEntryMarkdown} from '../../../entries/lib/entryMarkdown'
 import {RenameDialog} from '../../../../shared/ui/overlay'
+import {getMeaningfulCoverMark} from '../../../../shared/lib/defaultCover'
 import EntryTypeIcon from '../EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
@@ -83,11 +84,6 @@ function formatDate(s?: string | null): string {
         hour: '2-digit',
         minute: '2-digit',
     }).format(ms)
-}
-
-function placeholderMark(title: string): string {
-    const trimmed = title.trim()
-    return trimmed ? trimmed[0] : '词'
 }
 
 function normalizeStarredEntryIds(entryIds: string[] | null | undefined) {
@@ -160,6 +156,7 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
             },
         }
         : undefined
+    const coverMark = getMeaningfulCoverMark(entry.title)
     const coverFallback = (
         <div
             className="pe-entry-placeholder"
@@ -170,11 +167,11 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
                     <EntryTypeIcon entryType={entryType}
                                    className="pe-entry-placeholder__type-icon"/>
                 ) : (
-                    <span className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
+                    <span className="pe-entry-placeholder__mark">{coverMark}</span>
                 )}
             </div>
             <div className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                {placeholderMark(entry.title)}
+                {coverMark}
             </div>
         </div>
     )

@@ -17,6 +17,7 @@ import EntryTypeIcon from '../../../features/project-editor/components/EntryType
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
+import {getMeaningfulCoverMark} from '../../../shared/lib/defaultCover'
 import {MobileAddIcon, MobileBackIcon, MobileMenuIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileEntryList.css'
@@ -39,11 +40,6 @@ function formatDate(s?: string | null): string {
     return Number.isNaN(t) ? '未知' : new Intl.DateTimeFormat('zh-CN', {
         month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }).format(t)
-}
-
-function placeholderMark(title: string): string {
-    const trimmed = title.trim()
-    return trimmed ? trimmed[0] : '词'
 }
 
 /** 首屏与每次「加载更多」的页大小。 */
@@ -369,17 +365,18 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                       */}
                     {entries.map(entry => {
                             const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
+                            const coverMark = getMeaningfulCoverMark(entry.title)
                             const coverFallback = (
                                 <span className="mobile-entry-card__placeholder">
                                     <span className="mobile-entry-card__placeholder-icon">
                                         {et ? (
                                             <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
                                         ) : (
-                                            <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
+                                            <span className="mobile-entry-card__placeholder-mark">{coverMark}</span>
                                         )}
                                     </span>
                                     <span className="mobile-entry-card__placeholder-ghost">
-                                        {placeholderMark(entry.title)}
+                                        {coverMark}
                                     </span>
                                 </span>
                             )

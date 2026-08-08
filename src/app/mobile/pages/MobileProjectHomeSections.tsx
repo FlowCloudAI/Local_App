@@ -1,5 +1,6 @@
 import {Button} from 'flowcloudai-ui'
 import {formatProjectDate} from '../../../features/projects/projectDisplay'
+import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
 import {MobileAddIcon} from '../components/MobileTopControls'
 
 export interface ProjectHomeStatItem {
@@ -15,6 +16,7 @@ export interface ProjectHomeTool {
 }
 
 interface ProjectHomeHeroProps {
+    projectId: string
     projectName: string
     description?: string | null
     image?: string
@@ -25,6 +27,7 @@ interface ProjectHomeHeroProps {
 }
 
 export function ProjectHomeHero({
+    projectId,
     projectName,
     description,
     image,
@@ -42,9 +45,12 @@ export function ProjectHomeHero({
                     className="mobile-project-home__cover"
                 />
             ) : (
-                <div className="mobile-project-home__cover mobile-project-home__cover--empty">
-                    {projectName.trim()[0] ?? '世'}
-                </div>
+                <ProjectDefaultCover
+                    className="mobile-project-home__cover"
+                    projectId={projectId}
+                    projectName={projectName}
+                    variant="hero"
+                />
             )}
             <div className="mobile-project-home__title-row">
                 <div className="mobile-project-home__title-copy">

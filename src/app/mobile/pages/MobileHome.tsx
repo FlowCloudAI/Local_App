@@ -19,6 +19,7 @@ import {
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
+import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
 import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {
@@ -482,6 +483,12 @@ export default function MobileHome({
                 title={project.name}
                 description={project.description || '你的世界在等你回来，继续补全新的角色、地点和事件。'}
                 image={image}
+                imageSlot={!image ? (
+                    <ProjectDefaultCover
+                        projectId={project.id}
+                        projectName={project.name}
+                    />
+                ) : undefined}
                 imageHeight="8.5rem"
                 extraInfo={<span className="mobile-project-card__meta">{meta}</span>}
                 variant="shadow"
