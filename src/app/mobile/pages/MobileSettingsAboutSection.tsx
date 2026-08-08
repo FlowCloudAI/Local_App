@@ -1,5 +1,7 @@
 import {Button} from 'flowcloudai-ui'
+import {useState} from 'react'
 import {type AppLogSnapshot} from '../../../api'
+import FontLicenseModal from '../../../features/about/FontLicenseModal'
 
 interface AboutSectionProps {
     version: string
@@ -95,6 +97,8 @@ export default function MobileSettingsAboutSection({
     onCopyOfficialEmail,
     onExit,
 }: AboutSectionProps) {
+    const [fontLicenseModalOpen, setFontLicenseModalOpen] = useState(false)
+
     return (
         <div className="mobile-settings-section">
             <div className="mobile-settings-about-card">
@@ -168,6 +172,23 @@ export default function MobileSettingsAboutSection({
                         </span>
                     </Button>
                 </div>
+                <div className="mobile-settings-about-action">
+                    <div className="mobile-settings-about-action__copy">
+                        <span className="mobile-settings-about-action__title">字体版权与授权</span>
+                        <span className="mobile-settings-about-action__desc">
+                            Noto CJK、霞鹜文楷 · SIL Open Font License 1.1
+                        </span>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        radius="full"
+                        onClick={() => setFontLicenseModalOpen(true)}
+                    >
+                        查看
+                    </Button>
+                </div>
             </div>
             {logViewerOpen && (
                 <div className="mobile-settings-log-viewer">
@@ -232,6 +253,7 @@ export default function MobileSettingsAboutSection({
             >
                 退出应用
             </Button>
+            <FontLicenseModal open={fontLicenseModalOpen} onClose={() => setFontLicenseModalOpen(false)}/>
         </div>
     )
 }

@@ -6,6 +6,7 @@ import {check, type DownloadEvent, type Update} from '@tauri-apps/plugin-updater
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {submit_public_feedback, type PublicFeedbackPayload} from '../../api/feedback'
 import {logger} from '../../shared/logger'
+import FontLicenseModal from './FontLicenseModal'
 import LicenseModal from './LicenseModal'
 import githubInvertocat from './assets/github-invertocat.png'
 import './AboutSection.css'
@@ -56,6 +57,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
     const {showAlert} = useAlert()
     const [appVersion, setAppVersion] = useState<string>('')
     const [licenseModalOpen, setLicenseModalOpen] = useState(false)
+    const [fontLicenseModalOpen, setFontLicenseModalOpen] = useState(false)
     const [feedbackKind, setFeedbackKind] = useState<PublicFeedbackPayload['kind']>('suggestion')
     const [feedbackTitle, setFeedbackTitle] = useState('')
     const [feedbackContent, setFeedbackContent] = useState('')
@@ -357,6 +359,17 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 </div>
                 <div className="about-section-action-row">
                     <div className="about-section-action-copy">
+                        <span className="about-section-action-title">字体版权与授权</span>
+                        <span className="about-section-action-desc">
+                            查看 Noto CJK、霞鹜文楷的版权、使用范围及完整 OFL 1.1。
+                        </span>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setFontLicenseModalOpen(true)}>
+                        查看
+                    </Button>
+                </div>
+                <div className="about-section-action-row">
+                    <div className="about-section-action-copy">
                         <span className="about-section-action-title">日志目录</span>
                         <span className="about-section-action-desc">
                             app.log 位于配置目录内，仅 release 构建写入。
@@ -430,6 +443,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 </div>
             </section>
             <LicenseModal open={licenseModalOpen} onClose={() => setLicenseModalOpen(false)}/>
+            <FontLicenseModal open={fontLicenseModalOpen} onClose={() => setFontLicenseModalOpen(false)}/>
         </>
     )
 }

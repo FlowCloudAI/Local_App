@@ -70,6 +70,60 @@
     text-align: justify;
 }
 
+.font-license-modal-terms {
+    display: grid;
+    gap: var(--fc-space-sm);
+    margin: 0;
+    padding-left: var(--fc-space-xl);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-control, 0.875rem);
+    line-height: 1.7;
+}
+
+.font-license-modal-copy {
+    display: grid;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-control, 0.875rem);
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.font-license-modal-copy p {
+    margin: 0;
+}
+
+.font-license-modal-copy strong {
+    color: var(--fc-color-text);
+}
+
+.font-license-modal-details {
+    margin-top: var(--fc-space-md);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-control, 0.875rem);
+}
+
+.font-license-modal-details summary {
+    color: var(--fc-color-primary);
+    cursor: pointer;
+}
+
+.font-license-modal-license-text {
+    max-height: 18rem;
+    margin: var(--fc-space-sm) 0 0;
+    padding: var(--fc-space-md);
+    overflow: auto;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text-secondary);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .license-modal-footer {
     display: flex;
     justify-content: flex-end;

@@ -4,19 +4,22 @@
 
 ## Noto Sans CJK
 
-- 文件：`noto-sans-cjk/NotoSansSC-VF.ttf`、`NotoSansTC-VF.ttf`、`NotoSansJP-VF.ttf`
+- 文件：`noto-sans-cjk/NotoSansSC-VF.ttf`、`NotoSansTC-VF.ttf`、`NotoSansJP-VF.ttf` 及对应 `.woff2`
+- 版权：© 2014–2021 Adobe；保留字体名称 `Source`
 - 来源：https://github.com/notofonts/noto-cjk
 - 许可：SIL Open Font License 1.1，完整文本见 `noto-sans-cjk/OFL.txt`
 
 ## Noto Serif CJK
 
-- 文件：`noto-serif-cjk/NotoSerifSC-VF.ttf`、`NotoSerifTC-VF.ttf`、`NotoSerifJP-VF.ttf`
+- 文件：`noto-serif-cjk/NotoSerifSC-VF.ttf`、`NotoSerifTC-VF.ttf`、`NotoSerifJP-VF.ttf` 及对应 `.woff2`
+- 版权：© 2017–2024 Adobe；`Noto` 是 Google Inc. 的商标
 - 来源：https://github.com/notofonts/noto-cjk
 - 许可：SIL Open Font License 1.1，完整文本见 `noto-serif-cjk/OFL.txt`
 
 ## LXGW WenKai / 霞鹜文楷
 
-- 文件：`lxgw-wenkai/LXGWWenKai-Regular.ttf`
+- 文件：`lxgw-wenkai/LXGWWenKai-Regular.ttf`、`LXGWWenKai-Regular.woff2`
+- 版权：© 2021–2026 LXGW；© 2020 The Klee Project Authors
 - 来源：https://github.com/lxgw/LxgwWenKai
 - 许可：SIL Open Font License 1.1，完整文本及保留名称、网页字体格式转换附加许可见 `lxgw-wenkai/OFL.txt`
 
