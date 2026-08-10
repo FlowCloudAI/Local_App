@@ -10,10 +10,24 @@ import type {
     PixiLocationIconAsset,
     PixiLocationIconSet,
 } from '../types'
+import tolkienHill1Url from './terrain/tolkien/hill-1.png'
+import tolkienHill2Url from './terrain/tolkien/hill-2.png'
+import tolkienHill3Url from './terrain/tolkien/hill-3.png'
+import tolkienMountain1Url from './terrain/tolkien/mountain-1.png'
+import tolkienMountain2Url from './terrain/tolkien/mountain-2.png'
+import tolkienMountain3Url from './terrain/tolkien/mountain-3.png'
+import tolkienTree1Url from './terrain/tolkien/tree-1.png'
+import tolkienTree2Url from './terrain/tolkien/tree-2.png'
+import tolkienTree3Url from './terrain/tolkien/tree-3.png'
 
 export type PixiCompassAssetId = 'tolkien-compass' | 'ink-minimal-compass'
 export type PixiBrushAssetId = 'tolkien-coastline' | 'ink-boundary'
-export type PixiTerrainSymbolAssetId = 'flat-mountain' | 'tolkien-mountain' | 'ink-mountain'
+export type PixiTerrainSymbolAssetId =
+    | 'flat-mountain'
+    | 'tolkien-mountain'
+    | 'tolkien-hill'
+    | 'tolkien-tree'
+    | 'ink-mountain'
 
 export interface PixiTerrainSymbolAsset {
     url: string
@@ -21,6 +35,30 @@ export interface PixiTerrainSymbolAsset {
     height: number
     anchorX: number
     anchorY: number
+}
+
+type PixiTerrainSymbolVariants = readonly [
+    PixiTerrainSymbolAsset,
+    PixiTerrainSymbolAsset,
+    PixiTerrainSymbolAsset,
+]
+
+const TOLKIEN_TERRAIN_SYMBOL_ASSETS: Partial<Record<PixiTerrainSymbolAssetId, PixiTerrainSymbolVariants>> = {
+    'tolkien-mountain': [
+        {url: tolkienMountain1Url, width: 512, height: 512, anchorX: 256, anchorY: 447},
+        {url: tolkienMountain2Url, width: 512, height: 512, anchorX: 256, anchorY: 487},
+        {url: tolkienMountain3Url, width: 512, height: 512, anchorX: 256, anchorY: 469},
+    ],
+    'tolkien-hill': [
+        {url: tolkienHill1Url, width: 512, height: 512, anchorX: 256, anchorY: 512},
+        {url: tolkienHill2Url, width: 512, height: 512, anchorX: 256, anchorY: 512},
+        {url: tolkienHill3Url, width: 512, height: 512, anchorX: 256, anchorY: 503},
+    ],
+    'tolkien-tree': [
+        {url: tolkienTree1Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
+        {url: tolkienTree2Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
+        {url: tolkienTree3Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
+    ],
 }
 
 interface PixiLocationIconAssetInput {
@@ -72,6 +110,8 @@ export function buildPixiTerrainSymbolAsset(
     variant: number,
 ): PixiTerrainSymbolAsset {
     const normalizedVariant = Math.abs(Math.round(variant)) % 3
+    const imageVariants = TOLKIEN_TERRAIN_SYMBOL_ASSETS[asset]
+    if (imageVariants) return imageVariants[normalizedVariant]
 
     if (asset === 'flat-mountain') {
         const peaks = [
@@ -88,25 +128,6 @@ export function buildPixiTerrainSymbolAsset(
             height: 32,
             anchorX: 23,
             anchorY: 29,
-        }
-    }
-
-    if (asset === 'tolkien-mountain') {
-        const peaks = [
-            'M3 37L14 22L20 10L28 24L34 16L47 37',
-            'M3 37L12 26L19 15L25 24L32 8L47 37',
-            'M3 37L13 19L21 27L29 12L36 23L47 37',
-        ][normalizedVariant]
-        return {
-            url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="50" height="40" viewBox="0 0 50 40">
-                <path d="${peaks}" fill="#ead8ac" fill-opacity="0.58" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M6 37C14 34 18 38 25 35C33 32 39 38 46 35" fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" stroke-opacity="0.62"/>
-                <path d="M15 22L20 10L24 22M27 24L34 16L38 28" fill="none" stroke="${color}" stroke-width="0.85" stroke-linecap="round" stroke-opacity="0.48"/>
-            </svg>`),
-            width: 50,
-            height: 40,
-            anchorX: 25,
-            anchorY: 36,
         }
     }
 

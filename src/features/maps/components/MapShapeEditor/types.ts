@@ -80,6 +80,8 @@ export const MAP_TERRAIN_KINDS = [
     {id: 'grass', label: '草地', semanticColor: '#82b45f', renderLayer: 'field', order: 0},
     {id: 'mountain', label: '高山', semanticColor: '#8a7868', renderLayer: 'field', order: 1},
     {id: 'desert', label: '沙漠', semanticColor: '#d8b067', renderLayer: 'field', order: 2},
+    {id: 'hill', label: '丘陵', semanticColor: '#9a8c72', renderLayer: 'field', order: 3},
+    {id: 'forest', label: '森林', semanticColor: '#55704b', renderLayer: 'field', order: 4},
 ] as const satisfies ReadonlyArray<MapTerrainKindDef>;
 
 function assertMapTerrainKindRegistry(definitions: ReadonlyArray<MapTerrainKindDef>): void {

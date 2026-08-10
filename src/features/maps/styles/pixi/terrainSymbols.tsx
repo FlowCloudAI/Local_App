@@ -20,6 +20,8 @@ extend({Sprite})
 const TERRAIN_SYMBOL_ASSETS = new Set<PixiTerrainSymbolAssetId>([
     'flat-mountain',
     'tolkien-mountain',
+    'tolkien-hill',
+    'tolkien-tree',
     'ink-mountain',
 ])
 

@@ -124,6 +124,22 @@ export const inkPixiMapStyle: PixiMapStyle = {
                         patternOpacity: 0.32,
                         patternScale: 28,
                     },
+                    hill: {
+                        color: '#77736a',
+                        detailColor: '#55524c',
+                        baseOpacity: 0.06,
+                        pattern: 'none',
+                        patternOpacity: 0,
+                        patternScale: 26,
+                    },
+                    forest: {
+                        color: '#687369',
+                        detailColor: '#465449',
+                        baseOpacity: 0.08,
+                        pattern: 'ink-grass',
+                        patternOpacity: 0.2,
+                        patternScale: 22,
+                    },
                 },
                 symbols: {
                     mountain: {

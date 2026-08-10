@@ -69,6 +69,22 @@ export const flatPixiMapStyle: PixiMapStyle = {
                         patternOpacity: 0.24,
                         patternScale: 18,
                     },
+                    hill: {
+                        color: '#a69a78',
+                        detailColor: '#807454',
+                        baseOpacity: 1,
+                        pattern: 'flat-mountain',
+                        patternOpacity: 0.08,
+                        patternScale: 26,
+                    },
+                    forest: {
+                        color: '#5f8158',
+                        detailColor: '#456640',
+                        baseOpacity: 1,
+                        pattern: 'flat-grass',
+                        patternOpacity: 0.24,
+                        patternScale: 20,
+                    },
                 },
                 symbols: {
                     mountain: {
