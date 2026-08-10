@@ -225,12 +225,11 @@ pub struct MapShapeDraft {
 pub struct MapKeyLocationDraft {
     pub id: String,
     pub name: String,
-    pub r#type: String,
     pub x: f64,
     pub y: f64,
-    /// 风格无关的地点显示语义；旧数据缺省时由前端按 type 推断。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub marker_class: Option<String>,
+    /// 风格无关的地点显示语义；旧请求缺省时按普通标记点处理。
+    #[serde(default = "default_map_marker_class")]
+    pub marker_class: String,
     /// 旧数据兼容字段；关键地点归属图形由空间包含关系派生，不再要求显式关联。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape_id: Option<String>,
@@ -318,10 +317,9 @@ pub struct MapPreviewShape {
 pub struct MapPreviewKeyLocation {
     pub id: String,
     pub name: String,
-    pub r#type: String,
     pub position: [f64; 2],
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub marker_class: Option<String>,
+    #[serde(default = "default_map_marker_class")]
+    pub marker_class: String,
     /// 旧数据兼容字段；渲染与编辑不再要求显式关联。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape_id: Option<String>,
@@ -342,6 +340,10 @@ pub struct MapPreviewScene {
     pub terrain_strokes: Vec<MapTerrainStroke>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ext: Option<serde_json::Value>,
+}
+
+fn default_map_marker_class() -> String {
+    "marker".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

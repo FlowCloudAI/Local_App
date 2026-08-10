@@ -111,7 +111,7 @@ function matchTextByRule(value: string, pattern?: string, includes?: string[]): 
 }
 
 function matchLabelRule(location: MapPreviewKeyLocation, rule: PixiLabelRule): boolean {
-    return matchTextByRule(location.type, rule.typePattern, rule.typeIncludes)
+    return Boolean(rule.markerClasses?.includes(location.markerClass))
         || matchTextByRule(location.name, rule.namePattern, rule.nameIncludes)
 }
 

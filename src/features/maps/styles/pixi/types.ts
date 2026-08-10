@@ -51,15 +51,12 @@ export interface PixiCoastlineStyle {
 }
 
 export interface PixiLocationColorRule {
-    typePattern?: string
-    typeIncludes?: string[]
+    markerClasses: MapMarkerClass[]
     color: string
     opacity?: number
 }
 
 export interface PixiLocationIconRule {
-    typePattern?: string
-    typeIncludes?: string[]
     iconSet: PixiLocationIconSet
     asset?: PixiLocationIconAsset
     color?: string
@@ -75,14 +72,12 @@ export interface PixiLocationStyle {
         iconSize?: number
     }
     colorRules?: PixiLocationColorRule[]
-    iconRules?: PixiLocationIconRule[]
     markerAssets?: Record<MapMarkerClass, PixiLocationIconRule>
     iconSet?: PixiLocationIconSet
 }
 
 export interface PixiLabelRule {
-    typePattern?: string
-    typeIncludes?: string[]
+    markerClasses?: MapMarkerClass[]
     namePattern?: string
     nameIncludes?: string[]
     color?: string

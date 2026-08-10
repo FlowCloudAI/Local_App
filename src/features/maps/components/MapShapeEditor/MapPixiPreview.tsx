@@ -762,7 +762,7 @@ function getDefaultTooltip(detail: MapPreviewPickDetail): MapPreviewTooltip | nu
         return {text: `图形：${detail.object.name}`};
     }
 
-    return {text: `关键地点：${detail.object.name}\n类型：${detail.object.type}`};
+    return {text: `关键地点：${detail.object.name}`};
 }
 
 function getEventScreenPoint(event: FederatedPointerEvent): { x: number; y: number } {

@@ -43,6 +43,8 @@ test('跳过损坏地图并从草稿反查词条地点', () => {
     assert.equal(binding?.mapId, 'world')
     assert.equal(binding?.locationName, '赤岩峡谷')
     assert.deepEqual(binding?.marker.position, [819.8, 487.3])
+    assert.equal(binding?.marker.markerClass, 'marker')
+    assert.equal('type' in binding.marker, false)
     assert.equal(binding?.scene.shapes[0]?.id, 'land')
     assert.deepEqual(binding?.scene.keyLocations, [])
     assert.equal(findEntryMapBinding([], 'entry-1'), null)

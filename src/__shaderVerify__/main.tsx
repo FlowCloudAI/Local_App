@@ -220,10 +220,10 @@ const baseScene: MapPreviewScene = {
         },
     ],
     keyLocations: [
-        {id: 'loc-1', name: '晨风王都', type: '王都', position: [320, 260], color: [106, 67, 37, 255]},
-        {id: 'loc-2', name: '雾湾村', type: '村庄', position: [420, 380], color: [106, 67, 37, 255]},
-        {id: 'loc-3', name: '古神殿', type: '遗迹', position: [640, 170], color: [106, 67, 37, 255]},
-        {id: 'loc-4', name: '南礁港', type: '港口', position: [618, 462], color: [106, 67, 37, 255]},
+        {id: 'loc-1', name: '晨风王都', markerClass: 'major-city', position: [320, 260], color: [106, 67, 37, 255]},
+        {id: 'loc-2', name: '雾湾村', markerClass: 'town', position: [420, 380], color: [106, 67, 37, 255]},
+        {id: 'loc-3', name: '古神殿', markerClass: 'ruin', position: [640, 170], color: [106, 67, 37, 255]},
+        {id: 'loc-4', name: '南礁港', markerClass: 'harbor', position: [618, 462], color: [106, 67, 37, 255]},
     ],
     terrainStrokes: [
         {id: 'terrain-grass', kind: 'grass', points: [[230, 270], [300, 230], [370, 250]], radius: 58, mode: 'paint'},
@@ -267,7 +267,7 @@ const initialDraft: MapShapeEditorDraft = {
     keyLocations: baseScene.keyLocations.map(location => ({
         id: location.id,
         name: location.name,
-        type: location.type,
+        markerClass: location.markerClass,
         x: location.position[0],
         y: location.position[1],
     })),

@@ -87,7 +87,7 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
         haloWidth: 4,
         rules: [
             {
-                typePattern: '城|都|王都|京|要塞|港',
+                markerClasses: ['major-city', 'city', 'harbor'],
                 fontWeight: '700',
                 color: '#4f321b',
             },

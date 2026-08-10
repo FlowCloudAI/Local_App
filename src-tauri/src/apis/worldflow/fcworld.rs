@@ -3236,7 +3236,7 @@ mod tests {
             "keyLocations": [{
                 "id": "loc-1",
                 "name": "地点",
-                "type": "城市",
+                "markerClass": "city",
                 "x": 10,
                 "y": 20,
                 "bizId": target.id.to_string(),
@@ -3250,7 +3250,7 @@ mod tests {
             "keyLocations": [{
                 "id": "loc-1",
                 "name": "地点",
-                "type": "城市",
+                "markerClass": "city",
                 "position": [10, 20],
                 "color": [255, 0, 0, 255],
                 "bizId": target.id.to_string(),

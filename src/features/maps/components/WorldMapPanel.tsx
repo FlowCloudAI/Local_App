@@ -16,9 +16,9 @@ import {
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
     createMapShapeEditorLocalId,
-    inferMapMarkerClass,
     MAP_MARKER_CLASS_OPTIONS,
     MAP_TERRAIN_KIND_OPTIONS,
+    normalizeMapEditorDraft,
     type MapShapeSvgEditorLocationContextMenuDetail,
     type MapShapeSvgEditorShapeContextMenuDetail,
     type MapShapeSvgEditorVertexContextMenuDetail,
@@ -615,7 +615,7 @@ export default function WorldMapPanel({
     const loadMapData = useCallback((entry: MapEntry) => {
         let nextDraft = emptyDraft()
         try {
-            nextDraft = JSON.parse(entry.draftJson) as MapShapeEditorDraft
+            nextDraft = normalizeMapEditorDraft(JSON.parse(entry.draftJson) as MapShapeEditorDraft)
         } catch {
             // 保留空草稿
         }
@@ -1073,10 +1073,10 @@ export default function WorldMapPanel({
         setDrawingShape(ds => ds ? {...ds, [field]: value} : ds)
     }, [])
 
-    const updateSelectedLocation = useCallback((field: 'name' | 'type', value: string) => {
+    const updateSelectedLocation = useCallback((value: string) => {
         updateDraft(d => ({
             ...d,
-            keyLocations: d.keyLocations.map(l => (l.id === selectedLocationId ? {...l, [field]: value} : l)),
+            keyLocations: d.keyLocations.map(l => (l.id === selectedLocationId ? {...l, name: value} : l)),
         }))
     }, [selectedLocationId, updateDraft])
 
@@ -1203,7 +1203,6 @@ export default function WorldMapPanel({
         const loc: MapKeyLocationDraft = {
             id: createMapShapeEditorLocalId('loc'),
             name: `地点 ${draft.keyLocations.length + 1}`,
-            type: '标记点',
             markerClass: 'marker',
             x: cx,
             y: cy,
@@ -1405,9 +1404,7 @@ export default function WorldMapPanel({
 
     const selectedShape = draft.shapes.find(s => s.id === selectedShapeId) ?? null
     const selectedLocation = draft.keyLocations.find(l => l.id === selectedLocationId) ?? null
-    const selectedMarkerClass = selectedLocation
-        ? selectedLocation.markerClass ?? inferMapMarkerClass(selectedLocation.type)
-        : null
+    const selectedMarkerClass = selectedLocation?.markerClass ?? null
     const markerClassOptions = useMemo(() => {
         const pixiStyle = getPixiMapStyle(style)
         return MAP_MARKER_CLASS_OPTIONS.map(option => {
@@ -1416,7 +1413,6 @@ export default function WorldMapPanel({
             const icon = iconSet ? buildPixiLocationIconAsset({
                 iconSet,
                 asset: asset?.asset ?? option.value,
-                type: option.label,
                 color: asset?.color ?? pixiStyle.locations.marker.color,
             }) : undefined
             return {...option, iconUrl: icon?.url}
@@ -1885,14 +1881,7 @@ export default function WorldMapPanel({
                                 <label>名称</label>
                                 <Input
                                     value={selectedLocation.name}
-                                    onValueChange={value => updateSelectedLocation('name', value)}
-                                />
-                            </div>
-                            <div className="wm-field">
-                                <label>类型</label>
-                                <Input
-                                    value={selectedLocation.type}
-                                    onValueChange={value => updateSelectedLocation('type', value)}
+                                    onValueChange={updateSelectedLocation}
                                 />
                             </div>
                             <div className="wm-field">

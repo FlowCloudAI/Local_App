@@ -1,4 +1,4 @@
-use crate::map::constants::{DEFAULT_LOCATION_COLOR, SHAPE_FILL_PALETTE, SHAPE_LINE_PALETTE};
+use crate::map::constants::{SHAPE_FILL_PALETTE, SHAPE_LINE_PALETTE};
 use crate::map::types::MapRgbaColor;
 
 pub fn shape_fill_color(index: usize, value: Option<&str>) -> MapRgbaColor {
@@ -7,16 +7,6 @@ pub fn shape_fill_color(index: usize, value: Option<&str>) -> MapRgbaColor {
 
 pub fn shape_line_color(index: usize, value: Option<&str>) -> MapRgbaColor {
     hex_to_rgba_color(value, SHAPE_LINE_PALETTE[index % SHAPE_LINE_PALETTE.len()])
-}
-
-pub fn location_color(kind: &str) -> MapRgbaColor {
-    match kind.trim() {
-        "入口" => [226, 75, 74, 255],
-        "补给点" => [99, 153, 34, 255],
-        "观察点" => [0, 163, 163, 255],
-        "设备点" => [124, 92, 232, 255],
-        _ => DEFAULT_LOCATION_COLOR,
-    }
 }
 
 fn hex_to_rgba_color(value: Option<&str>, fallback: MapRgbaColor) -> MapRgbaColor {

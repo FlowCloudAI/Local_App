@@ -1,7 +1,7 @@
 import {log_message} from '../../../../api'
 import type {MapStyleCompileContext} from '../common'
 import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, mapRenderScale, paintToRgbaColor, strokeToRgbaColor,} from '../common'
-import {inferMapMarkerClass, type MapMarkerClass, type MapPreviewBackgroundImage} from '../../components/MapShapeEditor'
+import type {MapMarkerClass, MapPreviewBackgroundImage} from '../../components/MapShapeEditor'
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
 import {buildPixiLocationIconAsset, getPixiPaperTextureCanvas} from './assets'
 import {createPixiGroundOverlayRenderer, createPixiOverlayRenderer} from './overlays'
@@ -15,29 +15,20 @@ function colorToHexString(color: [number, number, number, number]): string {
     return `#${color.slice(0, 3).map(value => value.toString(16).padStart(2, '0')).join('')}`
 }
 
-function matchLocationTypeRule(type: string, rule: Pick<PixiLocationColorRule | PixiLocationIconRule, 'typePattern' | 'typeIncludes'>): boolean {
-    if (rule.typeIncludes?.some(token => type.includes(token))) return true
-    if (!rule.typePattern) return false
-
-    try {
-        return new RegExp(rule.typePattern).test(type)
-    } catch {
-        return false
-    }
+function matchLocationClassRule(markerClass: MapMarkerClass, rule: PixiLocationColorRule): boolean {
+    return rule.markerClasses.includes(markerClass)
 }
 
-function resolveLocationColor(type: string, style: PixiMapStyle): [number, number, number, number] {
-    const rule = style.locations.colorRules?.find(item => matchLocationTypeRule(type, item))
+function resolveLocationColor(markerClass: MapMarkerClass, style: PixiMapStyle): [number, number, number, number] {
+    const rule = style.locations.colorRules?.find(item => matchLocationClassRule(markerClass, item))
     return paintToRgbaColor({
         color: rule?.color ?? style.locations.marker.color,
         opacity: rule?.opacity ?? 1,
     })
 }
 
-function resolveLocationIconRule(type: string, markerClass: MapMarkerClass | null | undefined, style: PixiMapStyle): PixiLocationIconRule | undefined {
-    if (markerClass) return style.locations.markerAssets?.[markerClass]
-    return style.locations.iconRules?.find(rule => matchLocationTypeRule(type, rule))
-        ?? style.locations.markerAssets?.[inferMapMarkerClass(type)]
+function resolveLocationIconRule(markerClass: MapMarkerClass, style: PixiMapStyle): PixiLocationIconRule | undefined {
+    return style.locations.markerAssets?.[markerClass]
 }
 
 function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<PixiMapStyle>): MapPreviewBackgroundImage {
@@ -97,15 +88,14 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
                 lineColor: strokeToRgbaColor(style.regions.stroke),
             })),
             keyLocations: scene.keyLocations.map(location => {
-                const color = resolveLocationColor(location.type, style)
-                const iconRule = resolveLocationIconRule(location.type, location.markerClass, style)
+                const color = resolveLocationColor(location.markerClass, style)
+                const iconRule = resolveLocationIconRule(location.markerClass, style)
                 const iconSet = iconRule?.iconSet ?? style.locations.iconSet
                 const iconColor = iconRule?.color ?? colorToHexString(color)
                 const icon = iconSet
                     ? buildPixiLocationIconAsset({
                         iconSet,
-                        asset: iconRule?.asset,
-                        type: location.type,
+                        asset: iconRule?.asset ?? location.markerClass,
                         color: iconColor,
                     })
                     : undefined

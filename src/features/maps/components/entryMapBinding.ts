@@ -1,6 +1,6 @@
 /* 词条地图绑定解析：从项目地图草稿反查首个关联地点，并构造只突出该地点的轻量预览。 */
 import type {MapEntry} from '../../../api'
-import {buildPreviewKeyLocations, buildPreviewSceneFromDraft} from './MapShapeEditor/api.ts'
+import {buildPreviewKeyLocations, buildPreviewSceneFromDraft, normalizeMapEditorDraft} from './MapShapeEditor/api.ts'
 import type {
     MapKeyLocationDraft,
     MapPreviewKeyLocation,
@@ -21,7 +21,7 @@ export function findEntryMapBinding(maps: readonly MapEntry[], entryId: string):
     for (const map of maps) {
         let draft: MapShapeEditorDraft
         try {
-            draft = JSON.parse(map.draftJson) as MapShapeEditorDraft
+            draft = normalizeMapEditorDraft(JSON.parse(map.draftJson) as MapShapeEditorDraft)
         } catch {
             continue
         }

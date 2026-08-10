@@ -58,7 +58,7 @@ export const inkPixiMapStyle: PixiMapStyle = {
         },
         colorRules: [
             {
-                typePattern: '都|京',
+                markerClasses: ['major-city'],
                 color: '#9b2323',
                 opacity: 0.72,
             },
@@ -87,7 +87,7 @@ export const inkPixiMapStyle: PixiMapStyle = {
         haloWidth: 3,
         rules: [
             {
-                typePattern: '都|京',
+                markerClasses: ['major-city'],
                 color: '#8f2020',
                 opacity: 0.82,
                 fontWeight: '600',

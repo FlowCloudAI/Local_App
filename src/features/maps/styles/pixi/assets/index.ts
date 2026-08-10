@@ -1,5 +1,4 @@
 import {
-    inferMapMarkerClass,
     type MapMarkerClass,
     type MapPreviewKeyLocationIcon,
     type MapRgbaColor,
@@ -26,8 +25,7 @@ export interface PixiTerrainSymbolAsset {
 
 interface PixiLocationIconAssetInput {
     iconSet: PixiLocationIconSet
-    asset?: PixiLocationIconAsset
-    type: string
+    asset: PixiLocationIconAsset
     color: string
 }
 
@@ -361,7 +359,7 @@ function makeInkClassIcon(markerClass: MapMarkerClass, color: string): MapPrevie
 }
 
 export function buildPixiLocationIconAsset(input: PixiLocationIconAssetInput): MapPreviewKeyLocationIcon | undefined {
-    const markerClass = input.asset ?? inferMapMarkerClass(input.type)
+    const markerClass = input.asset
     if (input.iconSet === 'flat') return makeFlatMarkerIcon(markerClass, input.color)
     if (input.iconSet === 'ink-stamp') return makeInkClassIcon(markerClass, input.color)
 

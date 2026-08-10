@@ -691,10 +691,7 @@ mod tests {
     fn project_cover_thumbnail_limits_long_edge() {
         let temp = tempfile::tempdir().expect("应创建临时目录");
         let project_id = Uuid::now_v7();
-        let project_images = temp
-            .path()
-            .join("images")
-            .join(project_id.to_string());
+        let project_images = temp.path().join("images").join(project_id.to_string());
         std::fs::create_dir_all(&project_images).expect("应创建项目图片目录");
         let source_path = project_images.join("cover.png");
         image::DynamicImage::new_rgb8(1600, 800)

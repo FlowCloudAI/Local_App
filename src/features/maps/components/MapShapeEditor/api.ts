@@ -1,12 +1,15 @@
 import type {
+    MapKeyLocationDraft,
+    MapMarkerClass,
     MapPreviewKeyLocation,
     MapPreviewScene,
     MapPreviewShape,
     MapRgbaColor,
-    MapKeyLocationDraft,
     MapShapeDraft,
+    MapShapeEditorDraft,
     MapShapeSaveRequest,
 } from './types';
+import {MAP_MARKER_CLASS_OPTIONS} from './types.ts';
 
 const SHAPE_FILL_PALETTE: MapRgbaColor[] = [
     [55, 138, 221, 88],
@@ -22,12 +25,44 @@ const SHAPE_LINE_PALETTE: MapRgbaColor[] = [
     [80, 56, 176, 255],
 ];
 
-const LOCATION_COLOR_PALETTE: Record<string, MapRgbaColor> = {
-    '出入口': [226, 75, 74, 255],
-    '补给点': [99, 153, 34, 255],
-    '观察点': [0, 163, 163, 255],
-    '设备点': [124, 92, 232, 255],
+const DEFAULT_LOCATION_COLOR: MapRgbaColor = [212, 48, 106, 255];
+
+type LegacyMapKeyLocationDraft = Omit<MapKeyLocationDraft, 'markerClass'> & {
+    markerClass?: unknown;
+    type?: unknown;
 };
+
+function isMapMarkerClass(value: unknown): value is MapMarkerClass {
+    return MAP_MARKER_CLASS_OPTIONS.some(option => option.value === value);
+}
+
+function inferLegacyMapMarkerClass(value: unknown): MapMarkerClass {
+    if (typeof value !== 'string') return 'marker';
+    if (/首都|王都|都城|帝都|京/.test(value)) return 'major-city';
+    if (/港|码头|渡口/.test(value)) return 'harbor';
+    if (/村|镇|营地|聚落/.test(value)) return 'town';
+    if (/遗迹|废墟|神殿/.test(value)) return 'ruin';
+    if (/事件|战场|遭遇|任务/.test(value)) return 'event';
+    if (/城|要塞/.test(value)) return 'city';
+    if (/地标|塔|山|峰/.test(value)) return 'landmark';
+    return 'marker';
+}
+
+/** 读取旧地图时把 type 一次性折叠进 markerClass；后续保存不再写回 type。 */
+export function normalizeMapEditorDraft(draft: MapShapeEditorDraft): MapShapeEditorDraft {
+    return {
+        ...draft,
+        keyLocations: draft.keyLocations.map(value => {
+            const {type, markerClass, ...location} = value as unknown as LegacyMapKeyLocationDraft;
+            return {
+                ...location,
+                markerClass: isMapMarkerClass(markerClass)
+                    ? markerClass
+                    : inferLegacyMapMarkerClass(type),
+            };
+        }),
+    };
+}
 
 function hexToRgbaColor(value: string | undefined, fallback: MapRgbaColor): MapRgbaColor {
     if (!value) return fallback;
@@ -60,11 +95,10 @@ export function buildPreviewKeyLocations(keyLocations: MapKeyLocationDraft[]): M
     return keyLocations.map(location => ({
         id: location.id,
         name: location.name,
-        type: location.type,
         position: [location.x, location.y],
-        markerClass: location.markerClass ?? null,
+        markerClass: location.markerClass,
         shapeId: location.shapeId ?? null,
-        color: LOCATION_COLOR_PALETTE[location.type] ?? [212, 48, 106, 255],
+        color: DEFAULT_LOCATION_COLOR,
         bizId: location.bizId ?? null,
         ext: location.ext,
     }));

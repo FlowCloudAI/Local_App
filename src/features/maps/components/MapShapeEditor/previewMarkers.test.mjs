@@ -9,7 +9,7 @@ const scene = {
     keyLocations: [{
         id: 'saved-location',
         name: '城镇',
-        type: '城市',
+        markerClass: 'city',
         position: [240, 180],
         color: [80, 120, 180, 255],
     }],
@@ -19,7 +19,7 @@ test('临时标记追加到派生场景且不修改原场景', () => {
     const marker = {
         id: 'overlay:character:1',
         name: '角色位置',
-        type: 'character',
+        markerClass: 'marker',
         position: [360, 260],
         color: [220, 80, 100, 255],
         ext: {transientMarker: true},

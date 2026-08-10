@@ -89,16 +89,6 @@ function validateKeyLocation(
         }));
     }
 
-    if (!location.type.trim()) {
-        issues.push(createIssue({
-            code: 'key_location_type_required',
-            severity: 'error',
-            source: 'keyLocation',
-            keyLocationId: location.id,
-            message: `关键地点「${safeName}」缺少类型。`,
-        }));
-    }
-
     return {
         keyLocationId: location.id,
         issues,

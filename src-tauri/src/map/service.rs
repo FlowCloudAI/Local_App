@@ -1,8 +1,8 @@
 use crate::map::coastline::build_natural_coastline_polygon;
 use crate::map::coastline_v2::build_natural_coastline_polygon_v2;
-use crate::map::color::{location_color, shape_fill_color, shape_line_color};
+use crate::map::color::{shape_fill_color, shape_line_color};
 use crate::map::constants::{
-    DUPLICATE_VERTEX_DISTANCE, MIN_SHAPE_VERTEX_COUNT, MIN_VERTEX_DISTANCE,
+    DEFAULT_LOCATION_COLOR, DUPLICATE_VERTEX_DISTANCE, MIN_SHAPE_VERTEX_COUNT, MIN_VERTEX_DISTANCE,
 };
 use crate::map::geometry::{
     find_polygon_self_intersections, get_distance_squared, is_point_in_polygon,
@@ -334,11 +334,11 @@ fn validate_key_location(
         ));
     }
 
-    if location.r#type.trim().is_empty() {
+    if location.marker_class.trim().is_empty() {
         field_errors.push(field_error(
-            &format!("keyLocations[{location_index}].type"),
-            "key_location_type_required",
-            &format!("关键地点「{safe_name}」缺少类型。"),
+            &format!("keyLocations[{location_index}].markerClass"),
+            "key_location_marker_class_required",
+            &format!("关键地点「{safe_name}」缺少显示元素。"),
         ));
     }
 }
@@ -410,11 +410,10 @@ fn build_preview_key_locations(
         .map(|location| MapPreviewKeyLocation {
             id: location.id.clone(),
             name: location.name.clone(),
-            r#type: location.r#type.clone(),
             position: [location.x, location.y],
             marker_class: location.marker_class.clone(),
             shape_id: location.shape_id.clone(),
-            color: location_color(&location.r#type),
+            color: DEFAULT_LOCATION_COLOR,
             biz_id: location.biz_id.clone(),
             ext: location.ext.clone(),
         })
@@ -493,10 +492,9 @@ mod tests {
             key_locations: vec![MapKeyLocationDraft {
                 id: "loc-1".to_string(),
                 name: "主入口".to_string(),
-                r#type: "入口".to_string(),
                 x: 260.0,
                 y: 180.0,
-                marker_class: Some("landmark".to_string()),
+                marker_class: "landmark".to_string(),
                 shape_id: None,
                 biz_id: None,
                 ext: None,
@@ -531,11 +529,11 @@ mod tests {
             Some("square")
         );
         assert_eq!(response.scene.shapes[0].fill_color, [216, 236, 255, 88]);
-        assert_eq!(response.scene.key_locations[0].color, [226, 75, 74, 255]);
         assert_eq!(
-            response.scene.key_locations[0].marker_class.as_deref(),
-            Some("landmark")
+            response.scene.key_locations[0].color,
+            DEFAULT_LOCATION_COLOR
         );
+        assert_eq!(response.scene.key_locations[0].marker_class, "landmark");
         assert_eq!(
             response.meta.as_ref().and_then(|meta| meta.persisted),
             Some(false)
