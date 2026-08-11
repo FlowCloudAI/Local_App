@@ -89,7 +89,6 @@ export type SettingsTab =
 export type SettingsFocusTarget = 'writer-mode' | 'api-key'
 export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 type PluginKindFilter = SettingsPluginKindFilter
-type PluginPageRows = 2 | 5 | 10
 type SearchSourceKey = keyof SearchSourceSettings
 
 type TemplateView = 'list' | 'detail'
@@ -101,12 +100,6 @@ const PLUGIN_KIND_LABELS: Record<PluginKindFilter, string> = {
     image: 'AI 绘图',
     tts: 'AI 语音',
 }
-
-const PLUGIN_PAGE_ROW_OPTIONS: Array<{value: PluginPageRows; label: string}> = [
-    {value: 2, label: '每页 2 行'},
-    {value: 5, label: '每页 5 行'},
-    {value: 10, label: '每页 10 行'},
-]
 
 const SETTINGS_GROUPS: Array<{
     label: string
@@ -996,6 +989,51 @@ interface PluginsPanelProps {
     onCancelApiKey: () => void
 }
 
+const PLUGIN_GRID_COLUMNS = 2
+
+function usePluginPageCapacity(active: boolean, contentSize: number) {
+    const viewportRef = useRef<HTMLDivElement>(null)
+    const listRef = useRef<HTMLDivElement>(null)
+    const [pageSize, setPageSize] = useState(PLUGIN_GRID_COLUMNS)
+
+    useEffect(() => {
+        if (!active) return
+
+        const viewport = viewportRef.current
+        const list = listRef.current
+        if (!viewport || !list) return
+
+        let animationFrame = 0
+        const measure = () => {
+            cancelAnimationFrame(animationFrame)
+            animationFrame = requestAnimationFrame(() => {
+                const items = Array.from(list.children).filter(
+                    (item): item is HTMLElement => item instanceof HTMLElement
+                        && !item.classList.contains('plugins-empty'),
+                )
+                if (items.length === 0) return
+
+                const rowGap = Number.parseFloat(getComputedStyle(list).rowGap) || 0
+                const rowHeight = Math.max(...items.map(item => item.getBoundingClientRect().height))
+                const rows = Math.max(1, Math.floor((viewport.clientHeight + rowGap) / (rowHeight + rowGap)))
+                const nextPageSize = rows * PLUGIN_GRID_COLUMNS
+                setPageSize(current => current === nextPageSize ? current : nextPageSize)
+            })
+        }
+
+        const observer = new ResizeObserver(measure)
+        observer.observe(viewport)
+        measure()
+
+        return () => {
+            observer.disconnect()
+            cancelAnimationFrame(animationFrame)
+        }
+    }, [active, contentSize])
+
+    return {viewportRef, listRef, pageSize}
+}
+
 function PluginPagination({
                               page,
                               pageCount,
@@ -1007,10 +1045,12 @@ function PluginPagination({
     ariaLabel: string
     onPageChange: (page: number) => void
 }) {
-    if (pageCount <= 1) return null
-
     return (
-        <nav className="settings-plugin-pagination" aria-label={ariaLabel}>
+        <nav
+            className={`settings-plugin-pagination${pageCount <= 1 ? ' is-placeholder' : ''}`}
+            aria-label={ariaLabel}
+            aria-hidden={pageCount <= 1}
+        >
             <Button
                 type="button"
                 variant="outline"
@@ -1065,9 +1105,7 @@ function PluginsPanel({
                           onCancelApiKey,
                       }: PluginsPanelProps) {
     const [pluginLibraryOpen, setPluginLibraryOpen] = useState(false)
-    const [installedPageRows, setInstalledPageRows] = useState<PluginPageRows>(2)
     const [installedPage, setInstalledPage] = useState(1)
-    const [marketPageRows, setMarketPageRows] = useState<PluginPageRows>(2)
     const [marketPage, setMarketPage] = useState(1)
     const installedPluginMap = new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
     const installedIds = new Set(installedPluginMap.keys())
@@ -1080,17 +1118,27 @@ function PluginsPanel({
             || plugin.author.toLowerCase().includes(query)
         return matchKind && matchSearch
     })
-    const installedPageCount = Math.max(1, Math.ceil(localPlugins.length / installedPageRows))
+    const {
+        viewportRef: installedViewportRef,
+        listRef: installedListRef,
+        pageSize: installedPageSize,
+    } = usePluginPageCapacity(true, localPlugins.length)
+    const {
+        viewportRef: marketViewportRef,
+        listRef: marketListRef,
+        pageSize: marketPageSize,
+    } = usePluginPageCapacity(pluginLibraryOpen, filteredMarket.length)
+    const installedPageCount = Math.max(1, Math.ceil(localPlugins.length / installedPageSize))
     const currentInstalledPage = Math.min(installedPage, installedPageCount)
     const paginatedLocalPlugins = localPlugins.slice(
-        (currentInstalledPage - 1) * installedPageRows,
-        currentInstalledPage * installedPageRows,
+        (currentInstalledPage - 1) * installedPageSize,
+        currentInstalledPage * installedPageSize,
     )
-    const marketPageCount = Math.max(1, Math.ceil(filteredMarket.length / marketPageRows))
+    const marketPageCount = Math.max(1, Math.ceil(filteredMarket.length / marketPageSize))
     const currentMarketPage = Math.min(marketPage, marketPageCount)
     const paginatedMarketPlugins = filteredMarket.slice(
-        (currentMarketPage - 1) * marketPageRows,
-        currentMarketPage * marketPageRows,
+        (currentMarketPage - 1) * marketPageSize,
+        currentMarketPage * marketPageSize,
     )
 
     useEffect(() => {
@@ -1103,7 +1151,7 @@ function PluginsPanel({
 
     return (
         <>
-            <div className="settings-container fc-page-shell fc-page-shell--narrow">
+            <div className="settings-container settings-plugin-page fc-page-shell fc-page-shell--narrow">
                 <div className="settings-title fc-page-header">
                     <div className="fc-page-title-block">
                         <h1 className="fc-page-title">插件管理</h1>
@@ -1111,7 +1159,7 @@ function PluginsPanel({
                     </div>
                 </div>
 
-                <section className="settings-section fc-section-card">
+                <section className="settings-section settings-plugin-section fc-section-card">
                     <div className="plugins-section-header">
                         <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
                         <div className="plugins-section-actions">
@@ -1122,16 +1170,6 @@ function PluginsPanel({
                             >
                                 安装插件
                             </Button>
-                            <Select
-                                className="plugins-page-size"
-                                aria-label="已安装插件每页显示行数"
-                                options={PLUGIN_PAGE_ROW_OPTIONS}
-                                value={installedPageRows}
-                                onValueChange={(value) => {
-                                    setInstalledPageRows(Number(value) as PluginPageRows)
-                                    setInstalledPage(1)
-                                }}
-                            />
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1148,11 +1186,12 @@ function PluginsPanel({
                         <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
                     )}
 
-                    <div className="plugins-list">
-                        {localPlugins.length === 0 && !loadingLocal ? (
-                            <div className="plugins-empty">暂无已安装插件</div>
-                        ) : (
-                            paginatedLocalPlugins.map(plugin => {
+                    <div ref={installedViewportRef} className="plugins-list-viewport">
+                        <div ref={installedListRef} className="plugins-list">
+                            {localPlugins.length === 0 && !loadingLocal ? (
+                                <div className="plugins-empty">暂无已安装插件</div>
+                            ) : (
+                                paginatedLocalPlugins.map(plugin => {
                                 const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
                                 const updateVersion = marketPlugin
                                 && isRemoteVersionNewer(plugin.version, marketPlugin.version)
@@ -1239,8 +1278,9 @@ function PluginsPanel({
                                     </div>
                                     </div>
                                 )
-                            })
-                        )}
+                                })
+                            )}
+                        </div>
                     </div>
                     <PluginPagination
                         page={currentInstalledPage}
@@ -1267,16 +1307,6 @@ function PluginsPanel({
                         >
                             {installingLocalFile ? '安装中…' : '安装本地插件'}
                         </Button>
-                        <Select
-                            className="plugins-page-size"
-                            aria-label="插件库每页显示行数"
-                            options={PLUGIN_PAGE_ROW_OPTIONS}
-                            value={marketPageRows}
-                            onValueChange={(value) => {
-                                setMarketPageRows(Number(value) as PluginPageRows)
-                                setMarketPage(1)
-                            }}
-                        />
                         <Button
                             type="button"
                             variant="outline"
@@ -1319,13 +1349,14 @@ function PluginsPanel({
                         <div className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>
                     )}
 
-                    <div className="plugins-list">
-                        {filteredMarket.length === 0 && !loadingMarket ? (
-                            <div className="plugins-empty">
-                                {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
-                            </div>
-                        ) : (
-                            paginatedMarketPlugins.map(plugin => {
+                    <div ref={marketViewportRef} className="plugins-list-viewport">
+                        <div ref={marketListRef} className="plugins-list">
+                            {filteredMarket.length === 0 && !loadingMarket ? (
+                                <div className="plugins-empty">
+                                    {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
+                                </div>
+                            ) : (
+                                paginatedMarketPlugins.map(plugin => {
                                 const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
                                 const hasUpdate = installedPlugin
                                     ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
@@ -1341,8 +1372,9 @@ function PluginsPanel({
                                         installing={installingIds.has(plugin.id)}
                                     />
                                 )
-                            })
-                        )}
+                                })
+                            )}
+                        </div>
                     </div>
                     <PluginPagination
                         page={currentMarketPage}
