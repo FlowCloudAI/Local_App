@@ -428,7 +428,7 @@ function DesktopAppContent() {
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
     const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
     const [settingsOpenIntent, setSettingsOpenIntent] = useState<SettingsOpenIntent>({
-        tab: 'system',
+        tab: 'storage',
         pluginKind: 'all',
         focus: null,
         requestId: 0,
@@ -844,7 +844,7 @@ function DesktopAppContent() {
 
     const openSettings = useCallback((options: OpenSettingsOptions = {}) => {
         setSettingsOpenIntent(current => ({
-            tab: options.tab ?? 'system',
+            tab: options.tab ?? 'storage',
             pluginKind: options.pluginKind ?? 'all',
             focus: options.focus ?? null,
             apiKeyPluginId: options.apiKeyPluginId ?? null,
@@ -903,11 +903,11 @@ function DesktopAppContent() {
     }, [openSettings])
 
     const handleOpenAiSettings = useCallback((pluginId: string) => {
-        openSettings({tab: 'ai', focus: 'api-key', apiKeyPluginId: pluginId, focusRequest: true})
+        openSettings({tab: 'keys', focus: 'api-key', apiKeyPluginId: pluginId, focusRequest: true})
     }, [openSettings])
 
     const handleOpenWriterModeSettings = useCallback(() => {
-        openSettings({tab: 'ai', focus: 'writer-mode', focusRequest: true})
+        openSettings({tab: 'permissions', focus: 'writer-mode', focusRequest: true})
     }, [openSettings])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {

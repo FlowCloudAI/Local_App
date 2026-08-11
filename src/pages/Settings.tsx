@@ -75,11 +75,19 @@ import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
-export type SettingsTab = 'system' | 'ai' | 'plugins' | 'templates' | 'usage' | 'about'
+export type SettingsTab =
+    | 'storage'
+    | 'appearance'
+    | 'plugins'
+    | 'models'
+    | 'permissions'
+    | 'keys'
+    | 'templates'
+    | 'usage'
+    | 'about'
 export type SettingsFocusTarget = 'writer-mode' | 'api-key'
 export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 type PluginKindFilter = SettingsPluginKindFilter
-type AiSettingsSection = 'models' | 'permissions' | 'keys'
 type SearchSourceKey = keyof SearchSourceSettings
 
 type TemplateView = 'list' | 'detail'
@@ -92,19 +100,34 @@ const PLUGIN_KIND_LABELS: Record<PluginKindFilter, string> = {
     tts: 'AI 语音',
 }
 
-const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
-    {value: 'system', label: '系统配置'},
-    {value: 'ai', label: 'AI配置'},
-    {value: 'plugins', label: '插件管理'},
-    {value: 'templates', label: 'AI 指令模板'},
-    {value: 'usage', label: '用量统计'},
-    {value: 'about', label: '关于'},
-]
-
-const AI_SETTINGS_SECTIONS: Array<{ value: AiSettingsSection; label: string }> = [
-    {value: 'models', label: '模型'},
-    {value: 'permissions', label: '权限与工具'},
-    {value: 'keys', label: '密钥'},
+const SETTINGS_GROUPS: Array<{
+    label: string
+    tabs: Array<{ value: SettingsTab; label: string }>
+}> = [
+    {
+        label: '系统',
+        tabs: [
+            {value: 'storage', label: '存储与备份'},
+            {value: 'appearance', label: '外观'},
+        ],
+    },
+    {
+        label: 'AI',
+        tabs: [
+            {value: 'plugins', label: '插件管理'},
+            {value: 'keys', label: '访问密钥'},
+            {value: 'models', label: '模型管理'},
+            {value: 'permissions', label: '权限与工具'},
+            {value: 'templates', label: '指令模板'},
+            {value: 'usage', label: '用量与预算'},
+        ],
+    },
+    {
+        label: '信息',
+        tabs: [
+            {value: 'about', label: '关于'},
+        ],
+    },
 ]
 
 const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string }> = [
@@ -401,16 +424,23 @@ function SettingsSidebar({activeTab, onTabChange, onBack, collapsed, onCollapseT
                 </Button>
             </div>
             <nav className="settings-sidebar__nav" aria-label="设置项">
-                {SETTINGS_TABS.map(tab => (
-                    <button
-                        key={tab.value}
-                        type="button"
-                        className={`settings-sidebar-item ${activeTab === tab.value ? 'active' : ''}`}
-                        aria-current={activeTab === tab.value ? 'page' : undefined}
-                        onClick={() => onTabChange(tab.value)}
-                    >
-                        {tab.label}
-                    </button>
+                {SETTINGS_GROUPS.map(group => (
+                    <div className="settings-sidebar-group" key={group.label}>
+                        <div className="settings-sidebar-group__label">{group.label}</div>
+                        <div className="settings-sidebar-group__items">
+                            {group.tabs.map(tab => (
+                                <button
+                                    key={tab.value}
+                                    type="button"
+                                    className={`settings-sidebar-item ${activeTab === tab.value ? 'active' : ''}`}
+                                    aria-current={activeTab === tab.value ? 'page' : undefined}
+                                    onClick={() => onTabChange(tab.value)}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 ))}
             </nav>
         </aside>
@@ -419,9 +449,11 @@ function SettingsSidebar({activeTab, onTabChange, onBack, collapsed, onCollapseT
 
 interface TemplatesPanelProps {
     editorFontSize: number
+    defaultPrompt: string
+    onDefaultPromptChange: (value: string) => void
 }
 
-function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
+function TemplatesPanel({editorFontSize, defaultPrompt, onDefaultPromptChange}: TemplatesPanelProps) {
     const {showAlert} = useAlert()
     // ── 模板配置状态 ──
     const [templateMetas, setTemplateMetas] = useState<TemplateMeta[]>([])
@@ -650,6 +682,21 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                         <p className="fc-page-subtitle">集中管理内置 AI 指令模板，保存后自动检查格式是否正确。</p>
                                     </div>
                                 </div>
+
+                                <section className="settings-section fc-section-card">
+                                    <h2 className="settings-section-title fc-section-title">全局指令</h2>
+                                    <div className="settings-field-stack settings-field-stack--full settings-llm-prompt-field">
+                                        <textarea
+                                            className="settings-textarea"
+                                            value={defaultPrompt}
+                                            onChange={(event) => onDefaultPromptChange(event.currentTarget.value)}
+                                            placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
+                                        />
+                                        <span className="settings-field-hint">
+                                            当前对话没有独有提示词时，会自动使用这段默认指令。
+                                        </span>
+                                    </div>
+                                </section>
 
                                 <div className="templates-workspace">
                                 {templateView === 'list' && (
@@ -1108,7 +1155,7 @@ export default function Settings({
                                      onBack,
                                      openIntent,
                                  }: SettingsProps) {
-    const initialTab = openIntent?.tab ?? 'system'
+    const initialTab = openIntent?.tab ?? 'storage'
     const initialPluginKind = openIntent?.pluginKind ?? 'all'
     const initialFocus = openIntent?.focus ?? null
     const initialApiKeyPluginId = openIntent?.apiKeyPluginId ?? null
@@ -1173,8 +1220,6 @@ export default function Settings({
     const [searchText, setSearchText] = useState('')
     const [kindFilter, setKindFilter] = useState<PluginKindFilter>(initialPluginKind)
     const [pluginDirectoryLoaded, setPluginDirectoryLoaded] = useState(false)
-    const [aiSettingsSection, setAiSettingsSection] = useState<AiSettingsSection>('models')
-
     const {setTheme} = useTheme();
 
     // ── 用量统计状态 ──
@@ -1211,10 +1256,9 @@ export default function Settings({
     }, [initialPluginKind, initialTab])
 
     useEffect(() => {
-        if (loading || !settings || activeTab !== 'ai' || initialFocus !== 'writer-mode') return
+        if (loading || !settings || activeTab !== 'permissions' || initialFocus !== 'writer-mode') return
         if (handledFocusRequestIdRef.current === focusRequestId) return
         handledFocusRequestIdRef.current = focusRequestId
-        setAiSettingsSection('permissions')
         const frameId = window.requestAnimationFrame(() => {
             writerModeFieldRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'})
             setFocusedSetting('writer-mode')
@@ -1227,11 +1271,10 @@ export default function Settings({
     }, [activeTab, focusRequestId, initialFocus, loading, settings])
 
     useEffect(() => {
-        if (loading || !settings || activeTab !== 'ai' || initialFocus !== 'api-key' || !initialApiKeyPluginId) return
+        if (loading || !settings || activeTab !== 'keys' || initialFocus !== 'api-key' || !initialApiKeyPluginId) return
         if (![...llmPlugins, ...imagePlugins, ...ttsPlugins].some((plugin) => plugin.id === initialApiKeyPluginId)) return
         if (handledFocusRequestIdRef.current === focusRequestId) return
         handledFocusRequestIdRef.current = focusRequestId
-        setAiSettingsSection('keys')
         setExpandedApiKeyPluginId(initialApiKeyPluginId)
         setApiKeyDraft('')
         const frameId = window.requestAnimationFrame(() => apiKeyInputRef.current?.focus())
@@ -1910,12 +1953,12 @@ export default function Settings({
                 />
                 <RollingBox axis="y" className="settings-scroll-area" thumbSize={'thin'}>
                     <div className="settings-content">
-                    {activeTab === 'system' && (
+                    {activeTab === 'storage' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">系统配置</h1>
-                                    <p className="fc-page-subtitle">管理存储路径、外观主题和编辑器默认行为。</p>
+                                    <h1 className="fc-page-title">存储与备份</h1>
+                                    <p className="fc-page-subtitle">管理应用数据目录、插件目录和自动备份策略。</p>
                                 </div>
                             </div>
 
@@ -2058,6 +2101,20 @@ export default function Settings({
                                 </div>
                             </section>
 
+                            <div className="settings-footer">
+                                <Button type="button" variant="outline" onClick={handleReset}>重置为默认</Button>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'appearance' && (
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">外观</h1>
+                                    <p className="fc-page-subtitle">调整界面语言、编辑器字号和窗口显示效果。</p>
+                                </div>
+                            </div>
+
                             {/* 外观 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">外观</h2>
@@ -2130,11 +2187,6 @@ export default function Settings({
                                     onChange={handleThemeColorConfigChange}
                                 />
                             </section>
-
-                            {/* 操作按钮 */}
-                            <div className="settings-footer">
-                                <Button type="button" variant="outline" onClick={handleReset}>重置为默认</Button>
-                            </div>
                         </div>
                     )}
                     {activeTab === 'about' && (
@@ -2149,32 +2201,15 @@ export default function Settings({
                             <AboutSection configDir={configDir} onOpenDir={handleOpenDir}/>
                         </div>
                     )}
-                    {activeTab === 'ai' && (
+                    {activeTab === 'models' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">AI配置</h1>
-                                    <p className="fc-page-subtitle">配置默认模型、访问密钥、文本生成选项和 AI 工具权限。</p>
+                                    <h1 className="fc-page-title">模型管理</h1>
+                                    <p className="fc-page-subtitle">配置默认模型、生成参数、上下文策略和模型价格。</p>
                                 </div>
                             </div>
 
-                            <div className="settings-ai-section-tabs" role="tablist" aria-label="AI 配置分区">
-                                {AI_SETTINGS_SECTIONS.map((section) => (
-                                    <button
-                                        key={section.value}
-                                        type="button"
-                                        role="tab"
-                                        aria-selected={aiSettingsSection === section.value}
-                                        className={`settings-ai-section-tab ${aiSettingsSection === section.value ? 'active' : ''}`}
-                                        onClick={() => setAiSettingsSection(section.value)}
-                                    >
-                                        {section.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {aiSettingsSection === 'models' && (
-                                <>
                             {/* 默认模型 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">默认模型</h2>
@@ -2421,26 +2456,83 @@ export default function Settings({
                                         />
                                     </div>
                                 </div>
-                                <div className="settings-field-stack settings-field-stack--full settings-llm-prompt-field">
-                                    <label className="settings-label-wide">全局默认提示词</label>
-                                    <textarea
-                                        className="settings-textarea"
-                                        value={settings.llm.app_sense_custom_prompt}
-                                        onChange={(event) => updateLlmDefaults({
-                                            app_sense_custom_prompt: event.currentTarget.value,
-                                        })}
-                                        placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
-                                    />
+                            </section>
+
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">对话上下文</h2>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.auto_compact_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                auto_compact_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>自动精简对话记忆</span>
+                                    </label>
                                     <span className="settings-field-hint">
-                                        这段提示词会作为通用 AI 对话的默认提示词；当前对话没有独有提示词时会自动填充。
+                                        发送前若预计达到阈值，会先把较早对话整理成摘要并保留近期原文；可关闭此功能。
                                     </span>
                                 </div>
+                                {settings.llm.auto_compact_enabled && (
+                                    <div className="settings-row settings-llm-compact-options">
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">压缩阈值</label>
+                                            <div className="settings-range-control">
+                                                <Slider
+                                                    min={50}
+                                                    max={95}
+                                                    step={5}
+                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
+                                                    onValueChange={handleLlmCompactThresholdChange}
+                                                />
+                                            </div>
+                                            <span className="settings-span">
+                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">保留近期消息</label>
+                                            <Input
+                                                className="settings-number-input"
+                                                type="number"
+                                                size="sm"
+                                                min={2}
+                                                max={30}
+                                                step={1}
+                                                value={settings.llm.auto_compact_recent_messages}
+                                                onValueChange={handleLlmCompactRecentMessagesChange}
+                                            />
+                                            <span className="settings-span">条</span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">摘要详细程度</label>
+                                            <div className="settings-select-control">
+                                                <Select
+                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
+                                                    value={settings.llm.auto_compact_detail}
+                                                    onValueChange={(value) => updateLlmDefaults({
+                                                        auto_compact_detail: String(value) as LlmCompactDetail,
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
-                                </>
-                            )}
+                        </div>
+                    )}
 
-                            {/* 访问密钥管理 */}
-                            {aiSettingsSection === 'keys' && (
+                    {activeTab === 'keys' && (
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">访问密钥</h1>
+                                    <p className="fc-page-subtitle">管理已安装 AI 插件保存在本机的访问凭据。</p>
+                                </div>
+                            </div>
+
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">访问密钥管理</h2>
                                 <div className="settings-row">
@@ -2544,10 +2636,18 @@ export default function Settings({
                                     )}
                                 </div>
                             </section>
-                            )}
+                        </div>
+                    )}
 
-                            {/* AI 工具配置 */}
-                            {aiSettingsSection === 'permissions' && (
+                    {activeTab === 'permissions' && (
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">权限与工具</h1>
+                                    <p className="fc-page-subtitle">控制 AI 操作授权、搜索工具和可使用的信源。</p>
+                                </div>
+                            </div>
+
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">权限与工具</h2>
                                 <div
@@ -2569,66 +2669,6 @@ export default function Settings({
                                         作家模式会跳过新建、改写、移动等常规操作确认；删除类操作仍会要求确认。
                                     </span>
                                 </div>
-                                <div className="settings-field settings-field-stack settings-field-stack--full">
-                                    <label className="settings-checkbox-row">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.llm.auto_compact_enabled}
-                                            onChange={(event) => updateLlmDefaults({
-                                                auto_compact_enabled: event.target.checked,
-                                            })}
-                                        />
-                                        <span>自动精简对话记忆</span>
-                                    </label>
-                                    <span className="settings-field-hint">
-                                        发送前若预计达到阈值，会先把较早对话整理成摘要并保留近期原文；可关闭此功能。
-                                    </span>
-                                </div>
-                                {settings.llm.auto_compact_enabled && (
-                                    <div className="settings-row settings-llm-compact-options">
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">压缩阈值</label>
-                                            <div className="settings-range-control">
-                                                <Slider
-                                                    min={50}
-                                                    max={95}
-                                                    step={5}
-                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
-                                                    onValueChange={handleLlmCompactThresholdChange}
-                                                />
-                                            </div>
-                                            <span className="settings-span">
-                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
-                                            </span>
-                                        </div>
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">保留近期消息</label>
-                                            <Input
-                                                className="settings-number-input"
-                                                type="number"
-                                                size="sm"
-                                                min={2}
-                                                max={30}
-                                                step={1}
-                                                value={settings.llm.auto_compact_recent_messages}
-                                                onValueChange={handleLlmCompactRecentMessagesChange}
-                                            />
-                                            <span className="settings-span">条</span>
-                                        </div>
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">摘要详细程度</label>
-                                            <div className="settings-select-control">
-                                                <Select
-                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
-                                                    value={settings.llm.auto_compact_detail}
-                                                    onValueChange={(value) => updateLlmDefaults({
-                                                        auto_compact_detail: String(value) as LlmCompactDetail,
-                                                    })}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label-wide">搜索引擎</label>
@@ -2674,7 +2714,6 @@ export default function Settings({
                                     </div>
                                 </div>
                             </section>
-                            )}
                         </div>
                     )}
                     {activeTab === 'plugins' && (
@@ -2703,8 +2742,8 @@ export default function Settings({
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">用量统计</h1>
-                                    <p className="fc-page-subtitle">查看各个模型的 AI 使用次数与消耗统计。</p>
+                                    <h1 className="fc-page-title">用量与预算</h1>
+                                    <p className="fc-page-subtitle">查看模型用量、费用明细和月度预算状态。</p>
                                 </div>
                             </div>
 
@@ -2926,7 +2965,11 @@ export default function Settings({
                         </div>
                     )}
                         {activeTab === 'templates' && (
-                        <TemplatesPanel editorFontSize={settings.editor_font_size}/>
+                        <TemplatesPanel
+                            editorFontSize={settings.editor_font_size}
+                            defaultPrompt={settings.llm.app_sense_custom_prompt}
+                            onDefaultPromptChange={(value) => updateLlmDefaults({app_sense_custom_prompt: value})}
+                        />
                     )}
                     </div>
                 </RollingBox>
