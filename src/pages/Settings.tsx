@@ -53,6 +53,7 @@ import {
     getUsageBudgetWarning,
 } from '../features/settings/usageCost'
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
+import {usePluginPageCapacity} from '../features/plugins/usePluginPageCapacity'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
 import {CONVERSATION_TEMPERATURE_MAX} from '../features/ai-chat/model/AiControllerTypes'
 import {
@@ -987,51 +988,6 @@ interface PluginsPanelProps {
     onApiKeyDraftChange: (value: string) => void
     onSaveApiKey: (pluginId: string) => void | Promise<void>
     onCancelApiKey: () => void
-}
-
-const PLUGIN_GRID_COLUMNS = 2
-
-function usePluginPageCapacity(active: boolean, contentSize: number) {
-    const viewportRef = useRef<HTMLDivElement>(null)
-    const listRef = useRef<HTMLDivElement>(null)
-    const [pageSize, setPageSize] = useState(PLUGIN_GRID_COLUMNS)
-
-    useEffect(() => {
-        if (!active) return
-
-        const viewport = viewportRef.current
-        const list = listRef.current
-        if (!viewport || !list) return
-
-        let animationFrame = 0
-        const measure = () => {
-            cancelAnimationFrame(animationFrame)
-            animationFrame = requestAnimationFrame(() => {
-                const items = Array.from(list.children).filter(
-                    (item): item is HTMLElement => item instanceof HTMLElement
-                        && !item.classList.contains('plugins-empty'),
-                )
-                if (items.length === 0) return
-
-                const rowGap = Number.parseFloat(getComputedStyle(list).rowGap) || 0
-                const rowHeight = Math.max(...items.map(item => item.getBoundingClientRect().height))
-                const rows = Math.max(1, Math.floor((viewport.clientHeight + rowGap) / (rowHeight + rowGap)))
-                const nextPageSize = rows * PLUGIN_GRID_COLUMNS
-                setPageSize(current => current === nextPageSize ? current : nextPageSize)
-            })
-        }
-
-        const observer = new ResizeObserver(measure)
-        observer.observe(viewport)
-        measure()
-
-        return () => {
-            observer.disconnect()
-            cancelAnimationFrame(animationFrame)
-        }
-    }, [active, contentSize])
-
-    return {viewportRef, listRef, pageSize}
 }
 
 function PluginPagination({

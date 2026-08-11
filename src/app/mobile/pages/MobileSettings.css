@@ -896,3 +896,173 @@
 .mobile-settings-feedback .about-section-feedback-actions .fc-btn {
     border-radius: var(--fc-radius-full);
 }
+
+/* 插件管理使用固定视口：两列卡片填充可用高度，分页栏固定在底部。 */
+.mobile-settings-page--plugins {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.mobile-settings-page--plugins > .mobile-page-topbar {
+    flex: 0 0 auto;
+}
+
+.mobile-settings-plugin-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0;
+    gap: var(--fc-space-sm);
+}
+
+.mobile-settings-plugin-header-actions,
+.mobile-settings-plugin-library-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
+}
+
+.mobile-settings-plugin-grid-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    scrollbar-width: none;
+}
+
+.mobile-settings-plugin-grid-viewport::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-settings-plugin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: var(--fc-space-sm);
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-empty {
+    grid-column: 1 / -1;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-installed-plugin-item,
+.mobile-settings-plugin-grid .mobile-settings-plugin-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    padding: var(--fc-space-sm);
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: transparent;
+    box-shadow: none;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-icon {
+    margin-bottom: var(--fc-space-xs);
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item__body {
+    margin-bottom: var(--fc-space-sm);
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item__meta {
+    min-width: 0;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item__meta span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin-top: auto;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item__actions .fc-btn,
+.mobile-settings-plugin-grid .mobile-settings-plugin-item > .fc-btn {
+    min-width: 0;
+    width: 100%;
+}
+
+.mobile-settings-plugin-grid .mobile-settings-plugin-item > .fc-btn {
+    margin-top: auto;
+}
+
+.mobile-settings-plugin-pagination {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--fc-space-sm);
+    padding-top: var(--fc-space-sm);
+}
+
+.mobile-settings-plugin-pagination span {
+    min-width: 3rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.mobile-settings-plugin-pagination .fc-btn {
+    width: 100%;
+}
+
+.mobile-settings-plugin-pagination.is-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.mobile-settings-plugin-library-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.mobile-settings-plugin-library-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0 var(--fc-space-lg) var(--fc-space-lg);
+    background: transparent;
+}
+
+.mobile-settings-plugin-library-actions {
+    margin-bottom: var(--fc-space-md);
+}
+
+.mobile-settings-plugin-library-panel .mobile-settings-plugin-search-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.mobile-settings-plugin-library-panel .mobile-settings-plugin-list {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.mobile-settings-api-key-panel {
+    width: 100%;
+}
+
+.mobile-settings-api-key--panel {
+    margin: 0;
+    padding: 0 var(--fc-space-lg) var(--fc-space-lg);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
