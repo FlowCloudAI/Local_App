@@ -253,11 +253,11 @@
  * 玻璃盒：直接改自己的宽高从锚点矩形长到菜单矩形，形态是连续的。
  *
  * 不要改用容器 clip-path 来裁形状——实测（Redmi 24129RT7CC / Android WebView）
- * clip-path 会让容器成为 backdrop root，子元素的 backdrop-filter 就只能采样到
- * 容器内部（空的），毛玻璃直接消失。filter / opacity / mask / mix-blend-mode
- * 加在祖先上是同一类陷阱。
+ * clip-path 会让容器成为 backdrop root，内部层的 backdrop-filter 就只能采样到
+ * 容器内部（空的），毛玻璃直接消失。因此滤镜由容器自身承担，这一层只负责
+ * 可动画的底色、边框和圆角；不要再给容器加 clip-path / filter / opacity / mask。
  */
-.mobile-anchored-menu__glass {
+.mobile-anchored-menu::before {
     position: absolute;
     z-index: 0;
     top: 0;
@@ -268,6 +268,7 @@
     border: var(--mobile-glass-border);
     border-radius: inherit;
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
+    content: "";
     pointer-events: none;
     transition:
         width var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
@@ -277,7 +278,7 @@
     will-change: width, height, border-radius;
 }
 
-.mobile-anchored-menu[data-open="false"] .mobile-anchored-menu__glass {
+.mobile-anchored-menu[data-open="false"]::before {
     width: var(--mobile-anchored-menu-anchor-width);
     height: var(--mobile-anchored-menu-anchor-height);
     border-color: var(--mobile-anchored-menu-anchor-border-color);
@@ -296,10 +297,10 @@
  * 直接看穿到页面的一帧。--exit-fade 的值就是按这个约束定的，改之前先看这里。
  *
  * 用 animation 而不是 transition：延迟只该作用在 opacity 上，
- * 而 transition-delay 会套用到玻璃层整条 transition-property 列表，把形状收缩一起推迟。
+ * 而 transition-delay 会套用到 ::before 整条 transition-property 列表，把形状收缩一起推迟。
  * 另外 --closing 撤销时动画随之消失、opacity 立刻回到 1，中途反悔重开不会残留半透明。
  */
-.mobile-anchored-menu--closing .mobile-anchored-menu__glass {
+.mobile-anchored-menu--closing::before {
     animation: mobile-anchored-menu-exit-fade var(--mobile-anchored-menu-exit-fade) ease
         calc(var(--mobile-anchored-menu-duration-close) - var(--mobile-anchored-menu-exit-fade)) forwards;
 }
@@ -358,7 +359,7 @@
     max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
 }
 
-.mobile-anchored-menu--left .mobile-anchored-menu__glass {
+.mobile-anchored-menu--left::before {
     right: auto;
     left: 0;
 }
@@ -373,7 +374,7 @@
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-bottom) - 1rem));
 }
 
-.mobile-anchored-menu--placement-top .mobile-anchored-menu__glass {
+.mobile-anchored-menu--placement-top::before {
     top: auto;
     bottom: 0;
 }
@@ -456,7 +457,7 @@
 }
 
 @starting-style {
-    .mobile-anchored-menu[data-open="true"] .mobile-anchored-menu__glass {
+    .mobile-anchored-menu[data-open="true"]::before {
         width: var(--mobile-anchored-menu-anchor-width);
         height: var(--mobile-anchored-menu-anchor-height);
         border-color: var(--mobile-anchored-menu-anchor-border-color);
@@ -483,7 +484,7 @@
         --mobile-anchored-menu-exit-fade: 1ms;
     }
 
-    .mobile-anchored-menu__glass,
+    .mobile-anchored-menu::before,
     .mobile-anchored-menu__content {
         transition-delay: 0ms;
         transition-duration: 1ms;

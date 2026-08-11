@@ -100,7 +100,7 @@
  *
  * 为什么集中：开关只是把上面那组变量换掉，所以只要一处漏了 token（组件里硬编码
  * color-mix / blur），关闭态就得再补一条 !important 兜底——两套机制并存，
- * 而兜底那条还可能指错元素（.mobile-anchored-menu 的玻璃在独立的 __glass 层上，
+ * 而兜底那条还可能指错元素（.mobile-anchored-menu 的底色在 ::before 上，
  * 曾经打在容器上导致关掉毛玻璃后整块面板盖住屏幕）。收口到这里后关闭态是纯变量替换，
  * 不需要任何兜底名单。
  *
@@ -121,11 +121,14 @@
     backdrop-filter: var(--mobile-glass-filter);
 }
 
-/* 玻璃面独立伸缩：容器本身必须保持 transparent，否则会盖掉展开动画。 */
-:root .mobile-anchored-menu__glass {
-    background: var(--mobile-surface-control);
+/* WebView 无法从内部玻璃层采样页面，滤镜放容器；底色仍独立伸缩以保留展开动画。 */
+:root .mobile-anchored-menu {
     -webkit-backdrop-filter: var(--mobile-glass-filter-soft);
     backdrop-filter: var(--mobile-glass-filter-soft);
+}
+
+:root .mobile-anchored-menu::before {
+    background: var(--mobile-surface-control);
 }
 
 :root .mobile-entry-card__tag {
