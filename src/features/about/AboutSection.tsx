@@ -53,16 +53,113 @@ function MailIcon() {
     )
 }
 
-export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) {
+export function FeedbackSection() {
     const {showAlert} = useAlert()
-    const [appVersion, setAppVersion] = useState<string>('')
-    const [licenseModalOpen, setLicenseModalOpen] = useState(false)
-    const [fontLicenseModalOpen, setFontLicenseModalOpen] = useState(false)
     const [feedbackKind, setFeedbackKind] = useState<PublicFeedbackPayload['kind']>('suggestion')
     const [feedbackTitle, setFeedbackTitle] = useState('')
     const [feedbackContent, setFeedbackContent] = useState('')
     const [feedbackContact, setFeedbackContact] = useState('')
     const [submittingFeedback, setSubmittingFeedback] = useState(false)
+
+    const handleSubmitFeedback = useCallback(async () => {
+        if (!feedbackContent.trim()) {
+            void showAlert('请先填写反馈内容', 'warning', 'nonInvasive', 1800)
+            return
+        }
+
+        setSubmittingFeedback(true)
+        try {
+            const appVersion = await getVersion().catch(error => {
+                logger.error('读取应用版本失败:', error)
+                return undefined
+            })
+            await submit_public_feedback({
+                kind: feedbackKind,
+                title: feedbackTitle.trim() || undefined,
+                content: feedbackContent.trim(),
+                contact: feedbackContact.trim() || undefined,
+                app_version: appVersion,
+                page: '提交反馈页',
+            })
+            setFeedbackTitle('')
+            setFeedbackContent('')
+            setFeedbackContact('')
+            setFeedbackKind('suggestion')
+            void showAlert('反馈已提交，感谢你的帮助', 'success', 'nonInvasive', 2200)
+        } catch (error) {
+            logger.error('提交反馈失败:', error)
+            void showAlert(String(error), 'error', 'nonInvasive', 3000)
+        } finally {
+            setSubmittingFeedback(false)
+        }
+    }, [feedbackContact, feedbackContent, feedbackKind, feedbackTitle, showAlert])
+
+    return (
+        <section className="settings-section fc-section-card about-section-feedback">
+            <h2 className="settings-section-title fc-section-title">反馈内容</h2>
+            <div className="about-section-feedback-grid">
+                <label className="about-section-field">
+                    <span>类型</span>
+                    <Select
+                        className="about-section-feedback-kind"
+                        value={feedbackKind}
+                        options={[
+                            {value: 'suggestion', label: '建议'},
+                            {value: 'issue', label: '问题'},
+                        ]}
+                        onValueChange={value => setFeedbackKind(value === 'issue' ? 'issue' : 'suggestion')}
+                    />
+                </label>
+                <label className="about-section-field">
+                    <span>标题</span>
+                    <Input
+                        value={feedbackTitle}
+                        maxLength={120}
+                        placeholder="可选"
+                        onValueChange={setFeedbackTitle}
+                    />
+                </label>
+                <label className="about-section-field">
+                    <span>联系方式</span>
+                    <Input
+                        value={feedbackContact}
+                        maxLength={200}
+                        placeholder="可选，邮箱或其他联系方式"
+                        onValueChange={setFeedbackContact}
+                    />
+                </label>
+            </div>
+            <label className="about-section-field about-section-field--wide">
+                <span>内容</span>
+                <textarea
+                    className="about-section-textarea"
+                    value={feedbackContent}
+                    maxLength={5000}
+                    placeholder="请描述你的建议、遇到的问题或复现步骤。不会自动上传项目数据或日志。"
+                    onChange={event => setFeedbackContent(event.target.value)}
+                />
+            </label>
+            <div className="about-section-feedback-actions">
+                <span>{feedbackContent.length}/5000</span>
+                <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={submittingFeedback || !feedbackContent.trim()}
+                    onClick={() => void handleSubmitFeedback()}
+                >
+                    {submittingFeedback ? '提交中…' : '提交反馈'}
+                </Button>
+            </div>
+        </section>
+    )
+}
+
+export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) {
+    const {showAlert} = useAlert()
+    const [appVersion, setAppVersion] = useState<string>('')
+    const [licenseModalOpen, setLicenseModalOpen] = useState(false)
+    const [fontLicenseModalOpen, setFontLicenseModalOpen] = useState(false)
     const [checkingUpdate, setCheckingUpdate] = useState(false)
     const [installingUpdate, setInstallingUpdate] = useState(false)
     const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null)
@@ -99,35 +196,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'nonInvasive', 2200)
         }
     }, [showAlert])
-
-    const handleSubmitFeedback = useCallback(async () => {
-        if (!feedbackContent.trim()) {
-            void showAlert('请先填写反馈内容', 'warning', 'nonInvasive', 1800)
-            return
-        }
-
-        setSubmittingFeedback(true)
-        try {
-            await submit_public_feedback({
-                kind: feedbackKind,
-                title: feedbackTitle.trim() || undefined,
-                content: feedbackContent.trim(),
-                contact: feedbackContact.trim() || undefined,
-                app_version: appVersion || undefined,
-                page: '关于页',
-            })
-            setFeedbackTitle('')
-            setFeedbackContent('')
-            setFeedbackContact('')
-            setFeedbackKind('suggestion')
-            void showAlert('反馈已提交，感谢你的帮助', 'success', 'nonInvasive', 2200)
-        } catch (error) {
-            logger.error('提交反馈失败:', error)
-            void showAlert(String(error), 'error', 'nonInvasive', 3000)
-        } finally {
-            setSubmittingFeedback(false)
-        }
-    }, [appVersion, feedbackContact, feedbackContent, feedbackKind, feedbackTitle, showAlert])
 
     const handleCheckUpdate = useCallback(async () => {
         setCheckingUpdate(true)
@@ -382,63 +450,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                         onClick={() => onOpenDir(configDir)}
                     >
                         打开
-                    </Button>
-                </div>
-            </section>
-            <section className="settings-section fc-section-card about-section-feedback">
-                <h2 className="settings-section-title fc-section-title">提交反馈</h2>
-                <div className="about-section-feedback-grid">
-                    <label className="about-section-field">
-                        <span>类型</span>
-                        <Select
-                            className="about-section-feedback-kind"
-                            value={feedbackKind}
-                            options={[
-                                {value: 'suggestion', label: '建议'},
-                                {value: 'issue', label: '问题'},
-                            ]}
-                            onValueChange={value => setFeedbackKind(value === 'issue' ? 'issue' : 'suggestion')}
-                        />
-                    </label>
-                    <label className="about-section-field">
-                        <span>标题</span>
-                        <Input
-                            value={feedbackTitle}
-                            maxLength={120}
-                            placeholder="可选"
-                            onValueChange={setFeedbackTitle}
-                        />
-                    </label>
-                    <label className="about-section-field">
-                        <span>联系方式</span>
-                        <Input
-                            value={feedbackContact}
-                            maxLength={200}
-                            placeholder="可选，邮箱或其他联系方式"
-                            onValueChange={setFeedbackContact}
-                        />
-                    </label>
-                </div>
-                <label className="about-section-field about-section-field--wide">
-                    <span>内容</span>
-                    <textarea
-                        className="about-section-textarea"
-                        value={feedbackContent}
-                        maxLength={5000}
-                        placeholder="请描述你的建议、遇到的问题或复现步骤。不会自动上传项目数据或日志。"
-                        onChange={event => setFeedbackContent(event.target.value)}
-                    />
-                </label>
-                <div className="about-section-feedback-actions">
-                    <span>{feedbackContent.length}/5000</span>
-                    <Button
-                        type="button"
-                        variant="primary"
-                        size="sm"
-                        disabled={submittingFeedback || !feedbackContent.trim()}
-                        onClick={() => void handleSubmitFeedback()}
-                    >
-                        {submittingFeedback ? '提交中…' : '提交反馈'}
                     </Button>
                 </div>
             </section>

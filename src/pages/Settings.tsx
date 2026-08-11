@@ -18,7 +18,7 @@ import {
 import {openFileDialog} from '../api/dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '../api/events'
-import AboutSection from '../features/about/AboutSection'
+import AboutSection, {FeedbackSection} from '../features/about/AboutSection'
 import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
     ai_get_usage_by_model,
@@ -83,6 +83,7 @@ export type SettingsTab =
     | 'permissions'
     | 'templates'
     | 'usage'
+    | 'feedback'
     | 'about'
 export type SettingsFocusTarget = 'writer-mode' | 'api-key'
 export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
@@ -123,6 +124,7 @@ const SETTINGS_GROUPS: Array<{
     {
         label: '信息',
         tabs: [
+            {value: 'feedback', label: '提交反馈'},
             {value: 'about', label: '关于'},
         ],
     },
@@ -2289,6 +2291,18 @@ export default function Settings({
                                     onChange={handleThemeColorConfigChange}
                                 />
                             </section>
+                        </div>
+                    )}
+                    {activeTab === 'feedback' && (
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">提交反馈</h1>
+                                    <p className="fc-page-subtitle">提交建议或问题，不会自动上传项目数据或日志。</p>
+                                </div>
+                            </div>
+
+                            <FeedbackSection/>
                         </div>
                     )}
                     {activeTab === 'about' && (
