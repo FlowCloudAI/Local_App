@@ -1012,10 +1012,25 @@
 }
 
 .plugins-section-actions {
+  --settings-plugin-control-height: var(--fc-control-height-md);
+
   display: flex;
+  align-items: center;
   gap: var(--fc-space-md);
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.plugins-section-actions .fc-select__trigger,
+.plugins-section-actions > .fc-btn {
+  height: var(--settings-plugin-control-height);
+  min-height: var(--settings-plugin-control-height);
+  box-sizing: border-box;
+  padding-block: 0;
+}
+
+.plugins-page-size {
+  width: 7.5rem;
 }
 
 .plugins-list {
@@ -1073,6 +1088,45 @@
   margin-bottom: var(--fc-space-lg);
 }
 
+.settings-plugin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-lg);
+}
+
+.settings-plugin-pagination span {
+  min-width: 4rem;
+  color: var(--fc-color-text-secondary);
+  font-size: var(--fc-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.settings-plugin-pagination .fc-btn {
+  height: var(--fc-control-height-md);
+  min-height: var(--fc-control-height-md);
+  padding-block: 0;
+}
+
+.settings-plugin-library-panel {
+  width: min(52rem, 100%);
+}
+
+.settings-plugin-library-content {
+  padding: 0 var(--fc-space-lg) var(--fc-space-lg);
+  background: transparent;
+}
+
+.settings-plugin-library-actions {
+  margin-bottom: var(--fc-space-lg);
+}
+
+.settings-plugin-library-panel .plugin-card {
+  background: transparent;
+}
+
 @media (max-width: 720px) {
   .settings-text-model-grid {
     grid-template-columns: 1fr;
@@ -1127,6 +1181,14 @@
 
   .plugins-section-actions > *,
   .plugins-kind-tabs > * {
+    flex: 1;
+  }
+
+  .settings-plugin-pagination {
+    justify-content: stretch;
+  }
+
+  .settings-plugin-pagination .fc-btn {
     flex: 1;
   }
 

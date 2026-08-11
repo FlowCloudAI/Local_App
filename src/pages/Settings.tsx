@@ -72,6 +72,7 @@ import {
 } from '../features/settings/pluginCatalogStore'
 import {SidebarResizeHandle} from '../shared/ui/layout/SidebarResizeHandle'
 import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
+import {FloatingPanel} from '../shared/ui/overlay'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
@@ -88,6 +89,7 @@ export type SettingsTab =
 export type SettingsFocusTarget = 'writer-mode' | 'api-key'
 export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 type PluginKindFilter = SettingsPluginKindFilter
+type PluginPageRows = 2 | 5 | 10
 type SearchSourceKey = keyof SearchSourceSettings
 
 type TemplateView = 'list' | 'detail'
@@ -99,6 +101,12 @@ const PLUGIN_KIND_LABELS: Record<PluginKindFilter, string> = {
     image: 'AI 绘图',
     tts: 'AI 语音',
 }
+
+const PLUGIN_PAGE_ROW_OPTIONS: Array<{value: PluginPageRows; label: string}> = [
+    {value: 2, label: '每页 2 行'},
+    {value: 5, label: '每页 5 行'},
+    {value: 10, label: '每页 10 行'},
+]
 
 const SETTINGS_GROUPS: Array<{
     label: string
@@ -988,6 +996,44 @@ interface PluginsPanelProps {
     onCancelApiKey: () => void
 }
 
+function PluginPagination({
+                              page,
+                              pageCount,
+                              ariaLabel,
+                              onPageChange,
+                          }: {
+    page: number
+    pageCount: number
+    ariaLabel: string
+    onPageChange: (page: number) => void
+}) {
+    if (pageCount <= 1) return null
+
+    return (
+        <nav className="settings-plugin-pagination" aria-label={ariaLabel}>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => onPageChange(page - 1)}
+            >
+                上一页
+            </Button>
+            <span aria-live="polite">{page} / {pageCount}</span>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === pageCount}
+                onClick={() => onPageChange(page + 1)}
+            >
+                下一页
+            </Button>
+        </nav>
+    )
+}
+
 function PluginsPanel({
                           localPlugins,
                           marketPlugins,
@@ -1018,6 +1064,11 @@ function PluginsPanel({
                           onSaveApiKey,
                           onCancelApiKey,
                       }: PluginsPanelProps) {
+    const [pluginLibraryOpen, setPluginLibraryOpen] = useState(false)
+    const [installedPageRows, setInstalledPageRows] = useState<PluginPageRows>(2)
+    const [installedPage, setInstalledPage] = useState(1)
+    const [marketPageRows, setMarketPageRows] = useState<PluginPageRows>(2)
+    const [marketPage, setMarketPage] = useState(1)
     const installedPluginMap = new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
     const installedIds = new Set(installedPluginMap.keys())
     const marketPluginMap = new Map(marketPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
@@ -1029,53 +1080,93 @@ function PluginsPanel({
             || plugin.author.toLowerCase().includes(query)
         return matchKind && matchSearch
     })
+    const installedPageCount = Math.max(1, Math.ceil(localPlugins.length / installedPageRows))
+    const currentInstalledPage = Math.min(installedPage, installedPageCount)
+    const paginatedLocalPlugins = localPlugins.slice(
+        (currentInstalledPage - 1) * installedPageRows,
+        currentInstalledPage * installedPageRows,
+    )
+    const marketPageCount = Math.max(1, Math.ceil(filteredMarket.length / marketPageRows))
+    const currentMarketPage = Math.min(marketPage, marketPageCount)
+    const paginatedMarketPlugins = filteredMarket.slice(
+        (currentMarketPage - 1) * marketPageRows,
+        currentMarketPage * marketPageRows,
+    )
+
+    useEffect(() => {
+        setInstalledPage(page => Math.min(page, installedPageCount))
+    }, [installedPageCount])
+
+    useEffect(() => {
+        setMarketPage(page => Math.min(page, marketPageCount))
+    }, [marketPageCount])
 
     return (
-        <div className="settings-container fc-page-shell fc-page-shell--narrow">
-            <div className="settings-title fc-page-header">
-                <div className="fc-page-title-block">
-                    <h1 className="fc-page-title">插件管理</h1>
-                    <p className="fc-page-subtitle">安装、更新和卸载本地 AI 插件，并配置插件访问密钥。</p>
-                </div>
-            </div>
-
-            <section className="settings-section fc-section-card">
-                <div className="plugins-section-header">
-                    <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={loadingLocal}
-                        onClick={onRefreshLocal}
-                    >
-                        {loadingLocal ? '刷新中…' : '刷新'}
-                    </Button>
+        <>
+            <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                <div className="settings-title fc-page-header">
+                    <div className="fc-page-title-block">
+                        <h1 className="fc-page-title">插件管理</h1>
+                        <p className="fc-page-subtitle">管理已安装的 AI 插件，并配置插件访问密钥。</p>
+                    </div>
                 </div>
 
-                {localError && (
-                    <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
-                )}
+                <section className="settings-section fc-section-card">
+                    <div className="plugins-section-header">
+                        <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
+                        <div className="plugins-section-actions">
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => setPluginLibraryOpen(true)}
+                            >
+                                安装插件
+                            </Button>
+                            <Select
+                                className="plugins-page-size"
+                                aria-label="已安装插件每页显示行数"
+                                options={PLUGIN_PAGE_ROW_OPTIONS}
+                                value={installedPageRows}
+                                onValueChange={(value) => {
+                                    setInstalledPageRows(Number(value) as PluginPageRows)
+                                    setInstalledPage(1)
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={loadingLocal}
+                                onClick={onRefreshLocal}
+                            >
+                                {loadingLocal ? '刷新中…' : '刷新'}
+                            </Button>
+                        </div>
+                    </div>
 
-                <div className="plugins-list">
-                    {localPlugins.length === 0 && !loadingLocal ? (
-                        <div className="plugins-empty">暂无已安装插件</div>
-                    ) : (
-                        localPlugins.map(plugin => {
-                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
-                            const updateVersion = marketPlugin
-                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
-                                ? marketPlugin.version
-                                : undefined
-                            const isExpanded = expandedApiKeyPluginId === plugin.id
-                            const isSaving = savingApiKeyPluginId === plugin.id
-                            const isConfigured = apiKeyStatus[plugin.id] === true
+                    {localError && (
+                        <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
+                    )}
 
-                            return (
-                                <div
-                                    key={plugin.id}
-                                    className={`settings-plugin-card${isExpanded ? ' is-expanded' : ''}`}
-                                >
+                    <div className="plugins-list">
+                        {localPlugins.length === 0 && !loadingLocal ? (
+                            <div className="plugins-empty">暂无已安装插件</div>
+                        ) : (
+                            paginatedLocalPlugins.map(plugin => {
+                                const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
+                                const updateVersion = marketPlugin
+                                && isRemoteVersionNewer(plugin.version, marketPlugin.version)
+                                    ? marketPlugin.version
+                                    : undefined
+                                const isExpanded = expandedApiKeyPluginId === plugin.id
+                                const isSaving = savingApiKeyPluginId === plugin.id
+                                const isConfigured = apiKeyStatus[plugin.id] === true
+
+                                return (
+                                    <div
+                                        key={plugin.id}
+                                        className={`settings-plugin-card${isExpanded ? ' is-expanded' : ''}`}
+                                    >
                                     <LocalPluginCard
                                         plugin={plugin}
                                         updateVersion={updateVersion}
@@ -1146,17 +1237,28 @@ function PluginsPanel({
                                             </form>
                                         </div>
                                     </div>
-                                </div>
-                            )
-                        })
-                    )}
-                </div>
-            </section>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+                    <PluginPagination
+                        page={currentInstalledPage}
+                        pageCount={installedPageCount}
+                        ariaLabel="已安装插件分页"
+                        onPageChange={setInstalledPage}
+                    />
+                </section>
+            </div>
 
-            <section className="settings-section fc-section-card">
-                <div className="plugins-section-header">
-                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
-                    <div className="plugins-section-actions">
+            <FloatingPanel
+                open={pluginLibraryOpen}
+                onClose={() => setPluginLibraryOpen(false)}
+                title="插件库"
+                className="settings-plugin-library-panel"
+            >
+                <div className="settings-plugin-library-content">
+                    <div className="plugins-section-actions settings-plugin-library-actions">
                         <Button
                             type="button"
                             size="sm"
@@ -1165,6 +1267,16 @@ function PluginsPanel({
                         >
                             {installingLocalFile ? '安装中…' : '安装本地插件'}
                         </Button>
+                        <Select
+                            className="plugins-page-size"
+                            aria-label="插件库每页显示行数"
+                            options={PLUGIN_PAGE_ROW_OPTIONS}
+                            value={marketPageRows}
+                            onValueChange={(value) => {
+                                setMarketPageRows(Number(value) as PluginPageRows)
+                                setMarketPage(1)
+                            }}
+                        />
                         <Button
                             type="button"
                             variant="outline"
@@ -1175,59 +1287,72 @@ function PluginsPanel({
                             {loadingMarket ? '加载中…' : '刷新'}
                         </Button>
                     </div>
-                </div>
 
-                <div className="plugins-filter-bar">
-                    <Input
-                        placeholder="搜索名称或作者…"
-                        value={searchText}
-                        onValueChange={onSearchTextChange}
-                        className="plugins-search"
-                    />
-                    <div className="plugins-kind-tabs">
-                        {(['all', 'llm', 'image', 'tts'] as const).map(kind => (
-                            <button
-                                key={kind}
-                                className={`plugins-kind-tab${kindFilter === kind ? ' active' : ''}`}
-                                onClick={() => onKindFilterChange(kind)}
-                            >
-                                {PLUGIN_KIND_LABELS[kind]}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {marketError && (
-                    <div className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>
-                )}
-
-                <div className="plugins-list">
-                    {filteredMarket.length === 0 && !loadingMarket ? (
-                        <div className="plugins-empty">
-                            {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
+                    <div className="plugins-filter-bar">
+                        <Input
+                            placeholder="搜索名称或作者…"
+                            value={searchText}
+                            onValueChange={(value) => {
+                                setMarketPage(1)
+                                onSearchTextChange(value)
+                            }}
+                            className="plugins-search"
+                        />
+                        <div className="plugins-kind-tabs">
+                            {(['all', 'llm', 'image', 'tts'] as const).map(kind => (
+                                <button
+                                    key={kind}
+                                    type="button"
+                                    className={`plugins-kind-tab${kindFilter === kind ? ' active' : ''}`}
+                                    onClick={() => {
+                                        setMarketPage(1)
+                                        onKindFilterChange(kind)
+                                    }}
+                                >
+                                    {PLUGIN_KIND_LABELS[kind]}
+                                </button>
+                            ))}
                         </div>
-                    ) : (
-                        filteredMarket.map(plugin => {
-                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
-                            const hasUpdate = installedPlugin
-                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
-                                : false
-                            return (
-                                <MarketPluginCard
-                                    key={plugin.id}
-                                    plugin={plugin}
-                                    installedIds={installedIds}
-                                    installedVersion={installedPlugin?.version}
-                                    hasUpdate={hasUpdate}
-                                    onInstall={onInstall}
-                                    installing={installingIds.has(plugin.id)}
-                                />
-                            )
-                        })
+                    </div>
+
+                    {marketError && (
+                        <div className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>
                     )}
+
+                    <div className="plugins-list">
+                        {filteredMarket.length === 0 && !loadingMarket ? (
+                            <div className="plugins-empty">
+                                {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
+                            </div>
+                        ) : (
+                            paginatedMarketPlugins.map(plugin => {
+                                const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
+                                const hasUpdate = installedPlugin
+                                    ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
+                                    : false
+                                return (
+                                    <MarketPluginCard
+                                        key={plugin.id}
+                                        plugin={plugin}
+                                        installedIds={installedIds}
+                                        installedVersion={installedPlugin?.version}
+                                        hasUpdate={hasUpdate}
+                                        onInstall={onInstall}
+                                        installing={installingIds.has(plugin.id)}
+                                    />
+                                )
+                            })
+                        )}
+                    </div>
+                    <PluginPagination
+                        page={currentMarketPage}
+                        pageCount={marketPageCount}
+                        ariaLabel="插件库分页"
+                        onPageChange={setMarketPage}
+                    />
                 </div>
-            </section>
-        </div>
+            </FloatingPanel>
+        </>
     )
 }
 interface SettingsProps {
