@@ -177,19 +177,33 @@ function assertTerrainLayering() {
     const symbolShapes: MapPreviewScene['shapes'] = [{
         id: 'symbol-land',
         name: '符号陆地',
-        polygon: [[0, 0], [128, 0], [128, 128], [0, 128]],
+        polygon: [[0, 0], [256, 0], [256, 256], [0, 256]],
         fillColor: [255, 255, 255, 255],
         lineColor: [0, 0, 0, 255],
     }]
     const symbolStyle = getPixiMapStyle('tolkien')
     for (const kind of ['mountain', 'hill', 'forest'] as const) {
         const symbolField = createTerrainFieldData([
-            {id: `symbol-${kind}`, kind, points: [[64, 64]], radius: 54, mode: 'paint'},
-        ], 128, 128)
+            {id: `symbol-${kind}`, kind, points: [[128, 128]], radius: 120, mode: 'paint', shape: 'square'},
+        ], 256, 256)
         const firstPlacements = buildTerrainSymbolPlacements(symbolField, symbolShapes, symbolStyle)
         const secondPlacements = buildTerrainSymbolPlacements(symbolField, symbolShapes, symbolStyle)
         if (firstPlacements.length === 0 || JSON.stringify(firstPlacements) !== JSON.stringify(secondPlacements)) {
             throw new Error(`地形符号自检失败：${kind} 图片放置为空或不确定`)
+        }
+
+        const edgePlacement = firstPlacements[0]
+        const narrowLand: MapPreviewScene['shapes'] = [{
+            ...symbolShapes[0],
+            polygon: [
+                [edgePlacement.x - 2, edgePlacement.y - 2],
+                [edgePlacement.x + 2, edgePlacement.y - 2],
+                [edgePlacement.x + 2, edgePlacement.y + 2],
+                [edgePlacement.x - 2, edgePlacement.y + 2],
+            ],
+        }]
+        if (buildTerrainSymbolPlacements(symbolField, narrowLand, symbolStyle).length !== 0) {
+            throw new Error(`地形符号自检失败：${kind} 图片越过大陆边缘`)
         }
     }
 }
@@ -231,8 +245,8 @@ const baseScene: MapPreviewScene = {
         {id: 'terrain-grass', kind: 'grass', points: [[230, 270], [300, 230], [370, 250]], radius: 58, mode: 'paint'},
         {id: 'terrain-mountain', kind: 'mountain', points: [[275, 330], [340, 350], [400, 325]], radius: 42, mode: 'paint'},
         {id: 'terrain-desert', kind: 'desert', points: [[355, 225], [420, 275], [470, 310]], radius: 48, mode: 'paint'},
-        {id: 'terrain-hill', kind: 'hill', points: [[500, 205], [560, 180], [620, 185]], radius: 44, mode: 'paint'},
-        {id: 'terrain-forest', kind: 'forest', points: [[510, 410], [570, 445], [625, 465]], radius: 46, mode: 'paint'},
+        {id: 'terrain-hill', kind: 'hill', points: [[420, 205], [455, 235], [480, 275]], radius: 52, mode: 'paint'},
+        {id: 'terrain-forest', kind: 'forest', points: [[205, 365], [255, 395], [315, 410]], radius: 58, mode: 'paint'},
         {id: 'terrain-erase', kind: 'grass', points: [[292, 250], [320, 270]], radius: 18, mode: 'erase'},
     ],
 }

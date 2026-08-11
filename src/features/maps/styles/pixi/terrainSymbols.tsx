@@ -75,10 +75,50 @@ function isOnLand(x: number, y: number, shapes: MapPreviewShape[]): boolean {
 }
 
 function sampleTerrain(field: TerrainFieldData, x: number, y: number, typeIndex: number): boolean {
+    if (x < 0 || y < 0 || x >= field.width || y >= field.height) return false
     const px = Math.max(0, Math.min(field.width - 1, Math.round(x)))
     const py = Math.max(0, Math.min(field.height - 1, Math.round(y)))
     const offset = (py * field.width + px) * 4
     return field.data[offset] === typeIndex && field.data[offset + 1] >= 210
+}
+
+function isFootprintInsideTerrainAndLand({
+    field,
+    shapes,
+    typeIndex,
+    asset,
+    x,
+    y,
+    width,
+    height,
+}: {
+    field: TerrainFieldData
+    shapes: MapPreviewShape[]
+    typeIndex: number
+    asset: PixiTerrainSymbolAsset
+    x: number
+    y: number
+    width: number
+    height: number
+}): boolean {
+    // 图片以底部锚点落图，主体向上延伸；按完整纹理占位检查，避免只看锚点时越过地形或海岸。
+    const padding = Math.max(4, Math.min(width, height) * 0.08)
+    const left = x + width * ((asset.contentLeft ?? 0) - asset.anchorX) / asset.width - padding
+    const top = y + height * ((asset.contentTop ?? 0) - asset.anchorY) / asset.height - padding
+    const right = x + width * ((asset.contentRight ?? asset.width) - asset.anchorX) / asset.width + padding
+    const bottom = y + height * ((asset.contentBottom ?? asset.height) - asset.anchorY) / asset.height + padding
+    const columns = Math.max(2, Math.ceil((right - left) / 6))
+    const rows = Math.max(2, Math.ceil((bottom - top) / 6))
+
+    for (let row = 0; row <= rows; row++) {
+        const sampleY = top + (bottom - top) * row / rows
+        for (let column = 0; column <= columns; column++) {
+            const sampleX = left + (right - left) * column / columns
+            if (!sampleTerrain(field, sampleX, sampleY, typeIndex)
+                || !isOnLand(sampleX, sampleY, shapes)) return false
+        }
+    }
+    return true
 }
 
 function isSymbolAsset(value: string): value is PixiTerrainSymbolAssetId {
@@ -108,7 +148,6 @@ export function buildTerrainSymbolPlacements(
         const opacity = Math.max(0, Math.min(1, getNumber(config.opacity, 1)))
         const jitter = Math.max(0, Math.min(0.8, getNumber(config.jitter, 0.42)))
         const variants = Math.max(1, Math.min(3, Math.round(getNumber(config.variants, 3))))
-        const margin = Math.max(5, targetSize * 0.38)
         const salt = definition.order * 7919 + assetId.length * 104729
         const variantAssets = Array.from({length: variants}, (_, variant) => (
             buildPixiTerrainSymbolAsset(assetId, color, variant)
@@ -119,10 +158,21 @@ export function buildTerrainSymbolPlacements(
                 const x = gridX + (hashUnit(gridX, gridY, salt) - 0.5) * spacing * jitter
                 const y = gridY + (hashUnit(gridX, gridY, salt + 17) - 0.5) * spacing * jitter
                 if (!sampleTerrain(field, x, y, definition.order) || !isOnLand(x, y, shapes)) continue
-                if (!sampleTerrain(field, x - margin, y, definition.order)
-                    || !sampleTerrain(field, x + margin, y, definition.order)
-                    || !sampleTerrain(field, x, y - margin * 0.85, definition.order)
-                    || !sampleTerrain(field, x, y + margin * 0.25, definition.order)) continue
+
+                const variant = Math.min(variants - 1, Math.floor(hashUnit(gridX, gridY, salt + 31) * variants))
+                const asset = variantAssets[variant]
+                const width = targetSize * (0.70 + hashUnit(gridX, gridY, salt + 47) * 0.60)
+                const height = width * asset.height / asset.width
+                if (!isFootprintInsideTerrainAndLand({
+                    field,
+                    shapes,
+                    typeIndex: definition.order,
+                    asset,
+                    x,
+                    y,
+                    width,
+                    height,
+                })) continue
 
                 const densityRadius = spacing * 0.58
                 const interiorSamples = [
@@ -134,10 +184,6 @@ export function buildTerrainSymbolPlacements(
                 const density = 0.30 + interiorSamples / 4 * 0.70
                 if (hashUnit(gridX, gridY, salt + 23) > density) continue
 
-                const variant = Math.min(variants - 1, Math.floor(hashUnit(gridX, gridY, salt + 31) * variants))
-                const asset = variantAssets[variant]
-                const width = targetSize * (0.70 + hashUnit(gridX, gridY, salt + 47) * 0.60)
-                const height = width * asset.height / asset.width
                 const assetKey = `${assetId}:${color}:${variant}`
                 placements.push({
                     key: `${definition.id}:${Math.round(gridX)}:${Math.round(gridY)}`,

@@ -159,8 +159,8 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
                     },
                     forest: {
                         asset: 'tolkien-tree',
-                        size: 32,
-                        spacing: 38,
+                        size: 22,
+                        spacing: 25,
                         opacity: 0.88,
                         jitter: 0.58,
                         variants: 3,

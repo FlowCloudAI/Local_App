@@ -35,6 +35,10 @@ export interface PixiTerrainSymbolAsset {
     height: number
     anchorX: number
     anchorY: number
+    contentLeft?: number
+    contentTop?: number
+    contentRight?: number
+    contentBottom?: number
 }
 
 type PixiTerrainSymbolVariants = readonly [
@@ -45,19 +49,19 @@ type PixiTerrainSymbolVariants = readonly [
 
 const TOLKIEN_TERRAIN_SYMBOL_ASSETS: Partial<Record<PixiTerrainSymbolAssetId, PixiTerrainSymbolVariants>> = {
     'tolkien-mountain': [
-        {url: tolkienMountain1Url, width: 512, height: 512, anchorX: 256, anchorY: 447},
-        {url: tolkienMountain2Url, width: 512, height: 512, anchorX: 256, anchorY: 487},
-        {url: tolkienMountain3Url, width: 512, height: 512, anchorX: 256, anchorY: 469},
+        {url: tolkienMountain1Url, width: 512, height: 512, anchorX: 256, anchorY: 447, contentLeft: 12, contentTop: 48, contentRight: 500, contentBottom: 447},
+        {url: tolkienMountain2Url, width: 512, height: 512, anchorX: 256, anchorY: 487, contentLeft: 15, contentTop: 91, contentRight: 497, contentBottom: 487},
+        {url: tolkienMountain3Url, width: 512, height: 512, anchorX: 256, anchorY: 469, contentLeft: 11, contentTop: 70, contentRight: 498, contentBottom: 469},
     ],
     'tolkien-hill': [
-        {url: tolkienHill1Url, width: 512, height: 512, anchorX: 256, anchorY: 512},
-        {url: tolkienHill2Url, width: 512, height: 512, anchorX: 256, anchorY: 512},
-        {url: tolkienHill3Url, width: 512, height: 512, anchorX: 256, anchorY: 503},
+        {url: tolkienHill1Url, width: 512, height: 512, anchorX: 256, anchorY: 512, contentLeft: 0, contentTop: 237, contentRight: 512, contentBottom: 512},
+        {url: tolkienHill2Url, width: 512, height: 512, anchorX: 256, anchorY: 512, contentLeft: 0, contentTop: 203, contentRight: 512, contentBottom: 512},
+        {url: tolkienHill3Url, width: 512, height: 512, anchorX: 256, anchorY: 503, contentLeft: 0, contentTop: 217, contentRight: 507, contentBottom: 503},
     ],
     'tolkien-tree': [
-        {url: tolkienTree1Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
-        {url: tolkienTree2Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
-        {url: tolkienTree3Url, width: 256, height: 256, anchorX: 128, anchorY: 256},
+        {url: tolkienTree1Url, width: 256, height: 256, anchorX: 128, anchorY: 256, contentLeft: 17, contentTop: 6, contentRight: 223, contentBottom: 256},
+        {url: tolkienTree2Url, width: 256, height: 256, anchorX: 128, anchorY: 256, contentLeft: 51, contentTop: 11, contentRight: 205, contentBottom: 256},
+        {url: tolkienTree3Url, width: 256, height: 256, anchorX: 128, anchorY: 256, contentLeft: 31, contentTop: 5, contentRight: 209, contentBottom: 256},
     ],
 }
 
