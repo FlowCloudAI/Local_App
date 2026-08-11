@@ -21,11 +21,17 @@
     display: flex;
     min-height: 0;
     flex: 1;
-    margin: 0 var(--mobile-page-x) var(--fc-space-md);
+    margin: var(--fc-space-sm) var(--mobile-page-x) var(--fc-space-md);
     overflow: hidden;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--fc-color-bg-secondary);
+}
+
+.mobile-relation-graph-page__graph > .project-relation-graph {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
 }
 
 .mobile-relation-graph-page .project-relation-graph > .fc-op-header {
