@@ -310,6 +310,7 @@ export function MobileAnchoredMenu({
                 } as CSSProperties : undefined}
                 onPointerDown={event => event.stopPropagation()}
             >
+                <div className="mobile-anchored-menu__glass" aria-hidden="true"/>
                 <div className="mobile-anchored-menu__content">
                     {children}
                 </div>
