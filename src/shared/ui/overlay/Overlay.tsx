@@ -1,10 +1,13 @@
-import {type ReactNode, useEffect, useRef, useState} from 'react'
+import {type CSSProperties, type ReactNode, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {pushOverlay, removeOverlay} from './overlayStack'
 import './Overlay.css'
 
-/** 退场动画时长，需 ≥ Overlay.css 中的浮层过渡时长。 */
-const EXIT_DURATION_MS = 100
+/** 退场动画时长，需与传给 Overlay.css 的浮层过渡时长一致。 */
+const FLOATING_TRANSITION_MS = 100
+const SHEET_TRANSITION_MS = 280
+
+type OverlayStyle = CSSProperties & {'--fc-overlay-transition-duration': string}
 
 type OverlayVariant = 'floating' | 'sheet'
 
@@ -40,6 +43,7 @@ export default function Overlay({
     dataTourId,
     children,
 }: OverlayProps) {
+    const transitionDurationMs = variant === 'sheet' ? SHEET_TRANSITION_MS : FLOATING_TRANSITION_MS
     const [mounted, setMounted] = useState(open)
     const [active, setActive] = useState(false)
     const [overlayTop, setOverlayTop] = useState(0)
@@ -61,9 +65,9 @@ export default function Overlay({
             return () => cancelAnimationFrame(raf)
         }
         setActive(false)
-        const timer = setTimeout(() => setMounted(false), EXIT_DURATION_MS)
+        const timer = setTimeout(() => setMounted(false), transitionDurationMs)
         return () => clearTimeout(timer)
-    }, [open])
+    }, [open, transitionDurationMs])
 
     useEffect(() => {
         if (variant !== 'floating') {
@@ -119,11 +123,16 @@ export default function Overlay({
 
     if (!mounted) return null
 
+    const overlayStyle: OverlayStyle = {
+        '--fc-overlay-transition-duration': `${transitionDurationMs}ms`,
+        ...(variant === 'floating' ? {top: overlayTop} : {}),
+    }
+
     return createPortal(
         <div
             className={`fc-overlay fc-overlay--${variant}${layerClassName ? ` ${layerClassName}` : ''}`}
             data-state={active ? 'open' : 'closed'}
-            style={variant === 'floating' ? {top: overlayTop} : undefined}
+            style={overlayStyle}
             onMouseDown={(e) => {
                 // 仅背板（自身）被按下时关闭，面板内部按下不触发。
                 if (e.target === e.currentTarget && dismissibleRef.current) onCloseRef.current?.()

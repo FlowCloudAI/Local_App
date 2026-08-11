@@ -1,7 +1,9 @@
 /* 浮层基座样式：背板 + 定位 + 进出动画。卡片外观由子内容/变体提供。 */
 
 .fc-overlay {
-    --fc-overlay-transition: 100ms ease;
+    --fc-overlay-transition-duration: 100ms;
+    --fc-overlay-transition-easing: ease;
+    --fc-overlay-transition: var(--fc-overlay-transition-duration) var(--fc-overlay-transition-easing);
     position: fixed;
     inset: 0;
     z-index: var(--fc-z-modal);
@@ -29,6 +31,7 @@
 
 /* 上滑：贴底铺满，底部留安全区。变体组件后续接入。 */
 .fc-overlay--sheet {
+    --fc-overlay-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
     align-items: flex-end;
     justify-content: stretch;
     padding-bottom: env(safe-area-inset-bottom, 0px);

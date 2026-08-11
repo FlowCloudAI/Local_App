@@ -87,6 +87,31 @@
     overflow: hidden;
 }
 
+/* 移动端普通按钮默认采用胶囊规范；显式形状、图标按钮和按钮组仍由组件调用方决定。 */
+.mobile-app .fc-btn:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    --btn-radius: var(--fc-radius-full);
+}
+
+.mobile-app .fc-btn--xs:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    padding-inline: max(var(--fc-space-sm), calc(var(--fc-space-xs) * 2));
+}
+
+.mobile-app .fc-btn--sm:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    padding-inline: max(var(--fc-space-md), calc(var(--fc-space-sm) * 2));
+}
+
+.mobile-app .fc-btn--md:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    padding-inline: max(var(--fc-space-lg), calc(var(--fc-space-md) * 2));
+}
+
+.mobile-app .fc-btn--lg:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    padding-inline: max(var(--fc-space-xl), calc(var(--fc-space-lg) * 2));
+}
+
+.mobile-app .fc-btn--xl:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
+    padding-inline: max(var(--fc-space-2xl), calc(var(--fc-space-xl) * 2));
+}
+
 .mobile-app-side-drawer-shell {
     position: relative;
     display: flex;
