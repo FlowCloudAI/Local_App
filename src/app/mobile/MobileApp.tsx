@@ -34,8 +34,10 @@ import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
+import MobileRelationGraph from './pages/MobileRelationGraph'
 import MobileSettings from './pages/MobileSettings'
 import MobileTagManager from './pages/MobileTagManager'
+import MobileTimeline from './pages/MobileTimeline'
 import MobileWorldCheck from './pages/MobileWorldCheck'
 import {
     type MobileBeforeLeave,
@@ -467,6 +469,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 )}
                                 {currentPage?.type === 'worldCheck' && (
                                     <MobileWorldCheck {...pageProps} params={currentPage.params}/>
+                                )}
+                                {currentPage?.type === 'timeline' && (
+                                    <MobileTimeline {...pageProps} params={currentPage.params}/>
+                                )}
+                                {currentPage?.type === 'relationGraph' && (
+                                    <MobileRelationGraph {...pageProps} params={currentPage.params}/>
                                 )}
                             </div>
                         )}

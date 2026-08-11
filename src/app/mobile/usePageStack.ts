@@ -30,6 +30,8 @@ export interface MobilePageParamsMap {
     tagManager: MobileProjectScopedPageParams
     categoryManager: MobileProjectScopedPageParams
     worldCheck: MobileProjectScopedPageParams
+    timeline: MobileProjectScopedPageParams
+    relationGraph: MobileProjectScopedPageParams
     settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined
     settingsAppearance: undefined

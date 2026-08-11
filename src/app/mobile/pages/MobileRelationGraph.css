@@ -1,0 +1,95 @@
+.mobile-relation-graph-page {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mobile-relation-graph-page__topbar {
+    margin-bottom: 0;
+}
+
+.mobile-relation-graph-page__title {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--mobile-font-weight-heading);
+    line-height: 1.2;
+}
+
+.mobile-relation-graph-page__graph {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    margin: 0 var(--mobile-page-x) var(--fc-space-md);
+    overflow: hidden;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--fc-color-bg-secondary);
+}
+
+.mobile-relation-graph-page .project-relation-graph > .fc-op-header {
+    justify-content: flex-end;
+    padding: var(--fc-space-sm);
+    background: var(--fc-color-bg);
+}
+
+.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-op-header__title-block {
+    display: none;
+}
+
+.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-op-header__actions {
+    width: 100%;
+    justify-content: flex-end;
+}
+
+.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-button {
+    min-height: 2.75rem;
+}
+
+.mobile-relation-graph-page .project-relation-graph .fc-op-viewport {
+    margin: 0;
+}
+
+.mobile-relation-graph-page__sheet-title {
+    margin: 0 0 var(--fc-space-md);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--mobile-font-weight-heading);
+}
+
+.mobile-relation-graph-page__relations-host {
+    height: min(28rem, 48dvh);
+    overflow: hidden;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--fc-color-bg);
+}
+
+.mobile-relation-graph-page__relations-host .rg-sidebar__relation {
+    min-height: 3.25rem;
+}
+
+.mobile-relation-graph-page__sheet {
+    overflow: hidden;
+}
+
+@media (max-width: 720px) {
+    .mobile-relation-graph-page .rg-node {
+        width: 9.5rem;
+    }
+
+    .mobile-relation-graph-page .rg-node__cover-wrap {
+        height: 4.75rem;
+    }
+
+    .mobile-relation-graph-page .react-flow__controls button {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    .mobile-relation-graph-page .rg-layout-dialog {
+        width: calc(100vw - 1.5rem);
+        max-height: calc(100dvh - 1.5rem);
+    }
+}

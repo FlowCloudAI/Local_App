@@ -1,0 +1,117 @@
+.mobile-timeline-page {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mobile-timeline-page__topbar {
+    margin-bottom: 0;
+}
+
+.mobile-timeline-page__title {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--mobile-font-weight-heading);
+    line-height: 1.2;
+}
+
+.mobile-timeline-page__content {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-header {
+    justify-content: flex-end;
+    padding: var(--fc-space-sm) var(--mobile-page-x);
+    background: var(--fc-color-bg);
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-header .fc-op-header__title-block {
+    display: none;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-header .fc-op-header__actions {
+    width: 100%;
+    justify-content: flex-end;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-header .fc-button {
+    min-height: 2.75rem;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-toolbar {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: var(--fc-space-sm) var(--mobile-page-x);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-toolbar::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-toolbar > * {
+    flex: 0 0 auto;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-viewport-empty {
+    align-items: flex-start;
+    padding: var(--fc-space-md) var(--mobile-page-x);
+    box-sizing: border-box;
+}
+
+.mobile-timeline-page .project-timeline > .fc-op-viewport-empty .fc-op-hint-block {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+    .mobile-timeline-page .project-timeline__layout {
+        gap: var(--fc-space-sm);
+        padding: var(--fc-space-sm) var(--mobile-page-x) var(--fc-space-md);
+    }
+
+    .mobile-timeline-page .project-timeline__event-panel {
+        min-height: 9.5rem;
+        flex-basis: 9.5rem;
+        border-radius: var(--mobile-radius-card);
+    }
+
+    .mobile-timeline-page .project-timeline__timeline-panel {
+        min-height: 13rem;
+        border-radius: var(--mobile-radius-card);
+    }
+
+    .mobile-timeline-page .project-timeline__section-header {
+        padding: var(--fc-space-sm) var(--fc-space-md);
+    }
+
+    .mobile-timeline-page .project-timeline__section-copy,
+    .mobile-timeline-page .project-timeline__selected-summary {
+        display: none;
+    }
+
+    .mobile-timeline-page .project-timeline__event-item {
+        width: min(78vw, 16rem);
+        min-height: 4.5rem;
+        flex-basis: min(78vw, 16rem);
+    }
+
+    .mobile-timeline-page .project-timeline__timeline-header-actions {
+        align-items: center;
+    }
+
+    .mobile-timeline-page .timeline-zoom__btn,
+    .mobile-timeline-page .timeline-zoom__level {
+        min-height: 2.75rem;
+    }
+
+    .mobile-timeline-page .timeline-zoom__btn {
+        width: 2.75rem;
+    }
+}

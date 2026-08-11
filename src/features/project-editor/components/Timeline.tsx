@@ -506,6 +506,7 @@ export function Timeline({
             <RollingBox
                 className={`timeline-scroll-area ${isDragging ? 'dragging' : ''}`}
                 ref={scrollRef}
+                data-mobile-horizontal-scroll="true"
                 axis="x"
                 showThumb="auto"
                 onMouseDown={handleMouseDown}

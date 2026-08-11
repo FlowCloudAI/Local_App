@@ -31,6 +31,7 @@ import './ProjectRelationGraph.css'
 interface ProjectRelationGraphProps {
     projectId: string
     sidebarContainer?: HTMLElement | null
+    onRelationSelect?: (relationId: string) => void
 }
 
 const INITIAL_LAYOUT_STATE: RelationLayoutState = {
@@ -346,7 +347,11 @@ function parsePersistedLayoutConfig(raw: string | null): PersistedLayoutConfig |
     }
 }
 
-export default function ProjectRelationGraph({projectId, sidebarContainer}: ProjectRelationGraphProps) {
+export default function ProjectRelationGraph({
+    projectId,
+    sidebarContainer,
+    onRelationSelect,
+}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
     const [edges, setEdges] = useState<RelationGraphEdge[]>([])
@@ -567,7 +572,10 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                                 type="button"
                                 className={`rg-sidebar__relation${edge.id === selectedEdgeId ? ' is-selected' : ''}`}
                                 aria-pressed={edge.id === selectedEdgeId}
-                                onClick={() => setSelectedEdgeId(edge.id)}
+                                onClick={() => {
+                                    setSelectedEdgeId(edge.id)
+                                    onRelationSelect?.(edge.id)
+                                }}
                             >
                                 <div className="rg-sidebar__relation-main">
                                     <span title={nodeTitleById.get(edge.source) ?? edge.source}>

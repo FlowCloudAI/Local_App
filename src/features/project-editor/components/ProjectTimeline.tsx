@@ -378,7 +378,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
 
             {/* ── 工具栏（统计标签） ── */}
             {!sidebarContainer && data && events.length > 0 && (
-                <div className="fc-op-toolbar">
+                <div className="fc-op-toolbar" data-mobile-horizontal-scroll="true">
                     <span className="fc-op-chip">时间线事件 {data.matchedEntryCount}</span>
                     <span className="fc-op-chip">持续区间 {eventStats.rangeEvents}</span>
                     <span className="fc-op-chip">单点事件 {eventStats.pointEvents}</span>
@@ -441,6 +441,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                         <RollingBox
                             ref={eventStripRef}
                             className="project-timeline__event-strip"
+                            data-mobile-horizontal-scroll="true"
                             axis="x"
                             thumbSize="thin"
                             showThumb="show"

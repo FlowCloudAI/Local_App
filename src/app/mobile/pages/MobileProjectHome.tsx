@@ -172,6 +172,14 @@ export default function MobileProjectHome({
     }, [navigateToTab, projectId, setAiFocus])
 
     const handleSelectTool = useCallback((tool: ProjectHomeTool) => {
+        if (tool.key === 'relation') {
+            push({type: 'relationGraph', params: {projectId, displayName: '关系图谱'}})
+            return
+        }
+        if (tool.key === 'timeline') {
+            push({type: 'timeline', params: {projectId, displayName: '时间线'}})
+            return
+        }
         if (tool.key === 'check') {
             push({type: 'worldCheck', params: {projectId, displayName: '设定检测'}})
             return
