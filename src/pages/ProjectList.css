@@ -348,6 +348,7 @@
   --fc-card-overlay-background: linear-gradient(
     180deg,
     transparent,
+    color-mix(in srgb, var(--fc-gray-1000) 72%, transparent) 50%,
     color-mix(in srgb, var(--fc-gray-1000) 72%, transparent) 28%,
     color-mix(in srgb, var(--fc-gray-1000) 98%, transparent)
   );
