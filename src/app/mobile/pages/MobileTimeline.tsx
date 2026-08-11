@@ -50,6 +50,8 @@ export default function MobileTimeline({params, push, pop}: Props) {
                     projectId={params.projectId}
                     tagSchemas={tagSchemas}
                     onOpenEntry={handleOpenEntry}
+                    scrollableRows
+                    compact
                 />
             </div>
         </div>

@@ -21,6 +21,11 @@
     user-select: none;
 }
 
+.timeline-scroll-area.timeline-scroll-area--scrollable-rows {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .timeline-scroll-area.dragging {
     cursor: grabbing;
 }

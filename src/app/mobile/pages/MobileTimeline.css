@@ -29,42 +29,6 @@
     flex: 1;
 }
 
-.mobile-timeline-page .project-timeline > .fc-op-header {
-    justify-content: flex-end;
-    padding: var(--fc-space-sm) var(--mobile-page-x);
-    background: var(--fc-color-bg);
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-header .fc-op-header__title-block {
-    display: none;
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-header .fc-op-header__actions {
-    width: 100%;
-    justify-content: flex-end;
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-header .fc-button {
-    min-height: 2.75rem;
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-toolbar {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    padding: var(--fc-space-sm) var(--mobile-page-x);
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-toolbar::-webkit-scrollbar {
-    display: none;
-}
-
-.mobile-timeline-page .project-timeline > .fc-op-toolbar > * {
-    flex: 0 0 auto;
-}
-
 .mobile-timeline-page .project-timeline > .fc-op-viewport-empty {
     align-items: flex-start;
     padding: var(--fc-space-md) var(--mobile-page-x);
@@ -82,18 +46,22 @@
 }
 
 .mobile-timeline-page .project-timeline__event-panel {
-    min-height: 9.5rem;
-    flex-basis: 9.5rem;
+    min-height: 0;
+    flex: 0 0 auto;
     border-radius: var(--mobile-radius-card);
 }
 
 .mobile-timeline-page .project-timeline__timeline-panel {
-    min-height: 13rem;
+    min-height: 0;
     border-radius: var(--mobile-radius-card);
 }
 
 .mobile-timeline-page .project-timeline__section-header {
-    padding: var(--fc-space-sm) var(--fc-space-md);
+    min-height: 2.75rem;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 var(--fc-space-sm);
+    box-sizing: border-box;
 }
 
 .mobile-timeline-page .project-timeline__section-header--timeline {
@@ -111,6 +79,11 @@
     width: min(78vw, 16rem);
     min-height: 4.5rem;
     flex-basis: min(78vw, 16rem);
+}
+
+.mobile-timeline-page .project-timeline__event-open {
+    min-height: 2.75rem;
+    padding-inline: var(--fc-space-sm);
 }
 
 .mobile-timeline-page .project-timeline__timeline-header-actions {

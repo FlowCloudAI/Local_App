@@ -214,6 +214,13 @@
     gap: var(--fc-space-md);
 }
 
+.project-timeline__event-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--fc-space-sm);
+}
+
 .project-timeline__zoom-host {
     display: flex;
     flex: 0 0 auto;
@@ -301,6 +308,10 @@
 
 .project-timeline__event-item .fc-op-item__excerpt {
     -webkit-line-clamp: 1;
+}
+
+.project-timeline__event-open {
+    flex: 0 0 auto;
 }
 
 .project-timeline__timeline-shell {

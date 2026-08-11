@@ -12,6 +12,8 @@ interface ProjectTimelineProps {
     onBack?: () => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
     sidebarContainer?: HTMLElement | null
+    scrollableRows?: boolean
+    compact?: boolean
 }
 
 interface TimelineTagHintGroup {
@@ -138,7 +140,15 @@ function BackArrow() {
     )
 }
 
-export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEntry, sidebarContainer}: ProjectTimelineProps) {
+export default function ProjectTimeline({
+    projectId,
+    tagSchemas,
+    onBack,
+    onOpenEntry,
+    sidebarContainer,
+    scrollableRows = false,
+    compact = false,
+}: ProjectTimelineProps) {
     const [data, setData] = useState<ProjectTimelineData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<Error | null>(null)
@@ -146,7 +156,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
     const [timelineControlsContainer, setTimelineControlsContainer] = useState<HTMLDivElement | null>(null)
     const selectedEventIdRef = useRef<string | null>(null)
     const eventStripRef = useRef<HTMLDivElement | null>(null)
-    const eventItemRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+    const eventItemRefs = useRef<Record<string, HTMLDivElement | null>>({})
     const shouldSyncEventStripRef = useRef(false)
 
     useEffect(() => {
@@ -347,37 +357,39 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
         <div className="project-timeline fc-op-panel">
             {sidebarContainer ? createPortal(timelineStats, sidebarContainer) : null}
 
-            {/* ── 顶部 ── */}
-            <div className="fc-op-header">
-                {onBack && (
-                    <Button type="button" className="fc-op-back-btn" variant="ghost" size="sm" onClick={onBack}>
-                        <BackArrow/>返回
-                    </Button>
-                )}
-                <div className="fc-op-header__title-block">
-                    <h2 className="fc-op-header__title">时间线</h2>
-                    <p className="fc-op-header__subtitle">
-                        系统会扫描项目中的词条标签，并自动识别时间线语义。
-                    </p>
-                </div>
-                <div className="fc-op-header__actions">
-                    {selectedEvent && onOpenEntry && (
-                        <Button type="button"
-                            size="sm"
-                            variant="primary"
-                            onClick={() => onOpenEntry({id: selectedEvent.id, title: selectedEvent.title})}
-                        >
-                            打开当前词条
+            {/* 移动端把操作收进内容卡片，避免额外占用一整行首屏高度。 */}
+            {!compact && (
+                <div className="fc-op-header">
+                    {onBack && (
+                        <Button type="button" className="fc-op-back-btn" variant="ghost" size="sm" onClick={onBack}>
+                            <BackArrow/>返回
                         </Button>
                     )}
-                    <Button type="button" size="sm" variant="ghost" onClick={() => void loadTimeline()} disabled={loading}>
-                        {loading ? '刷新中' : '刷新'}
-                    </Button>
+                    <div className="fc-op-header__title-block">
+                        <h2 className="fc-op-header__title">时间线</h2>
+                        <p className="fc-op-header__subtitle">
+                            系统会扫描项目中的词条标签，并自动识别时间线语义。
+                        </p>
+                    </div>
+                    <div className="fc-op-header__actions">
+                        {selectedEvent && onOpenEntry && (
+                            <Button type="button"
+                                size="sm"
+                                variant="primary"
+                                onClick={() => onOpenEntry({id: selectedEvent.id, title: selectedEvent.title})}
+                            >
+                                打开当前词条
+                            </Button>
+                        )}
+                        <Button type="button" size="sm" variant="ghost" onClick={() => void loadTimeline()} disabled={loading}>
+                            {loading ? '刷新中' : '刷新'}
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── 工具栏（统计标签） ── */}
-            {!sidebarContainer && data && events.length > 0 && (
+            {!compact && !sidebarContainer && data && events.length > 0 && (
                 <div className="fc-op-toolbar" data-mobile-horizontal-scroll="true">
                     <span className="fc-op-chip">时间线事件 {data.matchedEntryCount}</span>
                     <span className="fc-op-chip">持续区间 {eventStats.rangeEvents}</span>
@@ -432,11 +444,24 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                 <span className="project-timeline__section-title">事件列表</span>
                                 <span className="project-timeline__section-copy">按时间顺序浏览事件，点击后下方时间线会同步聚焦。</span>
                             </div>
-                            <span className="fc-op-count">
-                                {selectedEvent
-                                    ? `${events.findIndex((event) => event.id === selectedEvent.id) + 1} / ${events.length}`
-                                    : `0 / ${events.length}`}
-                            </span>
+                            <div className="project-timeline__event-header-actions">
+                                <span className="fc-op-count">
+                                    {selectedEvent
+                                        ? `${events.findIndex((event) => event.id === selectedEvent.id) + 1} / ${events.length}`
+                                        : `0 / ${events.length}`}
+                                </span>
+                                {compact && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => void loadTimeline()}
+                                        disabled={loading}
+                                    >
+                                        {loading ? '刷新中' : '刷新'}
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                         <RollingBox
                             ref={eventStripRef}
@@ -452,15 +477,24 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                             {events.map((event, index) => {
                                 const isSelected = event.id === selectedEventId
                                 return (
-                                    <button
+                                    <div
                                         key={event.id}
-                                        type="button"
                                         ref={(node) => {
                                             eventItemRefs.current[event.id] = node
                                         }}
                                         className={`project-timeline__event-item fc-op-item${isSelected ? ' is-active' : ''}`}
+                                        role="button"
+                                        tabIndex={0}
                                         aria-pressed={isSelected}
+                                        aria-label={`选择事件：${event.title}`}
                                         onClick={() => {
+                                            shouldSyncEventStripRef.current = false
+                                            setSelectedEventId(event.id)
+                                        }}
+                                        onKeyDown={(keyboardEvent) => {
+                                            if (keyboardEvent.target !== keyboardEvent.currentTarget) return
+                                            if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return
+                                            keyboardEvent.preventDefault()
                                             shouldSyncEventStripRef.current = false
                                             setSelectedEventId(event.id)
                                         }}
@@ -479,7 +513,21 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                                 </span>
                                             )}
                                         </div>
-                                    </button>
+                                        {compact && onOpenEntry && (
+                                            <Button
+                                                type="button"
+                                                className="project-timeline__event-open"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(clickEvent) => {
+                                                    clickEvent.stopPropagation()
+                                                    onOpenEntry({id: event.id, title: event.title})
+                                                }}
+                                            >
+                                                打开
+                                            </Button>
+                                        )}
+                                    </div>
                                 )
                             })}
                         </RollingBox>
@@ -521,6 +569,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                 selectedKey={selectedEventId}
                                 onSelectedKeyChange={handleTimelineSelect}
                                 controlsContainer={timelineControlsContainer}
+                                scrollableRows={scrollableRows}
                             />
                         </div>
                     </section>

@@ -52,3 +52,17 @@ test('事件排布不超过容量并复用重叠最少的行', () => {
         {rowIndex: 0},
     ])
 })
+
+test('移动端提供完整行容量时保留所有重叠事件行', () => {
+    const placements = placeTimelineRows([
+        {layoutStartX: 0, layoutCardWidth: 160},
+        {layoutStartX: 10, layoutCardWidth: 160},
+        {layoutStartX: 20, layoutCardWidth: 160},
+    ], 3)
+
+    assert.deepEqual(placements, [
+        {rowIndex: 0},
+        {rowIndex: 1},
+        {rowIndex: 2},
+    ])
+})

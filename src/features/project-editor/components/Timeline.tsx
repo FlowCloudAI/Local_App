@@ -39,6 +39,8 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLDivElement> {
     defaultSelectedKey?: string | null
     onSelectedKeyChange?: TimelineSelectedKeyChangeHandler
     controlsContainer?: HTMLElement | null
+    /** 为事件生成完整行布局，并允许轨道纵向滚动。 */
+    scrollableRows?: boolean
 }
 
 /** 旗帜（事件标记）的高度（px） */
@@ -85,6 +87,7 @@ export function Timeline({
                              defaultSelectedKey = null,
                              onSelectedKeyChange,
                              controlsContainer,
+                             scrollableRows = false,
                              className,
                              style,
                              ...props
@@ -175,10 +178,12 @@ export function Timeline({
         return ticksArr
     }, [currentStart, currentEnd])
 
-    /** 根据视口高度计算可容纳的最大事件行数 */
+    /** 移动端允许纵向滚动时保留全部事件行；桌面端继续按视口容量排布。 */
     const maxRows = useMemo(
-        () => calculateTimelineRowCapacity(viewportHeight, SINGLE_ROW_TRACK_HEIGHT, EVENT_ROW_GAP),
-        [viewportHeight],
+        () => scrollableRows
+            ? Math.max(events.length, 1)
+            : calculateTimelineRowCapacity(viewportHeight, SINGLE_ROW_TRACK_HEIGHT, EVENT_ROW_GAP),
+        [events.length, scrollableRows, viewportHeight],
     )
 
     /** 为每个事件计算像素坐标和尺寸，并分配所在行 */
@@ -368,10 +373,20 @@ export function Timeline({
         const cardCenter = cardContentLeft + cardRect.width / 2
         const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
         const nextScrollLeft = Math.min(maxScrollLeft, Math.max(0, cardCenter - container.clientWidth / 2))
-        if (Math.abs(container.scrollLeft - nextScrollLeft) < 1) return
+        const nextScrollTop = scrollableRows
+            ? Math.min(
+                Math.max(0, container.scrollHeight - container.clientHeight),
+                Math.max(0, cardRect.top - containerRect.top + container.scrollTop
+                    + cardRect.height / 2 - container.clientHeight / 2),
+            )
+            : container.scrollTop
+        if (
+            Math.abs(container.scrollLeft - nextScrollLeft) < 1
+            && Math.abs(container.scrollTop - nextScrollTop) < 1
+        ) return
 
-        container.scrollTo({left: nextScrollLeft, behavior: 'smooth'})
-    }, [selectedKey])
+        container.scrollTo({left: nextScrollLeft, top: nextScrollTop, behavior: 'smooth'})
+    }, [scrollableRows, selectedKey])
 
     /** 监听容器尺寸变化，更新视口宽高 */
     useLayoutEffect(() => {
@@ -502,12 +517,16 @@ export function Timeline({
             className={['timeline-flag', className].filter(Boolean).join(' ')}
             style={style}
         >
-            {/* 横向滚动容器，支持拖拽平移和滚轮/按钮缩放 */}
+            {/* 滚动容器：桌面横向平移，移动端额外允许浏览完整事件行。 */}
             <RollingBox
-                className={`timeline-scroll-area ${isDragging ? 'dragging' : ''}`}
+                className={[
+                    'timeline-scroll-area',
+                    scrollableRows ? 'timeline-scroll-area--scrollable-rows' : '',
+                    isDragging ? 'dragging' : '',
+                ].filter(Boolean).join(' ')}
                 ref={scrollRef}
                 data-mobile-horizontal-scroll="true"
-                axis="x"
+                axis={scrollableRows ? 'both' : 'x'}
                 showThumb="auto"
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
