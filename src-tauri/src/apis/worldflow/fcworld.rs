@@ -11,6 +11,9 @@ use std::sync::Mutex as StdMutex;
 use tauri::Emitter;
 use zip::{ZipWriter, write::SimpleFileOptions};
 
+#[cfg(target_os = "android")]
+use crate::android_file_import::{copy_local_file_to_android_uri, is_android_content_uri};
+
 use worldflow_core::{
     CsvExportItem, CsvExportScope, CsvImportBundle, CsvImportMode, CsvImportProgressPhase,
     CsvImportResult, ProjectCsvExport, ProjectOps, WorldflowCsvTable, models::Project,
@@ -2566,6 +2569,48 @@ async fn preview_fcworld_package(
     ))
 }
 
+fn resolve_fcworld_export_target(
+    paths: &PathsState,
+    output_path: &str,
+) -> Result<(PathBuf, Option<String>), String> {
+    #[cfg(target_os = "android")]
+    if is_android_content_uri(output_path) {
+        let app_data_dir = paths
+            .db_path
+            .parent()
+            .ok_or_else(|| "无法确定 Android 应用数据目录".to_string())?;
+        let local_path = app_data_dir
+            .join("exports")
+            .join(format!("{}.fcworld", Uuid::new_v4()));
+        return Ok((local_path, Some(output_path.to_string())));
+    }
+
+    let _ = paths;
+    Ok((PathBuf::from(output_path), None))
+}
+
+fn finish_fcworld_export_write(
+    local_path: &Path,
+    android_output_uri: Option<&str>,
+    write_result: Result<u64, String>,
+) -> Result<u64, String> {
+    #[cfg(target_os = "android")]
+    if let Some(uri) = android_output_uri {
+        let result = write_result.and_then(|file_size| {
+            copy_local_file_to_android_uri(local_path, uri).map(|()| file_size)
+        });
+        if let Err(error) = std::fs::remove_file(local_path) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("清理 Android 导出临时文件失败 {:?}: {}", local_path, error);
+            }
+        }
+        return result;
+    }
+
+    let _ = (local_path, android_output_uri);
+    write_result
+}
+
 #[tauri::command]
 pub async fn db_export_project_fcworld(
     app: AppHandle,
@@ -2583,7 +2628,8 @@ pub async fn db_export_project_fcworld(
     let result = async {
         let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
         let include_history = include_history.unwrap_or(true);
-        let output_path_buf = PathBuf::from(&output_path);
+        let (output_path_buf, android_output_uri) =
+            resolve_fcworld_export_target(paths.inner(), &output_path)?;
 
         let (project, export) = {
             let db = open_project_db(state.inner(), &project_id).await?;
@@ -2644,12 +2690,18 @@ pub async fn db_export_project_fcworld(
         progress.step("export_maps", "已处理地图数据");
 
         progress.note("write_zip", "写入 fcworld 压缩包");
-        let file_size = write_fcworld_package_with_progress(&package, &output_path_buf, |path| {
-            progress.step("write_zip", format!("已写入包内文件：{path}"));
-        })?;
+        let write_result =
+            write_fcworld_package_with_progress(&package, &output_path_buf, |path| {
+                progress.step("write_zip", format!("已写入包内文件：{path}"));
+            });
+        let file_size = finish_fcworld_export_write(
+            &output_path_buf,
+            android_output_uri.as_deref(),
+            write_result,
+        )?;
 
         Ok(FcworldExportResult {
-            output_path: output_path_buf.to_string_lossy().to_string(),
+            output_path,
             package_id: package.package_id,
             project_id: package.project_id.to_string(),
             asset_count: package.asset_count,

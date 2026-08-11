@@ -67,6 +67,18 @@ class MainActivity : TauriActivity() {
     return target.absolutePath
   }
 
+  fun copyFileToContentUri(sourcePath: String, uriString: String) {
+    val uri = Uri.parse(uriString)
+    val output = contentResolver.openOutputStream(uri, "w")
+      ?: throw IllegalArgumentException("无法写入已选择的文件")
+
+    File(sourcePath).inputStream().use { source ->
+      output.use { target ->
+        source.copyTo(target)
+      }
+    }
+  }
+
   private fun resolvePickedFileExtension(uri: Uri): String? {
     val name = when (uri.scheme) {
       ContentResolver.SCHEME_FILE -> uri.path?.let { File(it).name }
