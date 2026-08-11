@@ -64,12 +64,18 @@ interface ProjectListProps {
 }
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
+type ProjectPageRows = 2 | 5 | 10
 
 const SORT_OPTIONS: Array<{value: SortMode; label: string}> = [
     {value: 'updated-desc', label: '最近更新'},
     {value: 'updated-asc', label: '最早更新'},
     {value: 'name-asc', label: '标题 A-Z'},
     {value: 'name-desc', label: '标题 Z-A'},
+]
+const PROJECT_PAGE_ROW_OPTIONS: Array<{value: ProjectPageRows; label: string}> = [
+    {value: 2, label: '每页 2 行'},
+    {value: 5, label: '每页 5 行'},
+    {value: 10, label: '每页 10 行'},
 ]
 const HOME_WELCOME_STORAGE_KEY = 'fc:onboarding:home-welcome:v1'
 const WELCOME_TOUR_START_DELAY_MS = 300
@@ -148,6 +154,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {registerTour, startTour} = useTour()
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
+    const [projectPageRows, setProjectPageRows] = useState<ProjectPageRows>(2)
+    const [projectPage, setProjectPage] = useState(1)
+    const [projectGridColumnCount, setProjectGridColumnCount] = useState(4)
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [welcomeOpen, setWelcomeOpen] = useState(false)
     const [starredProjectIds, setStarredProjectIds] = useState<string[]>([])
@@ -164,6 +173,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     )
     const ideaInboxRevision = useIdeaInboxRevision()
     const ideaComposingRef = useRef(false)
+    const projectGridRef = useRef<HTMLDivElement>(null)
     const dashboard = useHomeDashboard()
     const [entryByTargetKey, setEntryByTargetKey] = useState<ReadonlyMap<string, Entry>>(() => new Map())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
@@ -465,6 +475,35 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             .toLocaleLowerCase('zh-CN')
             .includes(query))
     }, [searchText, sortedProjects])
+    const projectPageSize = Math.max(1, projectGridColumnCount * projectPageRows - 1)
+    const projectPageCount = Math.max(1, Math.ceil(filteredProjects.length / projectPageSize))
+    const currentProjectPage = Math.min(projectPage, projectPageCount)
+    const paginatedProjects = useMemo(() => {
+        const start = (currentProjectPage - 1) * projectPageSize
+        return filteredProjects.slice(start, start + projectPageSize)
+    }, [currentProjectPage, filteredProjects, projectPageSize])
+
+    useEffect(() => {
+        const grid = projectGridRef.current
+        if (!grid) return undefined
+
+        const updateColumnCount = () => {
+            const columns = window.getComputedStyle(grid).gridTemplateColumns
+                .split(' ')
+                .filter(Boolean)
+                .length
+            setProjectGridColumnCount(Math.max(1, columns))
+        }
+        updateColumnCount()
+
+        const observer = new ResizeObserver(updateColumnCount)
+        observer.observe(grid)
+        return () => observer.disconnect()
+    }, [error, hasLoadedProjects, loading])
+
+    useEffect(() => {
+        setProjectPage(page => Math.min(page, projectPageCount))
+    }, [projectPageCount])
 
     const saveStarredProjectIds = useCallback(async (projectIds: string[]) => {
         const nextIds = normalizeStarredProjectIds(projectIds)
@@ -935,7 +974,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     placeholder="搜索世界"
                                     value={searchText}
                                     aria-label="搜索世界"
-                                    onValueChange={setSearchText}
+                                    onValueChange={value => {
+                                        setSearchText(value)
+                                        setProjectPage(1)
+                                    }}
                                 />
                                 <Select
                                     className="project-list-sort"
@@ -945,6 +987,18 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     onValueChange={value => {
                                         const nextValue = Array.isArray(value) ? value[0] : value
                                         setSortMode(nextValue as SortMode)
+                                        setProjectPage(1)
+                                    }}
+                                />
+                                <Select
+                                    className="project-list-page-size"
+                                    options={PROJECT_PAGE_ROW_OPTIONS}
+                                    value={projectPageRows}
+                                    aria-label="每页显示行数"
+                                    onValueChange={value => {
+                                        const nextValue = Array.isArray(value) ? value[0] : value
+                                        setProjectPageRows(Number(nextValue) as ProjectPageRows)
+                                        setProjectPage(1)
                                     }}
                                 />
                                 <Button
@@ -969,13 +1023,13 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                         )}
 
                         {hasLoadedProjects || loading || error ? (
-                            <div className="project-list-grid">
+                            <div ref={projectGridRef} className="project-list-grid">
                                 {filteredProjects.length === 0 && !loading ? (
                                     <div className="project-list-feedback fc-status-banner">
                                         没有匹配的项目。
                                     </div>
                                 ) : (
-                                    filteredProjects.map(project => {
+                                    paginatedProjects.map(project => {
                                         const coverPath = asOptionalString(project.cover_path)
                                         const updatedAt = asOptionalString(project.updated_at)
                                         const createdAt = asOptionalString(project.created_at)
@@ -1113,6 +1167,29 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 />
                             </div>
                         ) : null}
+                        {projectPageCount > 1 && (
+                            <nav className="project-list-pagination" aria-label="世界列表分页">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={currentProjectPage === 1}
+                                    onClick={() => setProjectPage(page => Math.max(1, page - 1))}
+                                >
+                                    上一页
+                                </Button>
+                                <span aria-live="polite">{currentProjectPage} / {projectPageCount}</span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={currentProjectPage === projectPageCount}
+                                    onClick={() => setProjectPage(page => Math.min(projectPageCount, page + 1))}
+                                >
+                                    下一页
+                                </Button>
+                            </nav>
+                        )}
                     </section>
                     {activeHelpLink && (
                         <section className="project-home-help-strip" aria-label="帮助与技巧">
