@@ -45,6 +45,7 @@ import {
     useHomeDashboard,
 } from '../features/home/homeActivity'
 import HomeContinueCoverImage from '../features/home/HomeContinueCoverImage'
+import {HOME_TIPS} from '../features/home/homeTips'
 import {refreshIdeas, useIdeaInboxRevision} from '../features/ideas/ideaStore'
 import {stripMarkdown} from '../features/entries/lib/entryMarkdown'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
@@ -164,7 +165,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [projectActionBusy, setProjectActionBusy] = useState(false)
     const [ideaText, setIdeaText] = useState('')
     const [ideaSaving, setIdeaSaving] = useState(false)
-    const [helpTipIndex, setHelpTipIndex] = useState(0)
+    const [tipIndex, setTipIndex] = useState(0)
     const [projectStatsById, setProjectStatsById] = useState<ReadonlyMap<string, ProjectStats | null>>(
         () => new Map(),
     )
@@ -682,9 +683,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         ?? resumeTarget?.updatedAt
         ?? asOptionalString(resumeProject?.updated_at)
         ?? asOptionalString(resumeProject?.created_at)
-    const activeHelpLink = dashboard.helpLinks.length > 0
-        ? dashboard.helpLinks[helpTipIndex % dashboard.helpLinks.length]
-        : null
+    const activeHelpLink = dashboard.helpLinks[0] ?? null
+    const activeHomeTip = HOME_TIPS.length > 0 ? HOME_TIPS[tipIndex % HOME_TIPS.length] : null
 
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
         const projectId = getHomeTargetProjectId(target)
@@ -915,7 +915,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                             actions={(
                                                 <div className="project-home-resume-actions">
                                                     <Button type="button" size="lg" onClick={() => openDashboardTarget(resumeTarget)}>
-                                                        {resumeTarget.type === 'entry' ? '继续写作' : '继续使用'}
+                                                        {resumeTarget.type === 'entry' ? '继续写作' : '继续创作'}
                                                     </Button>
                                                     <Button
                                                         type="button"
@@ -1191,11 +1191,11 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             </nav>
                         )}
                     </section>
-                    {activeHelpLink && (
+                    {(activeHomeTip || dashboard.helpLinks.length > 0) && (
                         <section className="project-home-help-strip" aria-label="帮助与技巧">
                             <span className="project-home-help-strip__icon" aria-hidden="true">?</span>
                             <div className="project-home-help-strip__content">
-                                <p>技巧：{activeHelpLink.description}</p>
+                                {activeHomeTip && <p>技巧：{activeHomeTip}</p>}
                                 <div className="project-home-help-links">
                                     {dashboard.helpLinks.map(link => (
                                         <Button key={link.key} type="button" size="sm" variant="ghost" onClick={() => openDashboardTarget(link.target)}>
@@ -1204,8 +1204,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     ))}
                                 </div>
                             </div>
-                            {dashboard.helpLinks.length > 1 && (
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setHelpTipIndex(index => index + 1)}>
+                            {HOME_TIPS.length > 1 && (
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setTipIndex(index => index + 1)}>
                                     换一条
                                 </Button>
                             )}

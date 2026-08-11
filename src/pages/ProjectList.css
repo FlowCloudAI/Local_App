@@ -256,6 +256,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--fc-space-md);
+  margin-top: var(--fc-space-md);
   padding: var(--fc-space-sm) var(--fc-space-md);
   border: var(--fc-home-border-width) solid var(--fc-color-border-light);
   border-radius: var(--fc-radius-lg);
@@ -268,6 +269,10 @@
 
 .project-home-idea-form__icon {
   color: var(--fc-color-primary);
+  font-size: var(--fc-font-size-xl);
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .project-home-idea-input,
