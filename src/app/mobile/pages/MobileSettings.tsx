@@ -511,7 +511,7 @@ export default function MobileSettings({push, pop, page}: Props) {
         const themeLabel = themeOptions.find(option => option.value === theme)?.label ?? '跟随系统'
         const marketSummary = loadingMarketPlugins ? '插件库加载中' : `插件库 ${marketPlugins.length} 个`
         return (
-            <div className="mobile-page mobile-settings-page">
+            <div key={section} className="mobile-page mobile-settings-page">
                 {topBar}
                 <MobileSettingsMenuSection
                     themeLabel={themeLabel}
@@ -530,7 +530,7 @@ export default function MobileSettings({push, pop, page}: Props) {
     }
 
     return (
-        <div className="mobile-page mobile-settings-page">
+        <div key={section} className="mobile-page mobile-settings-page">
             {topBar}
             {section === 'storage' && (
                 <MobileSettingsStorageSection
