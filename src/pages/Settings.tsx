@@ -1,5 +1,5 @@
 import {logger} from '../shared/logger'
-import {type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type CSSProperties, type RefObject, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     Button,
     type CategoryTreeNode,
@@ -81,7 +81,6 @@ export type SettingsTab =
     | 'plugins'
     | 'models'
     | 'permissions'
-    | 'keys'
     | 'templates'
     | 'usage'
     | 'about'
@@ -115,7 +114,6 @@ const SETTINGS_GROUPS: Array<{
         label: 'AI',
         tabs: [
             {value: 'plugins', label: '插件管理'},
-            {value: 'keys', label: '访问密钥'},
             {value: 'models', label: '模型管理'},
             {value: 'permissions', label: '权限与工具'},
             {value: 'templates', label: '指令模板'},
@@ -969,6 +967,11 @@ interface PluginsPanelProps {
     uninstallingId: string | null
     searchText: string
     kindFilter: PluginKindFilter
+    apiKeyStatus: Record<string, boolean>
+    expandedApiKeyPluginId: string | null
+    apiKeyDraft: string
+    savingApiKeyPluginId: string | null
+    apiKeyInputRef: RefObject<HTMLInputElement | null>
     onRefreshLocal: () => void | Promise<void>
     onRefreshMarket: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
@@ -976,6 +979,11 @@ interface PluginsPanelProps {
     onInstall: (pluginId: string) => void | Promise<void>
     onSearchTextChange: (value: string) => void
     onKindFilterChange: (value: PluginKindFilter) => void
+    onConfigureApiKey: (pluginId: string) => void
+    onDeleteApiKey: (pluginId: string) => void | Promise<void>
+    onApiKeyDraftChange: (value: string) => void
+    onSaveApiKey: (pluginId: string) => void | Promise<void>
+    onCancelApiKey: () => void
 }
 
 function PluginsPanel({
@@ -990,6 +998,11 @@ function PluginsPanel({
                           uninstallingId,
                           searchText,
                           kindFilter,
+                          apiKeyStatus,
+                          expandedApiKeyPluginId,
+                          apiKeyDraft,
+                          savingApiKeyPluginId,
+                          apiKeyInputRef,
                           onRefreshLocal,
                           onRefreshMarket,
                           onInstallFromFile,
@@ -997,6 +1010,11 @@ function PluginsPanel({
                           onInstall,
                           onSearchTextChange,
                           onKindFilterChange,
+                          onConfigureApiKey,
+                          onDeleteApiKey,
+                          onApiKeyDraftChange,
+                          onSaveApiKey,
+                          onCancelApiKey,
                       }: PluginsPanelProps) {
     const installedPluginMap = new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
     const installedIds = new Set(installedPluginMap.keys())
@@ -1015,7 +1033,7 @@ function PluginsPanel({
             <div className="settings-title fc-page-header">
                 <div className="fc-page-title-block">
                     <h1 className="fc-page-title">插件管理</h1>
-                    <p className="fc-page-subtitle">安装、更新和卸载本地 AI 插件。</p>
+                    <p className="fc-page-subtitle">安装、更新和卸载本地 AI 插件，并配置插件访问密钥。</p>
                 </div>
             </div>
 
@@ -1047,14 +1065,86 @@ function PluginsPanel({
                             && isRemoteVersionNewer(plugin.version, marketPlugin.version)
                                 ? marketPlugin.version
                                 : undefined
+                            const isExpanded = expandedApiKeyPluginId === plugin.id
+                            const isSaving = savingApiKeyPluginId === plugin.id
+                            const isConfigured = apiKeyStatus[plugin.id] === true
+
                             return (
-                                <LocalPluginCard
+                                <div
                                     key={plugin.id}
-                                    plugin={plugin}
-                                    updateVersion={updateVersion}
-                                    onUninstall={onUninstall}
-                                    uninstalling={uninstallingId === plugin.id}
-                                />
+                                    className={`settings-plugin-card${isExpanded ? ' is-expanded' : ''}`}
+                                >
+                                    <LocalPluginCard
+                                        plugin={plugin}
+                                        updateVersion={updateVersion}
+                                        onUninstall={onUninstall}
+                                        uninstalling={uninstallingId === plugin.id}
+                                    />
+                                    <div className="settings-plugin-credentials">
+                                        <div className="settings-plugin-credential-copy">
+                                            <span className="settings-plugin-credential-title">访问密钥</span>
+                                            <span className="settings-plugin-credential-hint">凭据仅保存在此设备</span>
+                                        </div>
+                                        <div className="settings-api-key-actions">
+                                            <span className={`settings-api-key-status${isConfigured ? '' : ' is-missing'}`}>
+                                                {isConfigured ? '已配置' : '未配置'}
+                                            </span>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => onConfigureApiKey(plugin.id)}
+                                            >
+                                                {isConfigured ? '重新配置' : '配置'}
+                                            </Button>
+                                            {isConfigured && (
+                                                <Button
+                                                    type="button"
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => onDeleteApiKey(plugin.id)}
+                                                >
+                                                    删除密钥
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className={`settings-api-key-drawer${isExpanded ? ' is-open' : ''}`}>
+                                        <div className="settings-api-key-drawer-inner">
+                                            <form
+                                                className="settings-api-key-form"
+                                                onSubmit={(event) => {
+                                                    event.preventDefault()
+                                                    void onSaveApiKey(plugin.id)
+                                                }}
+                                            >
+                                                <label className="settings-api-key-form-label">访问密钥</label>
+                                                <Input
+                                                    type="password"
+                                                    ref={isExpanded ? apiKeyInputRef : undefined}
+                                                    value={isExpanded ? apiKeyDraft : ''}
+                                                    onValueChange={(value) => onApiKeyDraftChange(String(value))}
+                                                    placeholder={`请输入 ${plugin.name} 的访问密钥`}
+                                                    style={{flex: 1}}
+                                                />
+                                                <div className="settings-api-key-form-actions">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={onCancelApiKey}
+                                                        disabled={isSaving}
+                                                    >
+                                                        取消
+                                                    </Button>
+                                                    <Button size="sm" type="submit" disabled={isSaving}>
+                                                        {isSaving ? '保存中...' : '保存'}
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             )
                         })
                     )}
@@ -1271,25 +1361,33 @@ export default function Settings({
     }, [activeTab, focusRequestId, initialFocus, loading, settings])
 
     useEffect(() => {
-        if (loading || !settings || activeTab !== 'keys' || initialFocus !== 'api-key' || !initialApiKeyPluginId) return
-        if (![...llmPlugins, ...imagePlugins, ...ttsPlugins].some((plugin) => plugin.id === initialApiKeyPluginId)) return
+        if (loading || !settings || activeTab !== 'plugins' || initialFocus !== 'api-key' || !initialApiKeyPluginId) return
+        const targetPlugin = localPlugins.find(plugin => (
+            normalizePluginKey(plugin.id) === normalizePluginKey(initialApiKeyPluginId)
+        ))
+        if (!targetPlugin) return
         if (handledFocusRequestIdRef.current === focusRequestId) return
         handledFocusRequestIdRef.current = focusRequestId
-        setExpandedApiKeyPluginId(initialApiKeyPluginId)
+        setExpandedApiKeyPluginId(targetPlugin.id)
         setApiKeyDraft('')
-        const frameId = window.requestAnimationFrame(() => apiKeyInputRef.current?.focus())
-        return () => window.cancelAnimationFrame(frameId)
     }, [
         activeTab,
         focusRequestId,
-        imagePlugins,
         initialApiKeyPluginId,
         initialFocus,
-        llmPlugins,
+        localPlugins,
         loading,
         settings,
-        ttsPlugins,
     ])
+
+    useEffect(() => {
+        if (activeTab !== 'plugins' || !expandedApiKeyPluginId) return
+        const frameId = window.requestAnimationFrame(() => {
+            apiKeyInputRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'})
+            apiKeyInputRef.current?.focus()
+        })
+        return () => window.cancelAnimationFrame(frameId)
+    }, [activeTab, expandedApiKeyPluginId])
 
     // 切换到用量统计 tab 时自动加载
     useEffect(() => {
@@ -1720,6 +1818,11 @@ export default function Settings({
         setApiKeyDraft('')
     }
 
+    const handleCancelApiKey = () => {
+        setExpandedApiKeyPluginId(null)
+        setApiKeyDraft('')
+    }
+
     const handleSaveApiKey = async (pluginId: string) => {
         const nextApiKey = apiKeyDraft.trim()
         if (!nextApiKey) {
@@ -1921,7 +2024,6 @@ export default function Settings({
         ]
     }
 
-    const allPlugins = [...llmPlugins, ...imagePlugins, ...ttsPlugins]
     const effectiveDbDir = settings.db_path || defaultPaths?.db_path || ''
     const derivedBackupDir = effectiveDbDir
         ? `${effectiveDbDir.replace(/[\\/]+$/, '')}${effectiveDbDir.includes('\\') ? '\\' : '/'}backup`
@@ -2524,121 +2626,6 @@ export default function Settings({
                         </div>
                     )}
 
-                    {activeTab === 'keys' && (
-                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
-                            <div className="settings-title fc-page-header">
-                                <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">访问密钥</h1>
-                                    <p className="fc-page-subtitle">管理已安装 AI 插件保存在本机的访问凭据。</p>
-                                </div>
-                            </div>
-
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">访问密钥管理</h2>
-                                <div className="settings-row">
-                                    {allPlugins.length === 0 ? (
-                                        <div className="settings-empty-state">
-                                            没有安装插件
-                                        </div>
-                                    ) : (
-                                        allPlugins.map(plugin => {
-                                            const isExpanded = expandedApiKeyPluginId === plugin.id
-                                            const isSaving = savingApiKeyPluginId === plugin.id
-
-                                            return (
-                                                <div
-                                                    key={plugin.id}
-                                                    className={`settings-api-key-card${isExpanded ? ' is-expanded' : ''}`}
-                                                >
-                                                    <div className="settings-api-key-item">
-                                                        <div className="settings-api-key-meta">
-                                                            <span className="settings-api-key-name">{plugin.name}</span>
-                                                            <span
-                                                                className="settings-api-key-plugin-id">{plugin.id}</span>
-                                                        </div>
-                                                        <div className="settings-api-key-actions">
-                                                            {apiKeyStatus[plugin.id] ? (
-                                                                <>
-                                                                    <span
-                                                                        className="settings-api-key-status">已配置</span>
-                                                                    <Button type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => handleConfigureApiKey(plugin.id)}
-                                                                    >
-                                                                        重新配置
-                                                                    </Button>
-                                                                    <Button type="button"
-                                                                        variant="danger"
-                                                                        size="sm"
-                                                                        onClick={() => handleDeleteApiKey(plugin.id)}
-                                                                    >
-                                                                        删除
-                                                                    </Button>
-                                                                </>
-                                                            ) : (
-                                                                <Button type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleConfigureApiKey(plugin.id)}
-                                                                >
-                                                                    配置
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div
-                                                        className={`settings-api-key-drawer${isExpanded ? ' is-open' : ''}`}>
-                                                        <div className="settings-api-key-drawer-inner">
-                                                            <form
-                                                                className="settings-api-key-form"
-                                                                onSubmit={(event) => {
-                                                                    event.preventDefault()
-                                                                    void handleSaveApiKey(plugin.id)
-                                                                }}
-                                                            >
-                                                                <label className="settings-api-key-form-label">访问密钥</label>
-                                                                <Input
-                                                                    type="password"
-                                                                    ref={isExpanded ? apiKeyInputRef : undefined}
-                                                                    value={isExpanded ? apiKeyDraft : ''}
-                                                                    onValueChange={(value) => setApiKeyDraft(String(value))}
-                                                                    placeholder={`请输入 ${plugin.name} 的访问密钥`}
-                                                                    style={{flex: 1}}
-                                                                />
-                                                                <div className="settings-api-key-form-actions">
-                                                                    <Button type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            setExpandedApiKeyPluginId(null)
-                                                                            setApiKeyDraft('')
-                                                                        }}
-                                                                        disabled={isSaving}
-                                                                    >
-                                                                        取消
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        type="submit"
-                                                                        disabled={isSaving}
-                                                                    >
-                                                                        {isSaving ? '保存中...' : '保存'}
-                                                                    </Button>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </section>
-                        </div>
-                    )}
-
                     {activeTab === 'permissions' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
@@ -2729,6 +2716,11 @@ export default function Settings({
                             uninstallingId={uninstallingId}
                             searchText={searchText}
                             kindFilter={kindFilter}
+                            apiKeyStatus={apiKeyStatus}
+                            expandedApiKeyPluginId={expandedApiKeyPluginId}
+                            apiKeyDraft={apiKeyDraft}
+                            savingApiKeyPluginId={savingApiKeyPluginId}
+                            apiKeyInputRef={apiKeyInputRef}
                             onRefreshLocal={loadLocal}
                             onRefreshMarket={loadMarket}
                             onInstallFromFile={handleInstallFromFile}
@@ -2736,6 +2728,11 @@ export default function Settings({
                             onInstall={handleInstall}
                             onSearchTextChange={setSearchText}
                             onKindFilterChange={setKindFilter}
+                            onConfigureApiKey={handleConfigureApiKey}
+                            onDeleteApiKey={handleDeleteApiKey}
+                            onApiKeyDraftChange={setApiKeyDraft}
+                            onSaveApiKey={handleSaveApiKey}
+                            onCancelApiKey={handleCancelApiKey}
                         />
                     )}
                     {activeTab === 'usage' && (

@@ -903,7 +903,7 @@ function DesktopAppContent() {
     }, [openSettings])
 
     const handleOpenAiSettings = useCallback((pluginId: string) => {
-        openSettings({tab: 'keys', focus: 'api-key', apiKeyPluginId: pluginId, focusRequest: true})
+        openSettings({tab: 'plugins', focus: 'api-key', apiKeyPluginId: pluginId, focusRequest: true})
     }, [openSettings])
 
     const handleOpenWriterModeSettings = useCallback(() => {
