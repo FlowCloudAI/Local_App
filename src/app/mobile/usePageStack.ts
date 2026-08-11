@@ -32,20 +32,30 @@ export interface MobilePageParamsMap {
     worldCheck: MobileProjectScopedPageParams
     timeline: MobileProjectScopedPageParams
     relationGraph: MobileProjectScopedPageParams
+    settingsStorage: undefined
     settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined
+    settingsModels: undefined
+    settingsPermissions: undefined
+    settingsTemplates: undefined
     settingsAppearance: undefined
     settingsUsage: undefined
+    settingsFeedback: undefined
     settingsAbout: undefined
 }
 
 export type MobilePageType = keyof MobilePageParamsMap
 
 export type MobileSettingsPageType =
+    | 'settingsStorage'
     | 'settingsAi'
     | 'settingsPlugins'
+    | 'settingsModels'
+    | 'settingsPermissions'
+    | 'settingsTemplates'
     | 'settingsAppearance'
     | 'settingsUsage'
+    | 'settingsFeedback'
     | 'settingsAbout'
 
 export type MobilePageOf<T extends MobilePageType = MobilePageType> = {

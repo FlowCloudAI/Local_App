@@ -3,8 +3,6 @@ import {
     type ApiUsageByModel,
     type ApiUsageSummary,
     type LocalPluginInfo,
-    type ModelPriceOverride,
-    type PluginModelInfo,
     type RemotePluginInfo,
 } from '../../../api'
 import {
@@ -30,39 +28,11 @@ interface MenuSectionProps {
     localPluginCount: number
     currentPluginName?: string
     apiKeyStatusLabel: string
+    writerModeEnabled: boolean
+    searchEngineLabel: string
+    budgetSummary: string
     version: string
     onOpenPage: (type: MobileSettingsPageType) => void
-}
-
-interface AiSectionProps {
-    selectedPlugin: string
-    selectedModel: string
-    selectedApiKeyPlugin: string
-    pluginOptions: SelectOption[]
-    modelOptions: SelectOption[]
-    apiKeyPluginOptions: SelectOption[]
-    apiKeyStatus: ApiKeyStatus
-    apiKeyStatusLabel: string
-    apiKeyDraft: string
-    apiKeyBusy: boolean
-    apiKeyPlaceholder: string
-    modelPriceOverride?: ModelPriceOverride
-    manifestModelPrice?: PluginModelInfo
-    monthlyBudgetAmount: number | null
-    monthlyBudgetCurrency: string
-    budgetWarnRatio: number
-    onSelectedPluginChange: (value: string) => void
-    onSelectedModelChange: (value: string) => void
-    onSelectedApiKeyPluginChange: (value: string) => void
-    onApiKeyDraftChange: (value: string) => void
-    onModelPriceOverrideToggle: (enabled: boolean) => void
-    onModelPriceOverrideChange: (patch: Partial<ModelPriceOverride>) => void
-    onMonthlyBudgetAmountChange: (value: number | null) => void
-    onMonthlyBudgetCurrencyChange: (value: string) => void
-    onBudgetWarnRatioChange: (value: number) => void
-    onSaveSettings: () => void | Promise<void>
-    onSaveApiKey: () => void | Promise<void>
-    onDeleteApiKey: () => void | Promise<void>
 }
 
 interface PluginsSectionProps {
@@ -77,12 +47,25 @@ interface PluginsSectionProps {
     localPlugins: LocalPluginInfo[]
     marketPlugins: RemotePluginInfo[]
     installingPluginIds: Set<string>
+    uninstallingPluginId: string | null
+    selectedApiKeyPlugin: string
+    apiKeyPluginOptions: SelectOption[]
+    apiKeyStatus: ApiKeyStatus
+    apiKeyStatusLabel: string
+    apiKeyDraft: string
+    apiKeyBusy: boolean
+    apiKeyPlaceholder: string
     onPluginSearchChange: (value: string) => void
     onPluginKindFilterChange: (value: PluginKindFilter) => void
     getInstalledPlugin: (pluginId: string) => LocalPluginInfo | undefined
     onRefreshPluginSources: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
     onInstallMarketPlugin: (pluginId: string) => void | Promise<void>
+    onUninstallPlugin: (pluginId: string) => void | Promise<void>
+    onSelectedApiKeyPluginChange: (value: string) => void
+    onApiKeyDraftChange: (value: string) => void
+    onSaveApiKey: () => void | Promise<void>
+    onDeleteApiKey: () => void | Promise<void>
 }
 
 interface AppearanceSectionProps {
@@ -107,6 +90,12 @@ interface UsageSectionProps {
     monthlyUsageAmount: number
     budgetCurrency: string
     budgetWarning: UsageBudgetWarning | null
+    monthlyBudgetAmount: number | null
+    budgetWarnRatio: number
+    onMonthlyBudgetAmountChange: (value: number | null) => void
+    onBudgetCurrencyChange: (value: string) => void
+    onBudgetWarnRatioChange: (value: number) => void
+    onSaveSettings: () => void | Promise<void>
     onRefresh: () => void | Promise<void>
 }
 
@@ -200,264 +189,73 @@ export function MobileSettingsMenuSection({
     localPluginCount,
     currentPluginName,
     apiKeyStatusLabel,
+    writerModeEnabled,
+    searchEngineLabel,
+    budgetSummary,
     version,
     onOpenPage,
 }: MenuSectionProps) {
+    const groups: Array<{
+        label: string
+        items: Array<{type: MobileSettingsPageType; label: string; summary: string}>
+    }> = [
+        {
+            label: '系统',
+            items: [
+                {type: 'settingsStorage', label: '存储与备份', summary: 'Android 私有存储与自动备份'},
+                {type: 'settingsAppearance', label: '外观', summary: themeLabel},
+            ],
+        },
+        {
+            label: 'AI',
+            items: [
+                {
+                    type: 'settingsPlugins',
+                    label: '插件管理',
+                    summary: `已安装 ${localPluginCount} 个 · ${marketSummary} · 密钥${apiKeyStatusLabel}`,
+                },
+                {type: 'settingsModels', label: '模型管理', summary: currentPluginName ?? '未选择默认对话插件'},
+                {
+                    type: 'settingsPermissions',
+                    label: '权限与工具',
+                    summary: `${writerModeEnabled ? '作家模式已允许' : '作家模式未允许'} · ${searchEngineLabel}`,
+                },
+                {type: 'settingsTemplates', label: '指令模板', summary: '应用感知指令与模板文件'},
+                {type: 'settingsUsage', label: '用量与预算', summary: budgetSummary},
+            ],
+        },
+        {
+            label: '信息',
+            items: [
+                {type: 'settingsFeedback', label: '提交反馈', summary: '提交建议或问题'},
+                {type: 'settingsAbout', label: '关于', summary: `流云AI 移动端${version ? ` · ${version}` : ''}`},
+            ],
+        },
+    ]
+
     return (
         <div className="mobile-settings-menu">
-            <button
-                type="button"
-                className="mobile-settings-menu-item"
-                onClick={() => onOpenPage('settingsAi')}
-            >
-                <span className="mobile-settings-menu-item__content">
-                    <span className="mobile-settings-menu-item__label">AI 设置</span>
-                    <span className="mobile-settings-menu-item__summary">
-                        {currentPluginName ?? '未选择插件'} · {apiKeyStatusLabel}
-                    </span>
-                </span>
-                <ChevronRightIcon/>
-            </button>
-            <button
-                type="button"
-                className="mobile-settings-menu-item"
-                onClick={() => onOpenPage('settingsPlugins')}
-            >
-                <span className="mobile-settings-menu-item__content">
-                    <span className="mobile-settings-menu-item__label">插件安装</span>
-                    <span className="mobile-settings-menu-item__summary">
-                        已安装 {localPluginCount} 个 · {marketSummary}
-                    </span>
-                </span>
-                <ChevronRightIcon/>
-            </button>
-            <button
-                type="button"
-                className="mobile-settings-menu-item"
-                onClick={() => onOpenPage('settingsAppearance')}
-            >
-                <span className="mobile-settings-menu-item__content">
-                    <span className="mobile-settings-menu-item__label">外观</span>
-                    <span className="mobile-settings-menu-item__summary">{themeLabel}</span>
-                </span>
-                <ChevronRightIcon/>
-            </button>
-            <button
-                type="button"
-                className="mobile-settings-menu-item"
-                onClick={() => onOpenPage('settingsUsage')}
-            >
-                <span className="mobile-settings-menu-item__content">
-                    <span className="mobile-settings-menu-item__label">用量统计</span>
-                    <span className="mobile-settings-menu-item__summary">AI 使用与消耗统计</span>
-                </span>
-                <ChevronRightIcon/>
-            </button>
-            <button
-                type="button"
-                className="mobile-settings-menu-item"
-                onClick={() => onOpenPage('settingsAbout')}
-            >
-                <span className="mobile-settings-menu-item__content">
-                    <span className="mobile-settings-menu-item__label">关于</span>
-                    <span className="mobile-settings-menu-item__summary">
-                        流云AI 移动端{version ? ` · ${version}` : ''}
-                    </span>
-                </span>
-                <ChevronRightIcon/>
-            </button>
-        </div>
-    )
-}
-
-export function MobileSettingsAiSection({
-    selectedPlugin,
-    selectedModel,
-    selectedApiKeyPlugin,
-    pluginOptions,
-    modelOptions,
-    apiKeyPluginOptions,
-    apiKeyStatus,
-    apiKeyStatusLabel,
-    apiKeyDraft,
-    apiKeyBusy,
-    apiKeyPlaceholder,
-    modelPriceOverride,
-    manifestModelPrice,
-    monthlyBudgetAmount,
-    monthlyBudgetCurrency,
-    budgetWarnRatio,
-    onSelectedPluginChange,
-    onSelectedModelChange,
-    onSelectedApiKeyPluginChange,
-    onApiKeyDraftChange,
-    onModelPriceOverrideToggle,
-    onModelPriceOverrideChange,
-    onMonthlyBudgetAmountChange,
-    onMonthlyBudgetCurrencyChange,
-    onBudgetWarnRatioChange,
-    onSaveSettings,
-    onSaveApiKey,
-    onDeleteApiKey,
-}: AiSectionProps) {
-    return (
-        <div className="mobile-settings-section">
-            <div className="mobile-settings-form-stack">
-                <div>
-                    <div className="mobile-settings-field-label">默认对话插件</div>
-                    <Select
-                        value={selectedPlugin}
-                        onValueChange={v => onSelectedPluginChange(String(v ?? ''))}
-                        options={pluginOptions}
-                        placeholder="选择插件"
-                        radius="full"
-                    />
-                </div>
-                <div className="mobile-settings-api-key">
-                    <label className="mobile-settings-switch-field">
-                        <span>覆盖插件声明的模型价格</span>
-                        <input
-                            type="checkbox"
-                            checked={Boolean(modelPriceOverride)}
-                            disabled={!selectedPlugin || !selectedModel}
-                            onChange={event => onModelPriceOverrideToggle(event.currentTarget.checked)}
-                        />
-                    </label>
-                    {modelPriceOverride && (
-                        <>
-                            <div className="mobile-settings-field-label">输入价 / 百万 token</div>
-                            <Input
-                                type="number"
-                                min={0}
-                                step={0.0001}
-                                value={modelPriceOverride.prompt_price_per_m}
-                                onValueChange={value => onModelPriceOverrideChange({
-                                    prompt_price_per_m: Math.max(0, Number(value) || 0),
-                                })}
-                            />
-                            <div className="mobile-settings-field-label">输出价 / 百万 token</div>
-                            <Input
-                                type="number"
-                                min={0}
-                                step={0.0001}
-                                value={modelPriceOverride.completion_price_per_m}
-                                onValueChange={value => onModelPriceOverrideChange({
-                                    completion_price_per_m: Math.max(0, Number(value) || 0),
-                                })}
-                            />
-                            <div className="mobile-settings-field-label">币种</div>
-                            <Input
-                                value={modelPriceOverride.currency}
-                                onValueChange={value => onModelPriceOverrideChange({
-                                    currency: String(value).trim().toUpperCase(),
-                                })}
-                            />
-                        </>
-                    )}
-                    <div className="mobile-settings-api-key__desc">
-                        {manifestModelPrice?.prompt_price_per_m != null
-                        && manifestModelPrice.completion_price_per_m != null
-                        && manifestModelPrice.currency
-                            ? `插件声明：输入 ${formatUsageAmount(manifestModelPrice.prompt_price_per_m, manifestModelPrice.currency)}，输出 ${formatUsageAmount(manifestModelPrice.completion_price_per_m, manifestModelPrice.currency)} / 百万 token。`
-                            : '插件未声明价格；不覆盖时金额显示为“—”。'}
+            {groups.map(group => (
+                <section className="mobile-settings-menu-group" key={group.label}>
+                    <h2 className="mobile-settings-menu-group__label">{group.label}</h2>
+                    <div className="mobile-settings-menu-group__items">
+                        {group.items.map(item => (
+                            <button
+                                key={item.type}
+                                type="button"
+                                className="mobile-settings-menu-item"
+                                onClick={() => onOpenPage(item.type)}
+                            >
+                                <span className="mobile-settings-menu-item__content">
+                                    <span className="mobile-settings-menu-item__label">{item.label}</span>
+                                    <span className="mobile-settings-menu-item__summary">{item.summary}</span>
+                                </span>
+                                <ChevronRightIcon/>
+                            </button>
+                        ))}
                     </div>
-                </div>
-                <div className="mobile-settings-api-key">
-                    <div className="mobile-settings-field-label">月度预算</div>
-                    <Input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={monthlyBudgetAmount ?? ''}
-                        placeholder="不设置则不告警"
-                        onValueChange={value => {
-                            const amount = Number(value)
-                            onMonthlyBudgetAmountChange(Number.isFinite(amount) && amount > 0 ? amount : null)
-                        }}
-                    />
-                    <div className="mobile-settings-field-label">预算币种</div>
-                    <Input
-                        value={monthlyBudgetCurrency}
-                        onValueChange={value => onMonthlyBudgetCurrencyChange(String(value).trim().toUpperCase() || 'USD')}
-                    />
-                    <div className="mobile-settings-field-label">告警比例（%）</div>
-                    <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        step={1}
-                        value={Math.round(budgetWarnRatio * 100)}
-                        onValueChange={value => onBudgetWarnRatioChange(
-                            Math.min(1, Math.max(0.01, (Number(value) || 80) / 100)),
-                        )}
-                    />
-                    <div className="mobile-settings-api-key__desc">
-                        费用按调用时单价快照计算，不做汇率换算；预算只提醒，不中断服务。
-                    </div>
-                </div>
-                <div>
-                    <div className="mobile-settings-field-label">默认对话模型</div>
-                    <Select
-                        value={selectedModel}
-                        onValueChange={v => onSelectedModelChange(String(v ?? ''))}
-                        options={modelOptions}
-                        placeholder="选择模型"
-                        radius="full"
-                    />
-                </div>
-                <div className="mobile-settings-api-key">
-                    <div className="mobile-settings-api-key__header">
-                        <div>
-                            <div className="mobile-settings-field-label">访问密钥</div>
-                            <div className="mobile-settings-api-key__desc">
-                                仅保存到系统密钥链，不在设置文件中写入明文
-                            </div>
-                        </div>
-                        <span className={`mobile-settings-api-key__status mobile-settings-api-key__status--${apiKeyStatus}`}>
-                            {apiKeyStatusLabel}
-                        </span>
-                    </div>
-                    <div className="mobile-settings-field-label">密钥所属插件</div>
-                    <Select
-                        value={selectedApiKeyPlugin}
-                        onValueChange={v => onSelectedApiKeyPluginChange(String(v ?? ''))}
-                        options={apiKeyPluginOptions}
-                        placeholder="选择需要配置密钥的插件"
-                        radius="full"
-                    />
-                    <Input
-                        type="password"
-                        value={apiKeyDraft}
-                        onValueChange={onApiKeyDraftChange}
-                        placeholder={apiKeyPlaceholder}
-                        disabled={!selectedApiKeyPlugin || apiKeyBusy}
-                        autoComplete="off"
-                        className="mobile-settings-api-key__input"
-                    />
-                    <div className="mobile-settings-api-key__actions">
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => void onSaveApiKey()}
-                            disabled={!selectedApiKeyPlugin || apiKeyBusy || !apiKeyDraft.trim()}
-                        >
-                            {apiKeyBusy ? '处理中…' : '保存访问密钥'}
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void onDeleteApiKey()}
-                            disabled={!selectedApiKeyPlugin || apiKeyBusy || apiKeyStatus !== 'configured'}
-                        >
-                            删除
-                        </Button>
-                    </div>
-                </div>
-                <Button type="button" onClick={onSaveSettings} className="mobile-settings-full-button">
-                    保存设置
-                </Button>
-            </div>
+                </section>
+            ))}
         </div>
     )
 }
@@ -474,15 +272,77 @@ export function MobileSettingsPluginsSection({
     localPlugins,
     marketPlugins,
     installingPluginIds,
+    uninstallingPluginId,
+    selectedApiKeyPlugin,
+    apiKeyPluginOptions,
+    apiKeyStatus,
+    apiKeyStatusLabel,
+    apiKeyDraft,
+    apiKeyBusy,
+    apiKeyPlaceholder,
     onPluginSearchChange,
     onPluginKindFilterChange,
     getInstalledPlugin,
     onRefreshPluginSources,
     onInstallFromFile,
     onInstallMarketPlugin,
+    onUninstallPlugin,
+    onSelectedApiKeyPluginChange,
+    onApiKeyDraftChange,
+    onSaveApiKey,
+    onDeleteApiKey,
 }: PluginsSectionProps) {
     return (
-        <div className="mobile-settings-section">
+        <div className="mobile-settings-section mobile-settings-form-stack">
+            <div className="mobile-settings-api-key">
+                <div className="mobile-settings-api-key__header">
+                    <div>
+                        <div className="mobile-settings-panel__title">访问密钥</div>
+                        <div className="mobile-settings-api-key__desc">按插件保存到系统安全存储，不写入设置文件明文。</div>
+                    </div>
+                    <span className={`mobile-settings-api-key__status mobile-settings-api-key__status--${apiKeyStatus}`}>
+                        {apiKeyStatusLabel}
+                    </span>
+                </div>
+                <Select
+                    value={selectedApiKeyPlugin}
+                    onValueChange={value => onSelectedApiKeyPluginChange(String(value ?? ''))}
+                    options={apiKeyPluginOptions}
+                    placeholder="选择要配置的插件"
+                    radius="full"
+                />
+                <Input
+                    type="password"
+                    value={apiKeyDraft}
+                    onValueChange={onApiKeyDraftChange}
+                    placeholder={apiKeyPlaceholder}
+                    disabled={!selectedApiKeyPlugin || apiKeyBusy}
+                    autoComplete="off"
+                    radius="full"
+                    className="mobile-settings-api-key__input"
+                />
+                <div className="mobile-settings-api-key__actions">
+                    <Button
+                        type="button"
+                        size="sm"
+                        radius="full"
+                        onClick={() => void onSaveApiKey()}
+                        disabled={!selectedApiKeyPlugin || apiKeyBusy || !apiKeyDraft.trim()}
+                    >
+                        {apiKeyBusy ? '处理中…' : '保存密钥'}
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        radius="full"
+                        onClick={() => void onDeleteApiKey()}
+                        disabled={!selectedApiKeyPlugin || apiKeyBusy || apiKeyStatus !== 'configured'}
+                    >
+                        删除密钥
+                    </Button>
+                </div>
+            </div>
             <div className="mobile-settings-plugin-search-row">
                 <Input
                     value={pluginSearch}
@@ -560,6 +420,27 @@ export function MobileSettingsPluginsSection({
                                     <span>v{plugin.version}</span>
                                     <span>{plugin.author}</span>
                                 </div>
+                            </div>
+                            <div className="mobile-settings-plugin-item__actions">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    radius="full"
+                                    onClick={() => onSelectedApiKeyPluginChange(plugin.id)}
+                                >
+                                    密钥
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    radius="full"
+                                    disabled={uninstallingPluginId === plugin.id}
+                                    onClick={() => void onUninstallPlugin(plugin.id)}
+                                >
+                                    {uninstallingPluginId === plugin.id ? '卸载中…' : '卸载'}
+                                </Button>
                             </div>
                         </div>
                     ))
@@ -705,31 +586,68 @@ export function MobileSettingsUsageSection({
     monthlyUsageAmount,
     budgetCurrency,
     budgetWarning,
+    monthlyBudgetAmount,
+    budgetWarnRatio,
+    onMonthlyBudgetAmountChange,
+    onBudgetCurrencyChange,
+    onBudgetWarnRatioChange,
+    onSaveSettings,
     onRefresh,
 }: UsageSectionProps) {
-    if (loading && !summary) {
-        return <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>
-    }
-
-    if (error) {
-        return (
-            <div className="mobile-settings-section">
-                <div className="mobile-settings-plugin-error">加载失败：{error}</div>
-                <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()}>
-                    重试
-                </Button>
-            </div>
-        )
-    }
-
     return (
-        <div className="mobile-settings-section">
+        <div className="mobile-settings-section mobile-settings-form-stack">
+            <section className="mobile-settings-panel mobile-settings-form-stack">
+                <h2 className="mobile-settings-panel__title">费用与月度预算</h2>
+                <div className="mobile-settings-two-column-fields">
+                    <label className="mobile-settings-field-block">
+                        <span>月度预算</span>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={monthlyBudgetAmount ?? ''}
+                            placeholder="不设置则不告警"
+                            radius="full"
+                            onValueChange={value => {
+                                const amount = Number(value)
+                                onMonthlyBudgetAmountChange(Number.isFinite(amount) && amount > 0 ? amount : null)
+                            }}
+                        />
+                    </label>
+                    <label className="mobile-settings-field-block">
+                        <span>预算币种</span>
+                        <Input
+                            value={budgetCurrency}
+                            radius="full"
+                            onValueChange={value => onBudgetCurrencyChange(String(value).trim().toUpperCase() || 'USD')}
+                        />
+                    </label>
+                </div>
+                <label className="mobile-settings-range-field">
+                    <span>预算告警比例</span>
+                    <Slider
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={Math.round(budgetWarnRatio * 100)}
+                        tooltip
+                        onValueChange={value => onBudgetWarnRatioChange(readSliderNumber(value) / 100)}
+                    />
+                    <strong>{Math.round(budgetWarnRatio * 100)}%</strong>
+                </label>
+                <p className="mobile-settings-field-hint">预算只提醒，不会中断 AI 服务；未知单价不计入金额。</p>
+                <Button type="button" radius="full" onClick={() => void onSaveSettings()}>
+                    保存预算设置
+                </Button>
+            </section>
             <div className="mobile-settings-section__header">
                 <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
                 <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()} disabled={loading}>
                     {loading ? '刷新中…' : '刷新'}
                 </Button>
             </div>
+            {loading && !summary && <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>}
+            {error && <div className="mobile-settings-plugin-error">加载失败：{error}</div>}
             <div className="mobile-settings-plugin-count">
                 本月已知费用：{formatUsageAmount(monthlyUsageAmount, budgetCurrency)}
             </div>

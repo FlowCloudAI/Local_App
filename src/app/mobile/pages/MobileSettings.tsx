@@ -14,7 +14,6 @@ import {
     type ApiUsageByModel,
     type ApiUsageDaily,
     type ApiUsageSummary,
-    type ModelPriceOverride,
     toApiError,
 } from '../../../api'
 import {openFileDialog} from '../../../api/dialog'
@@ -35,18 +34,25 @@ import {
     installMarketPlugin,
     refreshLocalPlugins,
     refreshMarketPlugins,
+    uninstallPlugin,
     usePluginCatalogStore,
 } from '../../../features/settings/pluginCatalogStore'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
 import {
-    MobileSettingsAiSection,
     MobileSettingsAppearanceSection,
     MobileSettingsMenuSection,
     MobileSettingsPluginsSection,
     MobileSettingsUsageSection,
 } from './MobileSettingsSections'
+import MobileSettingsModelsSection from './MobileSettingsModelsSection'
+import {
+    MobileSettingsFeedbackSection,
+    MobileSettingsPermissionsSection,
+    MobileSettingsStorageSection,
+    MobileSettingsTemplatesSection,
+} from './MobileSettingsAdditionalSections'
 import './MobileSettings.css'
 
 interface Props {
@@ -56,7 +62,17 @@ interface Props {
 }
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
-type SettingsSection = 'menu' | 'ai' | 'plugins' | 'appearance' | 'usage' | 'about'
+type SettingsSection =
+    | 'menu'
+    | 'storage'
+    | 'plugins'
+    | 'models'
+    | 'permissions'
+    | 'templates'
+    | 'appearance'
+    | 'usage'
+    | 'feedback'
+    | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
@@ -88,20 +104,30 @@ function clampEditorFontSize(value: number): number {
 
 function getSettingsSection(page?: MobilePage | null): SettingsSection {
     switch (page?.type) {
-        case 'settingsAi': return 'ai'
+        case 'settingsStorage': return 'storage'
+        // 兼容图片等入口的旧深链：访问密钥现归属插件管理。
+        case 'settingsAi': return 'plugins'
         case 'settingsPlugins': return 'plugins'
+        case 'settingsModels': return 'models'
+        case 'settingsPermissions': return 'permissions'
+        case 'settingsTemplates': return 'templates'
         case 'settingsAppearance': return 'appearance'
         case 'settingsUsage': return 'usage'
+        case 'settingsFeedback': return 'feedback'
         case 'settingsAbout': return 'about'
         default: return 'menu'
     }
 }
 
 function getSettingsSectionTitle(section: SettingsSection): string {
-    if (section === 'ai') return 'AI 设置'
-    if (section === 'plugins') return '插件安装'
+    if (section === 'storage') return '存储与备份'
+    if (section === 'plugins') return '插件管理'
+    if (section === 'models') return '模型管理'
+    if (section === 'permissions') return '权限与工具'
+    if (section === 'templates') return '指令模板'
     if (section === 'appearance') return '外观'
-    if (section === 'usage') return '用量统计'
+    if (section === 'usage') return '用量与预算'
+    if (section === 'feedback') return '提交反馈'
     if (section === 'about') return '关于'
     return '设置'
 }
@@ -111,14 +137,11 @@ export default function MobileSettings({push, pop, page}: Props) {
     const {theme, setTheme} = useTheme()
     const appSettingsStore = useAppSettingsStore()
     const pluginCatalog = usePluginCatalogStore()
-    const plugins = appSettingsStore.llmPlugins
     const apiKeyPlugins = useMemo(() => [
         ...appSettingsStore.llmPlugins,
         ...appSettingsStore.imagePlugins,
         ...appSettingsStore.ttsPlugins,
     ], [appSettingsStore.imagePlugins, appSettingsStore.llmPlugins, appSettingsStore.ttsPlugins])
-    const [selectedPlugin, setSelectedPlugin] = useState('')
-    const [selectedModel, setSelectedModel] = useState('')
     const [selectedApiKeyPlugin, setSelectedApiKeyPlugin] = useState('')
     const [apiKeyDraft, setApiKeyDraft] = useState('')
     const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unknown')
@@ -133,6 +156,7 @@ export default function MobileSettings({push, pop, page}: Props) {
     const loadingMarketPlugins = pluginCatalog.loadingMarket
     const installingLocalFile = pluginCatalog.installingLocalFile
     const installingPluginIds = pluginCatalog.installingIds
+    const uninstallingPluginId = pluginCatalog.uninstallingId
     const [settings, setSettings] = useState<AppSettings | null>(null)
     const [version, setVersion] = useState('')
     const loading = appSettingsStore.loading && !settings
@@ -160,21 +184,9 @@ export default function MobileSettings({push, pop, page}: Props) {
     }, [refreshPluginInstallSources])
 
     useEffect(() => {
-        const plugin = plugins.find(p => p.id === selectedPlugin)
-        if (plugin && (!selectedModel || !plugin.models.includes(selectedModel))) {
-            setSelectedModel(plugin.default_model ?? plugin.models[0] ?? '')
-        }
-    }, [selectedPlugin, selectedModel, plugins])
-
-    useEffect(() => {
         const nextSettings = appSettingsStore.settings
         if (!nextSettings) return
         setSettings(nextSettings)
-        setSelectedPlugin(current => (
-            current && plugins.some(plugin => plugin.id === current)
-                ? current
-                : nextSettings.llm.plugin_id || plugins[0]?.id || ''
-        ))
         const requestedPluginId = page?.type === 'settingsAi' ? page.params.pluginId : undefined
         setSelectedApiKeyPlugin(current => resolveApiKeyPluginId(
             requestedPluginId,
@@ -182,7 +194,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             apiKeyPlugins,
             nextSettings.llm.plugin_id || '',
         ))
-    }, [apiKeyPlugins, appSettingsStore.settings, page, plugins])
+    }, [apiKeyPlugins, appSettingsStore.settings, page])
 
     useEffect(() => {
         if (!selectedApiKeyPlugin) {
@@ -202,11 +214,6 @@ export default function MobileSettings({push, pop, page}: Props) {
         const merged: AppSettings = {
             ...settings,
             theme,
-            llm: {
-                ...settings.llm,
-                plugin_id: selectedPlugin || null,
-                default_model: selectedModel || null,
-            },
         }
         try {
             const saved = await saveAppSettings(merged)
@@ -215,7 +222,7 @@ export default function MobileSettings({push, pop, page}: Props) {
         } catch (e) {
             await showAlert(`保存失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
-    }, [selectedPlugin, selectedModel, theme, settings, showAlert])
+    }, [theme, settings, showAlert])
 
     const handleSaveApiKey = useCallback(async () => {
         if (!selectedApiKeyPlugin) {
@@ -293,6 +300,18 @@ export default function MobileSettings({push, pop, page}: Props) {
         } catch (error) {
             logger.error('[MobileSettings] 插件安装失败', error)
             await showAlert(`插件安装失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [showAlert])
+
+    const handleUninstallPlugin = useCallback(async (pluginId: string) => {
+        const confirmed = await showAlert('确认卸载这个插件吗？', 'warning', 'confirm')
+        if (confirmed !== 'yes') return
+        try {
+            await uninstallPlugin(pluginId)
+            await showAlert('插件已卸载', 'success', 'nonInvasive', 1600)
+        } catch (error) {
+            logger.error('[MobileSettings] 插件卸载失败', error)
+            await showAlert(`插件卸载失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         }
     }, [showAlert])
 
@@ -432,41 +451,14 @@ export default function MobileSettings({push, pop, page}: Props) {
 
     if (loading || !settings) return <div className="mobile-page__loading">加载中…</div>
 
-    const pluginOptions = plugins.map(p => ({value: p.id, label: p.name}))
     const apiKeyPluginOptions = apiKeyPlugins.map(plugin => {
         const kind = getPluginKindFilterValue(plugin.kind)
         const kindLabel = kind === 'image' ? '图片' : kind === 'tts' ? '语音' : '对话'
         return {value: plugin.id, label: `${plugin.name} · ${kindLabel}`}
     })
-    const currentPlugin = plugins.find(p => p.id === selectedPlugin)
-    const currentModelInfo = currentPlugin?.model_infos.find(model => model.id === selectedModel)
-    const modelPriceKey = currentPlugin && selectedModel ? `${currentPlugin.id}:${selectedModel}` : null
-    const modelPriceOverride = modelPriceKey ? settings.llm.model_price_overrides[modelPriceKey] : undefined
+    const currentPlugin = appSettingsStore.llmPlugins.find(plugin => plugin.id === settings.llm.plugin_id)
     const updateLlmDraft = (patch: Partial<AppSettings['llm']>) => {
         setSettings(current => current ? {...current, llm: {...current.llm, ...patch}} : current)
-    }
-    const toggleModelPriceOverride = (enabled: boolean) => {
-        if (!modelPriceKey) return
-        const next = {...settings.llm.model_price_overrides}
-        if (!enabled) {
-            delete next[modelPriceKey]
-        } else {
-            next[modelPriceKey] = {
-                prompt_price_per_m: currentModelInfo?.prompt_price_per_m ?? 0,
-                completion_price_per_m: currentModelInfo?.completion_price_per_m ?? 0,
-                currency: currentModelInfo?.currency ?? settings.llm.monthly_budget_currency,
-            }
-        }
-        updateLlmDraft({model_price_overrides: next})
-    }
-    const updateModelPriceOverride = (patch: Partial<ModelPriceOverride>) => {
-        if (!modelPriceKey || !modelPriceOverride) return
-        updateLlmDraft({
-            model_price_overrides: {
-                ...settings.llm.model_price_overrides,
-                [modelPriceKey]: {...modelPriceOverride, ...patch},
-            },
-        })
     }
     const monthlyUsageAmount = currentMonthUsageAmount(usageDaily, settings.llm.monthly_budget_currency)
     const budgetWarning = getUsageBudgetWarning(
@@ -475,16 +467,21 @@ export default function MobileSettings({push, pop, page}: Props) {
         settings.llm.monthly_budget_currency,
         settings.llm.budget_warn_ratio,
     )
-    const modelOptions = (currentPlugin?.models ?? []).map(m => ({value: m, label: m}))
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
-    const defaultPluginApiKeyStatusLabel = getApiKeyStatusLabel(!selectedPlugin
+    const defaultPluginApiKeyStatusLabel = getApiKeyStatusLabel(!settings.llm.plugin_id
         ? 'unknown'
         : appSettingsStore.loading
             ? 'checking'
-            : appSettingsStore.apiKeyStatus[selectedPlugin] ? 'configured' : 'missing')
+            : appSettingsStore.apiKeyStatus[settings.llm.plugin_id] ? 'configured' : 'missing')
     const apiKeyPlaceholder = apiKeyStatus === 'configured'
         ? '已配置，输入新密钥可覆盖'
         : '输入当前插件的访问密钥'
+    const searchEngineLabel = settings.search_engine === 'baidu'
+        ? '百度'
+        : settings.search_engine === 'duckduckgo' ? 'DuckDuckGo' : '必应'
+    const budgetSummary = settings.llm.monthly_budget_amount
+        ? `月度预算 ${settings.llm.monthly_budget_amount} ${settings.llm.monthly_budget_currency}`
+        : 'AI 使用、费用与预算告警'
 
     const themeOptions = [
         {value: 'system', label: '跟随系统'},
@@ -522,6 +519,9 @@ export default function MobileSettings({push, pop, page}: Props) {
                     localPluginCount={localPlugins.length}
                     currentPluginName={currentPlugin?.name}
                     apiKeyStatusLabel={defaultPluginApiKeyStatusLabel}
+                    writerModeEnabled={settings.llm.writer_mode_enabled}
+                    searchEngineLabel={searchEngineLabel}
+                    budgetSummary={budgetSummary}
                     version={version}
                     onOpenPage={openSettingsPage}
                 />
@@ -532,36 +532,47 @@ export default function MobileSettings({push, pop, page}: Props) {
     return (
         <div className="mobile-page mobile-settings-page">
             {topBar}
-            {section === 'ai' && (
-                <MobileSettingsAiSection
-                    selectedPlugin={selectedPlugin}
-                    selectedModel={selectedModel}
-                    selectedApiKeyPlugin={selectedApiKeyPlugin}
-                    pluginOptions={pluginOptions}
-                    modelOptions={modelOptions}
-                    apiKeyPluginOptions={apiKeyPluginOptions}
-                    apiKeyStatus={apiKeyStatus}
-                    apiKeyStatusLabel={apiKeyStatusLabel}
-                    apiKeyDraft={apiKeyDraft}
-                    apiKeyBusy={apiKeyBusy}
-                    apiKeyPlaceholder={apiKeyPlaceholder}
-                    modelPriceOverride={modelPriceOverride}
-                    manifestModelPrice={currentModelInfo}
-                    monthlyBudgetAmount={settings.llm.monthly_budget_amount}
-                    monthlyBudgetCurrency={settings.llm.monthly_budget_currency}
-                    budgetWarnRatio={settings.llm.budget_warn_ratio}
-                    onSelectedPluginChange={setSelectedPlugin}
-                    onSelectedModelChange={setSelectedModel}
-                    onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
-                    onApiKeyDraftChange={setApiKeyDraft}
-                    onModelPriceOverrideToggle={toggleModelPriceOverride}
-                    onModelPriceOverrideChange={updateModelPriceOverride}
-                    onMonthlyBudgetAmountChange={value => updateLlmDraft({monthly_budget_amount: value})}
-                    onMonthlyBudgetCurrencyChange={value => updateLlmDraft({monthly_budget_currency: value})}
-                    onBudgetWarnRatioChange={value => updateLlmDraft({budget_warn_ratio: value})}
+            {section === 'storage' && (
+                <MobileSettingsStorageSection
+                    autoBackupSecs={settings.auto_backup_secs}
+                    maxBackupCount={settings.max_backup_count}
+                    onAutoBackupSecsChange={value => updateSettingsDraft({auto_backup_secs: value})}
+                    onMaxBackupCountChange={value => updateSettingsDraft({max_backup_count: value})}
+                    onSave={handleSave}
+                />
+            )}
+
+            {section === 'models' && (
+                <MobileSettingsModelsSection
+                    settings={settings}
+                    llmPlugins={appSettingsStore.llmPlugins}
+                    imagePlugins={appSettingsStore.imagePlugins}
+                    ttsPlugins={appSettingsStore.ttsPlugins}
+                    onChange={setSettings}
+                    onSave={handleSave}
+                />
+            )}
+
+            {section === 'permissions' && (
+                <MobileSettingsPermissionsSection
+                    writerModeEnabled={settings.llm.writer_mode_enabled}
+                    searchEngine={settings.search_engine}
+                    searchSources={settings.search_sources}
+                    onWriterModeChange={enabled => updateLlmDraft({writer_mode_enabled: enabled})}
+                    onSearchEngineChange={search_engine => updateSettingsDraft({search_engine})}
+                    onSearchSourceChange={(key, enabled) => updateSettingsDraft({
+                        search_sources: {...settings.search_sources, [key]: enabled},
+                    })}
+                    onSave={handleSave}
+                />
+            )}
+
+            {section === 'templates' && (
+                <MobileSettingsTemplatesSection
+                    defaultPrompt={settings.llm.app_sense_custom_prompt}
+                    editorFontSize={settings.editor_font_size}
+                    onDefaultPromptChange={value => updateLlmDraft({app_sense_custom_prompt: value})}
                     onSaveSettings={handleSave}
-                    onSaveApiKey={handleSaveApiKey}
-                    onDeleteApiKey={handleDeleteApiKey}
                 />
             )}
 
@@ -578,12 +589,25 @@ export default function MobileSettings({push, pop, page}: Props) {
                     localPlugins={sortedLocalPlugins}
                     marketPlugins={filteredMarketPlugins}
                     installingPluginIds={installingPluginIds}
+                    uninstallingPluginId={uninstallingPluginId}
+                    selectedApiKeyPlugin={selectedApiKeyPlugin}
+                    apiKeyPluginOptions={apiKeyPluginOptions}
+                    apiKeyStatus={apiKeyStatus}
+                    apiKeyStatusLabel={apiKeyStatusLabel}
+                    apiKeyDraft={apiKeyDraft}
+                    apiKeyBusy={apiKeyBusy}
+                    apiKeyPlaceholder={apiKeyPlaceholder}
                     onPluginSearchChange={setPluginSearch}
                     onPluginKindFilterChange={setPluginKindFilter}
                     getInstalledPlugin={getInstalledPlugin}
                     onRefreshPluginSources={refreshPluginInstallSources}
                     onInstallFromFile={handleInstallFromFile}
                     onInstallMarketPlugin={handleInstallMarketPlugin}
+                    onUninstallPlugin={handleUninstallPlugin}
+                    onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
+                    onApiKeyDraftChange={setApiKeyDraft}
+                    onSaveApiKey={handleSaveApiKey}
+                    onDeleteApiKey={handleDeleteApiKey}
                 />
             )}
 
@@ -612,9 +636,17 @@ export default function MobileSettings({push, pop, page}: Props) {
                     monthlyUsageAmount={monthlyUsageAmount}
                     budgetCurrency={settings.llm.monthly_budget_currency}
                     budgetWarning={budgetWarning}
+                    monthlyBudgetAmount={settings.llm.monthly_budget_amount}
+                    budgetWarnRatio={settings.llm.budget_warn_ratio}
+                    onMonthlyBudgetAmountChange={value => updateLlmDraft({monthly_budget_amount: value})}
+                    onBudgetCurrencyChange={value => updateLlmDraft({monthly_budget_currency: value})}
+                    onBudgetWarnRatioChange={value => updateLlmDraft({budget_warn_ratio: value})}
+                    onSaveSettings={handleSave}
                     onRefresh={loadUsageStats}
                 />
             )}
+
+            {section === 'feedback' && <MobileSettingsFeedbackSection/>}
 
             {section === 'about' && (
                 <MobileSettingsAboutSection
