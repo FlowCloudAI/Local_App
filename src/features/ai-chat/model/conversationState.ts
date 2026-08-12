@@ -16,15 +16,16 @@ export const isEmptyDraftConversation = (conversation: Conversation) =>
 export const toConversationHistory = (conversations: Conversation[]) =>
     conversations.filter((conversation) => !isEmptyDraftConversation(conversation))
 
-/** 切换模型后旧运行时会话不可复用，但对话内容与设置必须保留。 */
+/** 切换模型时由调用方决定是否保留运行时，对话内容与设置始终不变。 */
 export const applyConversationModelSwitch = (
     conversation: Conversation,
     conversationId: string,
     pluginId: string,
     model: string,
+    runtime: Pick<Conversation, 'sessionId' | 'runId'> = {sessionId: null, runId: null},
 ): Conversation => conversation.id !== conversationId
     ? conversation
-    : {...conversation, pluginId, model, sessionId: null, runId: null}
+    : {...conversation, pluginId, model, ...runtime}
 
 export const hasMessageOutput = (message: Message) => Boolean(
     message.content.trim() || message.reasoning?.trim() || message.blocks?.length,

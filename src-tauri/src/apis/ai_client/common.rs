@@ -789,6 +789,13 @@ async fn save_session_snapshot(
 ) {
     let (nodes, head) = persistence.handle.tree_snapshot().await;
     let ai_state = app.state::<AiState>();
+    let (plugin_id, model) = {
+        let sessions = ai_state.sessions.lock().await;
+        sessions
+            .get(session_id)
+            .map(|entry| (entry.plugin_id.clone(), entry.model.clone()))
+            .unwrap_or_else(|| (persistence.plugin_id.clone(), persistence.model.clone()))
+    };
     // owner 检查与写盘必须在同一临界区，避免检查后被新会话接管再迟到覆盖。
     let owners = ai_state.conversation_owners.lock().await;
     if !conversation_is_owned_by(&owners, &persistence.conversation_id, session_id) {
@@ -804,8 +811,8 @@ async fn save_session_snapshot(
     match chat_store_save_snapshot(
         paths.inner(),
         &persistence.conversation_id,
-        &persistence.plugin_id,
-        &persistence.model,
+        &plugin_id,
+        &model,
         persistence.settings.clone(),
         nodes,
         head,
@@ -1428,14 +1435,17 @@ pub(crate) fn spawn_session_event_loop<S>(
                     });
                     save_session_snapshot(&app_clone, &sid, &persistence, snapshot_outcome).await;
                     if let Some(ref u) = usage {
-                        save_api_usage(
-                            &app_clone,
-                            &sid,
-                            &persistence.plugin_id,
-                            &persistence.model,
-                            u,
-                        )
-                        .await;
+                        let (plugin_id, model) = {
+                            let ai_state = app_clone.state::<AiState>();
+                            let sessions = ai_state.sessions.lock().await;
+                            sessions
+                                .get(&sid)
+                                .map(|entry| (entry.plugin_id.clone(), entry.model.clone()))
+                                .unwrap_or_else(|| {
+                                    (persistence.plugin_id.clone(), persistence.model.clone())
+                                })
+                        };
+                        save_api_usage(&app_clone, &sid, &plugin_id, &model, u).await;
                     }
                     if let Some(factor) = calibration_factor {
                         save_token_calibration(&app_clone, &calibration_key, factor).await;

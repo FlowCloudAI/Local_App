@@ -376,11 +376,11 @@ pub async fn ai_switch_plugin(
         .with_kv("plugin_id", plugin_id.clone())
     })?;
 
-    let handle = {
+    let (handle, run_id) = {
         let sessions = ai_state.sessions.lock().await;
         sessions
             .get(&session_id)
-            .map(|entry| entry.handle.clone())
+            .map(|entry| (entry.handle.clone(), entry.run_id.clone()))
             .ok_or_else(|| {
                 ApiError::new(
                     ErrorCode::LlmSessionNotFound,
@@ -393,7 +393,17 @@ pub async fn ai_switch_plugin(
     handle
         .switch_plugin(&plugin_id, &api_key)
         .await
-        .map_err(ApiError::internal)
+        .map_err(ApiError::internal)?;
+    if let Some(entry) = ai_state
+        .sessions
+        .lock()
+        .await
+        .get_mut(&session_id)
+        .filter(|entry| entry.run_id == run_id)
+    {
+        entry.plugin_id = plugin_id;
+    }
+    Ok(())
 }
 
 /// 运行时会话参数更新（所有字段可选，只更新传入的字段）
@@ -529,11 +539,11 @@ pub async fn ai_update_session(
         changed_fields
     );
 
-    let handle = {
+    let (handle, run_id) = {
         let sessions = ai_state.sessions.lock().await;
         sessions
             .get(&session_id)
-            .map(|entry| entry.handle.clone())
+            .map(|entry| (entry.handle.clone(), entry.run_id.clone()))
             .ok_or_else(|| {
                 ApiError::new(
                     ErrorCode::LlmSessionNotFound,
@@ -543,6 +553,7 @@ pub async fn ai_update_session(
             })?
     };
 
+    let updated_model = params.model.clone().flatten();
     handle
         .update(|req| {
             if let Some(v) = params.model {
@@ -597,6 +608,17 @@ pub async fn ai_update_session(
             }
         })
         .await;
+    if let Some(model) = updated_model {
+        if let Some(entry) = ai_state
+            .sessions
+            .lock()
+            .await
+            .get_mut(&session_id)
+            .filter(|entry| entry.run_id == run_id)
+        {
+            entry.model = model;
+        }
+    }
     log::info!(
         "[ai_update_session][applied] session_id={} fields={:?}",
         session_id,

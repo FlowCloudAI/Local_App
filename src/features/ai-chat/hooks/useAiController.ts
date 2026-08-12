@@ -17,6 +17,7 @@ import {
     ai_save_character_conversation_meta,
     ai_save_conversation_ui_state,
     ai_set_task_context,
+    ai_switch_plugin,
     ai_update_conversation_settings,
     ai_update_message_attachments,
     ai_update_session,
@@ -819,6 +820,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [activeConversationId, documentContextItemsByConversation, pendingDocumentAttachmentIdsByConversation])
 
     const activeConversationRef = useRef(activeConversation)
+    const modelSwitchInFlightRef = useRef<Promise<void> | null>(null)
     useEffect(() => {
         activeConversationRef.current = activeConversation
     }, [activeConversation])
@@ -1896,38 +1898,73 @@ export function useAiController(focus: AiFocus): AiContextValue {
         persistConversationSettings(convId, nextSettings)
     }, [persistConversationSettings, resolveContextPayload])
 
-    const switchActiveConversationModel = useCallback(async (pluginId: string, model: string) => {
-        if (!pluginId || !model) return
+    const switchActiveConversationModel = useCallback((pluginId: string, model: string) => {
+        const previousSwitch = modelSwitchInFlightRef.current ?? Promise.resolve()
+        const switchTask = previousSwitch.then(async () => {
+            if (!pluginId || !model) return
 
-        const conversationSnapshot = getAiConversationSnapshot()
-        const conv = conversationSnapshot.conversations.find(
-            (conversation) => conversation.id === conversationSnapshot.activeConversationId,
-        )
-        if (!conv) {
-            setAiSelectedPluginModel(pluginId, model)
-            return
-        }
-        if (conv.pluginId === pluginId && conv.model === model) {
-            setAiSelectedPluginModel(pluginId, model)
-            return
-        }
-        if (conv.runId && session.isRunStreaming(conv.runId)) return
+            const conversationSnapshot = getAiConversationSnapshot()
+            const conv = conversationSnapshot.conversations.find(
+                (conversation) => conversation.id === conversationSnapshot.activeConversationId,
+            )
+            if (!conv) {
+                setAiSelectedPluginModel(pluginId, model)
+                return
+            }
+            if (conv.pluginId === pluginId && conv.model === model) {
+                setAiSelectedPluginModel(pluginId, model)
+                return
+            }
+            if (conv.runId && session.isRunStreaming(conv.runId)) return
 
-        const switchModel = (conversation: Conversation) =>
-            applyConversationModelSwitch(conversation, conv.id, pluginId, model)
-        const nextConversations = conversationSnapshot.conversations.map(switchModel)
-        conversationsRef.current = nextConversations
-        activeConversationRef.current = switchModel(conv)
-        setAiConversations(nextConversations)
-        setAiSelectedPluginModel(pluginId, model)
-        session.activateSession(null, null)
+            const liveRuntime = conv.sessionId && conv.runId
+                ? {sessionId: conv.sessionId, runId: conv.runId}
+                : null
+            if (liveRuntime) {
+                try {
+                    if (conv.pluginId !== pluginId) {
+                        await ai_switch_plugin(liveRuntime.sessionId, pluginId)
+                    }
+                    if (conv.model !== model) {
+                        await ai_update_session(liveRuntime.sessionId, {model})
+                    }
+                } catch (error) {
+                    logger.error('[useAiController] 切换当前会话模型失败', error)
+                    return
+                }
+            }
 
-        if (conv.sessionId && conv.runId) {
-            deleteRuntimeConversation(conv.sessionId, conv.runId)
+            const switchModel = (conversation: Conversation) =>
+                applyConversationModelSwitch(
+                    conversation,
+                    conv.id,
+                    pluginId,
+                    model,
+                    liveRuntime ?? undefined,
+                )
+            const latestSnapshot = getAiConversationSnapshot()
+            const nextConversations = latestSnapshot.conversations.map(switchModel)
+            conversationsRef.current = nextConversations
+            setAiConversations(nextConversations)
+            if (latestSnapshot.activeConversationId === conv.id) {
+                activeConversationRef.current = nextConversations.find(
+                    (conversation) => conversation.id === conv.id,
+                )
+                setAiSelectedPluginModel(pluginId, model)
+                session.activateSession(liveRuntime?.sessionId ?? null, liveRuntime?.runId ?? null)
+            }
+            if (!liveRuntime && conv.sessionId) {
+                await session.closeSession(conv.sessionId)
+            }
+        })
+        modelSwitchInFlightRef.current = switchTask
+        const clearSwitchTask = () => {
+            if (modelSwitchInFlightRef.current === switchTask) {
+                modelSwitchInFlightRef.current = null
+            }
         }
-        if (conv.sessionId) {
-            await session.closeSession(conv.sessionId)
-        }
+        void switchTask.then(clearSwitchTask, clearSwitchTask)
+        return switchTask
     }, [session])
 
     useEffect(() => () => {
@@ -2104,6 +2141,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
         if (!trimmed) return
+        await modelSwitchInFlightRef.current
 
         const traceId = createAiTraceId()
         const activeConv = activeConversationRef.current ?? null

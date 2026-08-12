@@ -50,7 +50,7 @@ test('历史列表只排除普通空草稿', () => {
     assert.deepEqual(toConversationHistory([draft, report, stored]), [report, stored])
 })
 
-test('切换模型会断开目标对话的旧运行时', () => {
+test('切换模型按会话状态保留或断开运行时', () => {
     const target = conversation('session_target', {
         sessionId: 'session_old',
         runId: 'run_old',
@@ -66,4 +66,12 @@ test('切换模型会断开目标对话的旧运行时', () => {
         {...target, pluginId: 'minimax', model: 'MiniMax-M2', sessionId: null, runId: null},
         other,
     ])
+
+    assert.deepEqual(
+        applyConversationModelSwitch(target, target.id, 'minimax', 'MiniMax-M2', {
+            sessionId: target.sessionId,
+            runId: target.runId,
+        }),
+        {...target, pluginId: 'minimax', model: 'MiniMax-M2'},
+    )
 })
