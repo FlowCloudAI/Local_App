@@ -1588,15 +1588,31 @@ export default function EntryEditor({
                                             {saveStatus.text}
                                         </span>
                                     )}
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        radius="full"
-                                        disabled={!canSave}
-                                        onClick={() => void handleSave()}
-                                    >
-                                        {saving ? '保存中…' : '保存修改'}
-                                    </Button>
+                                    {editorMode === 'browse'
+                                        && normalizeComparableType(draft.type) === 'character'
+                                        && entry
+                                        && onStartCharacterChat && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            radius="full"
+                                            aria-label={`与${entry.title}开始角色对话`}
+                                            onClick={() => void onStartCharacterChat(entry)}
+                                        >
+                                            和 TA 聊天
+                                        </Button>
+                                    )}
+                                    {editorMode === 'edit' && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            radius="full"
+                                            disabled={!canSave}
+                                            onClick={() => void handleSave()}
+                                        >
+                                            {saving ? '保存中…' : '保存修改'}
+                                        </Button>
+                                    )}
                                     {onDelete && (
                                         <Button
                                             type="button"
@@ -1655,9 +1671,6 @@ export default function EntryEditor({
                                         entryTags.handleRemoveVisibleTagSchema(schema)
                                     },
                                     onOpenTagCreator: () => setTagCreatorOpen(true),
-                                    onStartCharacterChat: entry ? () => {
-                                        void onStartCharacterChat?.(entry)
-                                    } : undefined,
                                 }}
                             />
                             {recoveryNotice && (

@@ -342,35 +342,33 @@
 .entry-editor-character-voice {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: var(--fc-space-md);
+    padding: 0 var(--fc-space-lg) var(--fc-space-lg);
 }
 
-.entry-editor-character-voice__toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
+.entry-editor-character-voice-dialog {
+    width: min(32rem, 100%);
 }
 
-.entry-editor-character-voice__toggle input {
-    margin: 0;
+.entry-editor-character-voice-summary {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fc-space-md);
+    min-width: 0;
 }
 
-.entry-editor-character-voice__reset {
-    align-self: flex-start;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-full);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    padding: 0.32rem 0.72rem;
-    cursor: pointer;
-    font-size: var(--fc-font-size-caption, 0.75rem);
-}
-
-.entry-editor-character-voice__reset:hover {
+.entry-editor-character-voice-summary__value {
+    overflow: hidden;
     color: var(--fc-color-text);
-    border-color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entry-editor-character-voice__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-sm);
 }
 
 .entry-editor-type-grid {
