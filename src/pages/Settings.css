@@ -1050,7 +1050,8 @@
   justify-content: center;
   gap: var(--fc-space-md);
   width: 100%;
-  min-height: 4.5rem;
+  flex: none;
+  min-height: 5rem;
   margin-bottom: var(--fc-space-lg);
   padding: var(--fc-space-md) var(--fc-space-lg);
   border: 1px dashed var(--fc-color-border);

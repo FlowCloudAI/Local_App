@@ -1184,22 +1184,6 @@ function PluginsPanel({
                         </div>
                     </div>
 
-                    <button
-                        ref={pluginDropZoneRef}
-                        type="button"
-                        className={`settings-plugin-dropzone${nativeFileDragActive ? ' is-active' : ''}`}
-                        disabled={installingLocalFile}
-                        onClick={onInstallFromFile}
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
-                        </svg>
-                        <span>
-                            <strong>{installingLocalFile ? '正在安装插件…' : nativeFileDragActive ? '松开以安装插件' : '拖入 .fcplug 安装本地插件'}</strong>
-                            <small>也可以点击选择文件</small>
-                        </span>
-                    </button>
-
                     {localError && (
                         <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
                     )}
@@ -1316,15 +1300,22 @@ function PluginsPanel({
                 className="settings-plugin-library-panel"
             >
                 <div className="settings-plugin-library-content">
+                    <button
+                        ref={pluginDropZoneRef}
+                        type="button"
+                        className={`settings-plugin-dropzone${nativeFileDragActive ? ' is-active' : ''}`}
+                        disabled={installingLocalFile}
+                        onClick={onInstallFromFile}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+                        </svg>
+                        <span>
+                            <strong>{installingLocalFile ? '正在安装插件…' : nativeFileDragActive ? '松开以安装插件' : '拖入 .fcplug 安装本地插件'}</strong>
+                            <small>也可以点击选择文件</small>
+                        </span>
+                    </button>
                     <div className="plugins-section-actions settings-plugin-library-actions">
-                        <Button
-                            type="button"
-                            size="sm"
-                            disabled={installingLocalFile}
-                            onClick={onInstallFromFile}
-                        >
-                            {installingLocalFile ? '安装中…' : '安装本地插件'}
-                        </Button>
                         <Button
                             type="button"
                             variant="outline"
