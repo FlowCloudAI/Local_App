@@ -157,6 +157,11 @@ export interface AiSpeakParams {
   voiceId: string
 }
 
+export interface AiPlayTtsParams extends AiSpeakParams {
+  conversationId?: string | null
+  trigger?: 'auto' | 'manual'
+}
+
 export interface AiEventReady {
   session_id: string
   run_id: string
@@ -391,8 +396,8 @@ export const ai_merge_images = ({
 export const ai_speak = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
     command<TtsResult>('ai_speak', {pluginId, model, text, voiceId})
 
-export const ai_play_tts = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
-    command<void>('ai_play_tts', {pluginId, model, text, voiceId})
+export const ai_play_tts = ({pluginId, model, text, voiceId, conversationId, trigger}: AiPlayTtsParams) =>
+    command<void>('ai_play_tts', {pluginId, model, text, voiceId, conversationId, trigger})
 
 export const ai_cancel_tts = () => command<void>('ai_cancel_tts')
 

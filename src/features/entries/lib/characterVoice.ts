@@ -81,6 +81,19 @@ export function readCharacterVoiceConfigFromDraftTags(
     }
 }
 
+export function areCharacterVoiceDraftTagsEqual(
+    left: Record<string, string | number | boolean | null>,
+    right: Record<string, string | number | boolean | null>,
+    tagSchemas: Array<{id: string; name: string}> = [],
+): boolean {
+    const leftVoice = readCharacterVoiceConfigFromDraftTags(left, tagSchemas)
+    const rightVoice = readCharacterVoiceConfigFromDraftTags(right, tagSchemas)
+    return leftVoice.pluginId === rightVoice.pluginId
+        && leftVoice.model === rightVoice.model
+        && leftVoice.voiceId === rightVoice.voiceId
+        && leftVoice.autoPlay === rightVoice.autoPlay
+}
+
 export function writeCharacterVoiceDraftTag(
     tags: Record<string, string | number | boolean | null>,
     tagSchemas: Array<{id: string; name: string}>,
@@ -88,7 +101,6 @@ export function writeCharacterVoiceDraftTag(
     value: string | boolean | null,
 ) {
     const next = {...tags}
-    const legacySchemaId = tagSchemas.find((schema) => schema.name === definition.name)?.id
     delete next[definition.name]
     tagSchemas
         .filter((schema) => schema.name === definition.name)
@@ -96,7 +108,7 @@ export function writeCharacterVoiceDraftTag(
     if (value == null || (typeof value === 'string' && !value.trim())) {
         delete next[definition.id]
     } else {
-        next[legacySchemaId ?? definition.id] = typeof value === 'string' ? value.trim() : value
+        next[definition.id] = typeof value === 'string' ? value.trim() : value
     }
     return next
 }

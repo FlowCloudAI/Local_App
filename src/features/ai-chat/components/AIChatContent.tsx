@@ -50,6 +50,7 @@ import {
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
+import {readCharacterVoiceConfigFromTags} from '../../entries/lib/characterVoice'
 import {subscribeAppSettings, useAppSettingsStore} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
 import AiResponsePendingIndicator from './AiResponsePendingIndicator'
@@ -1404,10 +1405,9 @@ export default function AIChatContent({
 
     const handlePlayRoleMessage = useCallback(async (
         content: string,
-        overridePluginId?: string | null,
-        overrideModel?: string | null,
-        overrideVoiceId?: string | null,
+        trigger: 'auto' | 'manual',
     ) => {
+        const conversationId = activeConversation?.id ?? null
         const text = content.trim()
         if (!text) {
             await showAlert('当前消息没有可播放的文本内容。', 'warning', 'nonInvasive', 1800)
@@ -1424,9 +1424,38 @@ export default function AIChatContent({
             return
         }
 
+        let roleVoice = {
+            pluginId: activeConversation?.characterVoicePluginId ?? null,
+            model: activeConversation?.characterVoiceModel ?? null,
+            voiceId: activeConversation?.characterVoiceId ?? null,
+        }
+        let voiceConfigSource = 'conversation-snapshot'
+        if (activeConversation?.characterEntryId) {
+            try {
+                const character = await db_get_entry(activeConversation.characterEntryId)
+                const latest = readCharacterVoiceConfigFromTags(character.tags)
+                roleVoice = {
+                    pluginId: latest.pluginId,
+                    model: latest.model,
+                    voiceId: latest.voiceId,
+                }
+                voiceConfigSource = 'character-entry'
+            } catch (error) {
+                logger.warn('[roleplay-tts] 读取角色最新音色失败，回退会话快照', {
+                    conversationId,
+                    characterEntryId: activeConversation.characterEntryId,
+                    error: String(error),
+                })
+            }
+        }
+        if (conversationId && activeRoleplayConversationIdRef.current !== conversationId) {
+            logger.info('[roleplay-tts] 会话已切换，跳过过期播放', {conversationId, trigger})
+            return
+        }
+
         const selectedPlugin = resolvePreferredTtsPlugin(
             ttsPlugins,
-            overridePluginId ?? appSettings.tts.plugin_id,
+            roleVoice.pluginId ?? appSettings.tts.plugin_id,
         )
 
         if (!selectedPlugin) {
@@ -1439,8 +1468,8 @@ export default function AIChatContent({
             return
         }
 
-        const preferredModel = overrideModel
-            ?? (overridePluginId ? null : appSettings.tts.default_model)
+        const preferredModel = roleVoice.model
+            ?? (roleVoice.pluginId ? null : appSettings.tts.default_model)
         const model = preferredModel && selectedPlugin.models.includes(preferredModel)
             ? preferredModel
             : (selectedPlugin.default_model ?? selectedPlugin.models[0] ?? '')
@@ -1452,9 +1481,21 @@ export default function AIChatContent({
 
         const voiceId = resolveVoiceIdWithPlugin(
             selectedPlugin,
-            [overrideVoiceId, appSettings.tts.voice_id],
+            [roleVoice.voiceId, appSettings.tts.voice_id],
             DEFAULT_ROLEPLAY_VOICE_ID,
         )
+
+        logger.info('[roleplay-tts] 开始播放', {
+            conversationId,
+            characterEntryId: activeConversation?.characterEntryId ?? null,
+            trigger,
+            voiceConfigSource,
+            pluginId: selectedPlugin.id,
+            pluginName: selectedPlugin.name,
+            model,
+            voiceId,
+            textCharacters: [...text].length,
+        })
 
         try {
             await ai_play_tts({
@@ -1462,11 +1503,21 @@ export default function AIChatContent({
                 model,
                 text,
                 voiceId,
+                conversationId,
+                trigger,
             })
         } catch (error) {
+            logger.error('[roleplay-tts] 播放失败', {
+                conversationId,
+                trigger,
+                pluginId: selectedPlugin.id,
+                model,
+                voiceId,
+                error: String(error),
+            })
             await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2800)
         }
-    }, [apiKeyStatus, appSettings, appSettingsLoaded, showAlert, ttsPlugins])
+    }, [activeConversation, apiKeyStatus, appSettings, appSettingsLoaded, showAlert, ttsPlugins])
 
     useEffect(() => {
         const turn = ctx.completedAssistantTurn
@@ -1483,9 +1534,7 @@ export default function AIChatContent({
 
         void handlePlayRoleMessage(
             turn.text,
-            activeConversation.characterVoicePluginId,
-            activeConversation.characterVoiceModel,
-            activeConversation.characterVoiceId,
+            'auto',
         )
     }, [
         activeConversation,
@@ -1961,9 +2010,7 @@ export default function AIChatContent({
                                                 onPlay={roleplayTtsEnabled && message.role === 'assistant' && !isContinuing
                                                     ? () => void handlePlayRoleMessage(
                                                         message.content,
-                                                        activeConversation?.characterVoicePluginId,
-                                                        activeConversation?.characterVoiceModel,
-                                                        activeConversation?.characterVoiceId,
+                                                        'manual',
                                                     )
                                                     : undefined}
                                                 onEdit={message.role === 'user'

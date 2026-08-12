@@ -1,5 +1,6 @@
 import type {TagSchema} from '../../../api'
 import {normalizeTagRuntimeValue} from './entryCommon'
+import {areCharacterVoiceDraftTagsEqual} from './characterVoice'
 
 export function normalizeComparableTagValue(value: unknown): string | number | boolean | null {
     const normalized = normalizeTagRuntimeValue(value)
@@ -25,7 +26,8 @@ export function areTagMapsEqual(
     for (const schema of schemas) {
         if (getComparableTagValue(left, schema) !== getComparableTagValue(right, schema)) return false
     }
-    return true
+
+    return areCharacterVoiceDraftTagsEqual(left, right, schemas)
 }
 
 export function mergeUniqueStringValues(values: string[]): string[] {

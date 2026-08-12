@@ -5,12 +5,13 @@ import {
     CHARACTER_VOICE_ID_TAG_ID,
     CHARACTER_VOICE_PLUGIN_ID_TAG,
     CHARACTER_VOICE_PLUGIN_ID_TAG_ID,
+    areCharacterVoiceDraftTagsEqual,
     readCharacterVoiceConfigFromDraftTags,
     readCharacterVoiceConfigFromTags,
     writeCharacterVoiceDraftTag,
 } from './characterVoice.ts'
 
-test('角色语音兼容旧标签，并在新项目使用稳定标签 ID', () => {
+test('角色语音兼容旧标签，写入时迁移到稳定标签 ID', () => {
     assert.deepEqual(readCharacterVoiceConfigFromTags([
         {schema_id: CHARACTER_VOICE_PLUGIN_ID_TAG_ID, value: 'minimax-tts'},
         {schema_id: CHARACTER_VOICE_ID_TAG_ID, value: 'male-qn-qingse'},
@@ -31,7 +32,7 @@ test('角色语音兼容旧标签，并在新项目使用稳定标签 ID', () =>
             {name: CHARACTER_VOICE_PLUGIN_ID_TAG, id: CHARACTER_VOICE_PLUGIN_ID_TAG_ID},
             'minimax-tts',
         ),
-        {'legacy-plugin-schema': 'minimax-tts'},
+        {[CHARACTER_VOICE_PLUGIN_ID_TAG_ID]: 'minimax-tts'},
     )
     assert.deepEqual(
         writeCharacterVoiceDraftTag(
@@ -42,4 +43,12 @@ test('角色语音兼容旧标签，并在新项目使用稳定标签 ID', () =>
         ),
         {[CHARACTER_VOICE_PLUGIN_ID_TAG_ID]: 'minimax-tts'},
     )
+})
+
+test('角色语音变化会被词条保存判断识别', () => {
+    assert.equal(areCharacterVoiceDraftTagsEqual(
+        {},
+        {[CHARACTER_VOICE_PLUGIN_ID_TAG_ID]: 'minimax-tts'},
+        [],
+    ), false)
 })

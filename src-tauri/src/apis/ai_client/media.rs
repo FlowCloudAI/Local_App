@@ -202,7 +202,20 @@ pub async fn ai_play_tts(
     model: String,
     text: String,
     voice_id: String,
+    conversation_id: Option<String>,
+    trigger: Option<String>,
 ) -> Result<(), ApiError> {
+    let conversation_id = conversation_id.as_deref().unwrap_or("-");
+    let trigger = trigger.as_deref().unwrap_or("unknown");
+    log::info!(
+        "[tts:play] 请求开始 conversation_id={} trigger={} plugin_id={} model={} voice_id={} text_characters={}",
+        conversation_id,
+        trigger,
+        plugin_id,
+        model,
+        voice_id,
+        text.chars().count(),
+    );
     let token = playback_state.begin();
     let outcome = async {
         let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| api_key_missing(&plugin_id))?;
@@ -211,6 +224,20 @@ pub async fn ai_play_tts(
         drop(client);
 
         let result = session.speak(&model, &text, &voice_id).await?;
+        log::info!(
+            "[tts:play] 合成完成 conversation_id={} trigger={} plugin_id={} model={} voice_id={} format={} bytes={} has_url={} sample_rate={:?} channels={:?} duration_ms={:?}",
+            conversation_id,
+            trigger,
+            plugin_id,
+            model,
+            voice_id,
+            result.format,
+            result.audio.len(),
+            result.url.as_ref().is_some_and(|url| !url.is_empty()),
+            result.sample_rate,
+            result.channels,
+            result.duration_ms,
+        );
         if token.load(Ordering::Acquire) {
             return Ok(());
         }
@@ -243,6 +270,30 @@ pub async fn ai_play_tts(
         outcome
     };
     playback_state.finish(&token);
+    match &outcome {
+        Ok(()) => log::info!(
+            "[tts:play] 请求结束 conversation_id={} trigger={} plugin_id={} model={} voice_id={} status={}",
+            conversation_id,
+            trigger,
+            plugin_id,
+            model,
+            voice_id,
+            if token.load(Ordering::Acquire) {
+                "cancelled"
+            } else {
+                "completed"
+            },
+        ),
+        Err(error) => log::error!(
+            "[tts:play] 请求失败 conversation_id={} trigger={} plugin_id={} model={} voice_id={} error={}",
+            conversation_id,
+            trigger,
+            plugin_id,
+            model,
+            voice_id,
+            error,
+        ),
+    }
     outcome
 }
 
