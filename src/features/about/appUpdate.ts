@@ -46,14 +46,6 @@ export function checkAppUpdate() {
     return check({timeout: 30000})
 }
 
-export function mergeUpdateChangelog<T extends {version: string}>(
-    entries: readonly T[],
-    available: T | null,
-): readonly T[] {
-    if (!available || entries.some((entry) => entry.version === available.version)) return entries
-    return [available, ...entries]
-}
-
 export async function installAppUpdate(update: Update, onEvent?: (event: DownloadEvent) => void) {
     await update.downloadAndInstall(onEvent)
     await relaunch()

@@ -22,3 +22,28 @@ export const UPDATE_CHANGELOG: readonly UpdateChangelogEntry[] = [
         notes: '首个纳入应用内版本记录的测试版本；更早的更新内容尚未完成结构化归档。',
     },
 ]
+
+export function mergeUpdateChangelogEntries(
+    ...sources: ReadonlyArray<readonly UpdateChangelogEntry[]>
+): readonly UpdateChangelogEntry[] {
+    const merged: UpdateChangelogEntry[] = []
+    const indexes = new Map<string, number>()
+    for (const source of sources) {
+        for (const entry of source) {
+            const index = indexes.get(entry.version)
+            if (index === undefined) {
+                indexes.set(entry.version, merged.length)
+                merged.push({...entry})
+                continue
+            }
+            const current = merged[index]
+            if (!current.date && entry.date) current.date = entry.date
+            if (!current.notes.trim() && entry.notes.trim()) current.notes = entry.notes
+        }
+    }
+    merged.sort((left, right) => right.version.localeCompare(left.version, 'en', {numeric: true}))
+    for (const entry of merged) {
+        if (!entry.notes.trim()) entry.notes = '此版本未提供更新说明。'
+    }
+    return merged
+}

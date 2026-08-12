@@ -3,17 +3,21 @@
 import {useCallback, useEffect, useState} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
 import {Button, useAlert} from 'flowcloudai-ui'
+import {get_app_update_changelog} from '../../api'
 import {logger} from '../../shared/logger'
 import {
     checkAppUpdate,
     installAppUpdate,
     isAutoCheckUpdateEnabled,
     setAutoCheckUpdateEnabled,
-    mergeUpdateChangelog,
     type DownloadEvent,
     type Update,
 } from './appUpdate'
-import {UPDATE_CHANGELOG, type UpdateChangelogEntry} from './updateChangelog'
+import {
+    mergeUpdateChangelogEntries,
+    UPDATE_CHANGELOG,
+    type UpdateChangelogEntry,
+} from './updateChangelog'
 import './AboutSection.css'
 
 export default function UpdateSection() {
@@ -26,9 +30,17 @@ export default function UpdateSection() {
     const [downloadedBytes, setDownloadedBytes] = useState(0)
     const [downloadTotalBytes, setDownloadTotalBytes] = useState<number | null>(null)
     const [autoCheckUpdate, setAutoCheckUpdate] = useState(isAutoCheckUpdateEnabled)
+    const [remoteChangelog, setRemoteChangelog] = useState<readonly UpdateChangelogEntry[]>([])
 
     useEffect(() => {
         getVersion().then(setAppVersion).catch(logger.error)
+        get_app_update_changelog('windows', 'x86_64').then((entries) => {
+            setRemoteChangelog(entries.map((entry) => ({
+                version: entry.version,
+                date: entry.pub_date ?? '',
+                notes: entry.notes?.trim() ?? '',
+            })))
+        }).catch((error) => logger.warn('获取官网更新日志失败，继续使用内置日志', error))
     }, [])
 
     const handleCheckUpdate = useCallback(async () => {
@@ -97,13 +109,14 @@ export default function UpdateSection() {
             ? `${Math.round(downloadedBytes / 1024 / 1024 * 10) / 10} MB`
             : ''
 
-    const updateChangelog: readonly UpdateChangelogEntry[] = mergeUpdateChangelog(
-        UPDATE_CHANGELOG,
-        availableUpdate ? {
+    const updateChangelog = mergeUpdateChangelogEntries(
+        remoteChangelog,
+        availableUpdate ? [{
             version: availableUpdate.version,
             date: availableUpdate.date ?? '',
             notes: availableUpdate.body?.trim() || '此版本未提供更新说明。',
-        } : null,
+        }] : [],
+        UPDATE_CHANGELOG,
     )
 
     return (

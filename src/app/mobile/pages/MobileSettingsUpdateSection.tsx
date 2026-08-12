@@ -1,15 +1,25 @@
 // 移动端更新页：展示 APK 更新状态、自动检查偏好以及与桌面端共享的版本日志。
 
-import {useCallback, useState} from 'react'
+import {useCallback, useEffect, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {check_mobile_app_update, formatApiError, type MobileAppUpdate, toApiError} from '../../../api'
+import {
+    check_mobile_app_update,
+    formatApiError,
+    get_app_update_changelog,
+    type MobileAppUpdate,
+    toApiError,
+} from '../../../api'
 import {
     isAutoCheckUpdateEnabled,
-    mergeUpdateChangelog,
     setAutoCheckUpdateEnabled,
 } from '../../../features/about/appUpdate'
-import {UPDATE_CHANGELOG, type UpdateChangelogEntry} from '../../../features/about/updateChangelog'
+import {
+    mergeUpdateChangelogEntries,
+    UPDATE_CHANGELOG,
+    type UpdateChangelogEntry,
+} from '../../../features/about/updateChangelog'
 import {openUrl} from '../../../api/opener'
+import {logger} from '../../../shared/logger'
 
 interface Props {
     version: string
@@ -22,6 +32,18 @@ export default function MobileSettingsUpdateSection({version, supported}: Props)
     const [checking, setChecking] = useState(false)
     const [availableUpdate, setAvailableUpdate] = useState<MobileAppUpdate | null>(null)
     const [status, setStatus] = useState('')
+    const [remoteChangelog, setRemoteChangelog] = useState<readonly UpdateChangelogEntry[]>([])
+
+    useEffect(() => {
+        if (!supported) return
+        get_app_update_changelog('android', 'universal').then((entries) => {
+            setRemoteChangelog(entries.map((entry) => ({
+                version: entry.version,
+                date: entry.pub_date ?? '',
+                notes: entry.notes?.trim() ?? '',
+            })))
+        }).catch((error) => logger.warn('获取官网更新日志失败，继续使用内置日志', error))
+    }, [supported])
 
     const handleCheck = useCallback(async () => {
         if (!supported || !version) return
@@ -52,13 +74,14 @@ export default function MobileSettingsUpdateSection({version, supported}: Props)
         }
     }, [availableUpdate, showAlert])
 
-    const changelog: readonly UpdateChangelogEntry[] = mergeUpdateChangelog(
-        UPDATE_CHANGELOG,
-        availableUpdate ? {
+    const changelog = mergeUpdateChangelogEntries(
+        remoteChangelog,
+        availableUpdate ? [{
             version: availableUpdate.version,
             date: availableUpdate.pub_date ?? '',
             notes: availableUpdate.notes?.trim() || '此版本未提供更新说明。',
-        } : null,
+        }] : [],
+        UPDATE_CHANGELOG,
     )
 
     return (

@@ -437,6 +437,7 @@ pub fn run() {
             exit_app,
             get_platform_info,
             check_mobile_app_update,
+            get_app_update_changelog,
             // 项目
             db_create_project,
             db_get_project,
