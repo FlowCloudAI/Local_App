@@ -1,3 +1,6 @@
+import {useState} from 'react'
+import {Button} from 'flowcloudai-ui'
+import {FloatingPanel} from '../../../../../shared/ui/overlay'
 import {
     DashboardBarList,
     type DashboardBarItem,
@@ -19,6 +22,7 @@ import './ProjectDashboardControls.css'
 type ProjectDashboardProps = ProjectDashboardModelInput
 
 function ProjectDashboard(props: ProjectDashboardProps) {
+    const [detailsOpen, setDetailsOpen] = useState(false)
     const dashboard = buildProjectDashboardModel(props)
     const assetTotal = dashboard.effectiveEntryCount + dashboard.safeImageCount + dashboard.relationCount
 
@@ -28,91 +32,121 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                 <div>
                     <h2 className="pe-feature-section__title">项目总览</h2>
                     <p className="pe-feature-section__desc">
-                        查看这个世界已经写了多少、资料怎么分布，以及还有哪些地方需要补齐。
+                        快速判断项目状态并处理需要关注的问题。
                     </p>
                 </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDetailsOpen(true)}>
+                    详情
+                </Button>
             </div>
 
-            <div className="pe-dashboard-status-strip">
+            <div className="pe-dashboard-summary-grid">
                 <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
                     <HealthMeter score={dashboard.structureScore} entryCount={dashboard.effectiveEntryCount}/>
                 </article>
-                <div className="pe-dashboard-status-strip__kpis">
-                    <DashboardKpiStrip items={dashboard.kpiItems}/>
-                </div>
+                <ProjectDashboardRiskPanel
+                    projectStats={props.projectStats}
+                    riskSummary={props.riskSummary}
+                    onOpenEntry={props.onOpenEntry}
+                />
             </div>
 
-            <div className="pe-dashboard-layout">
-                <div className="pe-dashboard-main-column">
-                    <article className="pe-dashboard-panel pe-dashboard-panel--primary">
-                        <div className="pe-dashboard-panel__header">
-                            <h3>资料概览</h3>
-                            <span>{formatDashboardNumber(assetTotal)} 项内容</span>
+            <FloatingPanel
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                title="项目总览详情"
+                className="pe-dashboard-details-panel"
+            >
+                <div className="pe-dashboard-details-content">
+                    <div className="pe-dashboard-status-strip">
+                        <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
+                            <HealthMeter score={dashboard.structureScore} entryCount={dashboard.effectiveEntryCount}/>
+                        </article>
+                        <div className="pe-dashboard-status-strip__kpis">
+                            <DashboardKpiStrip items={dashboard.kpiItems}/>
                         </div>
-                        <div className="pe-dashboard-distribution-grid">
-                            <DashboardDistributionBlock
-                                title={props.projectStats ? '词条类型分布' : '词条类型配置'}
-                                items={dashboard.typeItems}
-                                variant="pie"
-                            />
-                            <DashboardDistributionBlock
-                                title={props.projectStats ? '分类词条分布' : '分类结构'}
-                                items={dashboard.categoryItems}
-                            />
-                            <DashboardDistributionBlock title="标签字段类型" items={dashboard.tagTypeItems} variant="pie"/>
-                        </div>
-                    </article>
+                    </div>
 
-                    <article className="pe-dashboard-panel">
-                        <div className="pe-dashboard-panel__header">
-                            <h3>资料结构</h3>
-                            <span>分类、内链和内容厚度</span>
-                        </div>
-                        <div className="pe-dashboard-structure-grid">
-                            <DashboardMetric
-                                label="平均词条字数"
-                                value={formatDashboardNumber(dashboard.averageWords)}
-                                hint="衡量设定资料的填充厚度"
-                                muted={dashboard.averageWords === 0}
-                            />
-                            <DashboardMetric
-                                label="图文资源比"
-                                value={formatDashboardRatio(dashboard.assetRatio)}
-                                hint="平均每个词条关联图片资源"
-                                muted={dashboard.assetRatio === 0}
-                            />
-                            <DashboardMetric
-                                label="内链总数"
-                                value={formatDashboardNumber(dashboard.internalLinkCount)}
-                                hint="正文中维护的词条链接"
-                                muted={dashboard.internalLinkCount === 0}
-                            />
-                            <DashboardMetric
-                                label="分类层级深度"
-                                value={`${dashboard.categoryDepth || 0} 层`}
-                                hint="观察资料结构的组织深度"
-                                muted={!dashboard.categoryDepth}
-                            />
-                        </div>
-                    </article>
+                    <div className="pe-dashboard-layout">
+                        <div className="pe-dashboard-main-column">
+                            <article className="pe-dashboard-panel pe-dashboard-panel--primary">
+                                <div className="pe-dashboard-panel__header">
+                                    <h3>资料概览</h3>
+                                    <span>{formatDashboardNumber(assetTotal)} 项内容</span>
+                                </div>
+                                <div className="pe-dashboard-distribution-grid">
+                                    <DashboardDistributionBlock
+                                        title={props.projectStats ? '词条类型分布' : '词条类型配置'}
+                                        items={dashboard.typeItems}
+                                        variant="pie"
+                                    />
+                                    <DashboardDistributionBlock
+                                        title={props.projectStats ? '分类词条分布' : '分类结构'}
+                                        items={dashboard.categoryItems}
+                                    />
+                                    <DashboardDistributionBlock
+                                        title="标签字段类型"
+                                        items={dashboard.tagTypeItems}
+                                        variant="pie"
+                                    />
+                                </div>
+                            </article>
 
-                    <article className="pe-dashboard-panel pe-dashboard-panel--signals">
-                        <div className="pe-dashboard-panel__header">
-                            <h3>需要留意的地方</h3>
-                            <span>资料整理</span>
+                            <article className="pe-dashboard-panel">
+                                <div className="pe-dashboard-panel__header">
+                                    <h3>资料结构</h3>
+                                    <span>分类、内链和内容厚度</span>
+                                </div>
+                                <div className="pe-dashboard-structure-grid">
+                                    <DashboardMetric
+                                        label="平均词条字数"
+                                        value={formatDashboardNumber(dashboard.averageWords)}
+                                        hint="衡量设定资料的填充厚度"
+                                        muted={dashboard.averageWords === 0}
+                                    />
+                                    <DashboardMetric
+                                        label="图文资源比"
+                                        value={formatDashboardRatio(dashboard.assetRatio)}
+                                        hint="平均每个词条关联图片资源"
+                                        muted={dashboard.assetRatio === 0}
+                                    />
+                                    <DashboardMetric
+                                        label="内链总数"
+                                        value={formatDashboardNumber(dashboard.internalLinkCount)}
+                                        hint="正文中维护的词条链接"
+                                        muted={dashboard.internalLinkCount === 0}
+                                    />
+                                    <DashboardMetric
+                                        label="分类层级深度"
+                                        value={`${dashboard.categoryDepth || 0} 层`}
+                                        hint="观察资料结构的组织深度"
+                                        muted={!dashboard.categoryDepth}
+                                    />
+                                </div>
+                            </article>
+
+                            <article className="pe-dashboard-panel pe-dashboard-panel--signals">
+                                <div className="pe-dashboard-panel__header">
+                                    <h3>需要留意的地方</h3>
+                                    <span>资料整理</span>
+                                </div>
+                                <DashboardSignalList items={dashboard.signalItems}/>
+                            </article>
                         </div>
-                        <DashboardSignalList items={dashboard.signalItems}/>
-                    </article>
+
+                        <aside className="pe-dashboard-sidebar">
+                            <ProjectDashboardRiskPanel
+                                projectStats={props.projectStats}
+                                riskSummary={props.riskSummary}
+                                onOpenEntry={(entry) => {
+                                    setDetailsOpen(false)
+                                    props.onOpenEntry?.(entry)
+                                }}
+                            />
+                        </aside>
+                    </div>
                 </div>
-
-                <aside className="pe-dashboard-sidebar">
-                    <ProjectDashboardRiskPanel
-                        projectStats={props.projectStats}
-                        riskSummary={props.riskSummary}
-                        onOpenEntry={props.onOpenEntry}
-                    />
-                </aside>
-            </div>
+            </FloatingPanel>
         </section>
     )
 }
