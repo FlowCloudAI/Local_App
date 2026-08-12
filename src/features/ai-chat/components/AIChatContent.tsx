@@ -6,18 +6,15 @@ import {listen} from '../../../api/events'
 import {Button, MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
-    ai_list_plugins,
     ai_play_tts,
     db_get_entry,
     db_list_entries,
     type Entry,
     type EntryBrief,
     type DocumentContextItem,
-    type PluginInfo,
     type ConversationExportFormat,
     ErrorCode,
     formatApiError,
-    setting_get_settings,
     setting_has_api_key,
     toApiError,
 } from '../../../api'
@@ -530,7 +527,12 @@ export default function AIChatContent({
                                        sidePortalTarget,
                                    }: AIChatContentProps) {
     const ctx = controller
-    const {settings: appSettings} = useAppSettingsStore()
+    const {
+        settings: appSettings,
+        ttsPlugins,
+        apiKeyStatus,
+        hasLoaded: appSettingsLoaded,
+    } = useAppSettingsStore()
     const {addDocumentContextFiles} = ctx
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
@@ -654,7 +656,6 @@ export default function AIChatContent({
 
     const [autoScroll, setAutoScroll] = useState(true)
     const [isNativeFileDragActive, setIsNativeFileDragActive] = useState(false)
-    const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
     const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
@@ -666,13 +667,11 @@ export default function AIChatContent({
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const projectEntriesRef = useRef<EntryBrief[]>([])
     const lastScrollTopRef = useRef(0)
-    const roleplayAutoPlayRef = useRef<string | null>(null)
+    const handledAssistantTurnSequenceRef = useRef(ctx.completedAssistantTurn?.sequence ?? 0)
     const notifiedFailedDocumentIdsRef = useRef<Set<string>>(new Set())
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
-    const [ttsPluginsReady, setTtsPluginsReady] = useState(false)
-    const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const visibleDocumentContextItems = ctx.documentContextItems
@@ -802,7 +801,7 @@ export default function AIChatContent({
         }).sort(compareConversationsForList)
     }, [conversationFilter, conversationSearch, conversationStatusFilter, ctx.conversations])
     const hasConversationSearch = conversationSearch.trim().length > 0
-    const ttsUnavailable = ttsPluginsReady && !hasTtsPlugin
+    const ttsUnavailable = appSettingsLoaded && ttsPlugins.length === 0
     const roleplayTtsEnabled = isCharacterConversation && !ttsUnavailable
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
@@ -879,29 +878,6 @@ export default function AIChatContent({
         setEntryCache({})
         closeLinkPreview()
     }, [closeLinkPreview, linkPreviewProjectId])
-
-    const refreshTtsPluginAvailability = useCallback(async () => {
-        try {
-            const ttsPlugins = await ai_list_plugins('tts')
-            setHasTtsPlugin(ttsPlugins.length > 0)
-            setTtsPluginsReady(true)
-        } catch (error) {
-            logger.error('检查 TTS 插件状态失败', error)
-        }
-    }, [])
-
-    useEffect(() => {
-        void refreshTtsPluginAvailability()
-        const handler = () => {
-            void refreshTtsPluginAvailability()
-        }
-        const unlistenBackendReady = listen('backend-ready', handler)
-        const unsubscribeSettings = subscribeAppSettings(handler)
-        return () => {
-            unsubscribeSettings()
-            unlistenBackendReady.then((fn) => fn())
-        }
-    }, [refreshTtsPluginAvailability])
 
     useEffect(() => {
         const handler = () => setLlmApiKeyState((state) => ({
@@ -1414,26 +1390,19 @@ export default function AIChatContent({
             return
         }
 
-        let settings
-        let plugins: PluginInfo[]
-        try {
-            ;[settings, plugins] = await Promise.all([
-                setting_get_settings(),
-                ai_list_plugins('tts'),
-            ])
-        } catch (error) {
-            await showAlert(`读取语音设置失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
+        if (!appSettingsLoaded || !appSettings) {
+            await showAlert('语音设置仍在加载，请稍后重试。', 'warning', 'nonInvasive', 1800)
             return
         }
 
-        if (plugins.length === 0) {
+        if (ttsPlugins.length === 0) {
             await showAlert('当前没有可用的语音插件，请先安装 AI 语音插件。', 'warning', 'nonInvasive', 2600)
             return
         }
 
         const selectedPlugin = resolvePreferredTtsPlugin(
-            plugins,
-            overridePluginId ?? settings.tts.plugin_id,
+            ttsPlugins,
+            overridePluginId ?? appSettings.tts.plugin_id,
         )
 
         if (!selectedPlugin) {
@@ -1441,21 +1410,13 @@ export default function AIChatContent({
             return
         }
 
-        let hasApiKey = false
-        try {
-            hasApiKey = await setting_has_api_key(selectedPlugin.id)
-        } catch (error) {
-            await showAlert(`读取语音插件密钥状态失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
-            return
-        }
-
-        if (!hasApiKey) {
+        if (apiKeyStatus[selectedPlugin.id] === false) {
             await showAlert(`语音插件「${selectedPlugin.name}」尚未配置访问密钥。`, 'warning', 'nonInvasive', 2600)
             return
         }
 
         const preferredModel = overrideModel
-            ?? (overridePluginId ? null : settings.tts.default_model)
+            ?? (overridePluginId ? null : appSettings.tts.default_model)
         const model = preferredModel && selectedPlugin.models.includes(preferredModel)
             ? preferredModel
             : (selectedPlugin.default_model ?? selectedPlugin.models[0] ?? '')
@@ -1467,7 +1428,7 @@ export default function AIChatContent({
 
         const voiceId = resolveVoiceIdWithPlugin(
             selectedPlugin,
-            [overrideVoiceId, settings.tts.voice_id],
+            [overrideVoiceId, appSettings.tts.voice_id],
             DEFAULT_ROLEPLAY_VOICE_ID,
         )
 
@@ -1481,74 +1442,36 @@ export default function AIChatContent({
         } catch (error) {
             await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2800)
         }
-    }, [showAlert])
+    }, [apiKeyStatus, appSettings, appSettingsLoaded, showAlert, ttsPlugins])
 
     useEffect(() => {
-        if (!isCharacterConversation || !activeConversation) {
-            roleplayAutoPlayRef.current = null
-            return
-        }
-        const latestMessage = ctx.messages[ctx.messages.length - 1]
-        if (!latestMessage || latestMessage.role !== 'assistant') return
-        const currentKey = `${activeConversation.id}:${latestMessage.id}`
-        if (roleplayAutoPlayRef.current === currentKey) return
-        let cancelled = false
+        const turn = ctx.completedAssistantTurn
+        if (!turn || turn.sequence <= handledAssistantTurnSequenceRef.current) return
+        handledAssistantTurnSequenceRef.current = turn.sequence
+        if (
+            !turn.activeAtCompletion
+            || ttsUnavailable
+            || !activeConversation
+            || activeConversation.id !== turn.conversationId
+            || activeConversation.mode !== 'character'
+            || !(activeConversation.characterAutoPlay ?? appSettings?.tts.auto_play ?? false)
+        ) return
 
-        const run = async () => {
-            if (ttsUnavailable) return
-            let shouldAutoPlay = activeConversation.characterAutoPlay
-            if (shouldAutoPlay == null) {
-                try {
-                    const settings = await setting_get_settings()
-                    shouldAutoPlay = settings.tts.auto_play
-                } catch {
-                    shouldAutoPlay = false
-                }
-            }
-            if (!shouldAutoPlay || cancelled) return
-            roleplayAutoPlayRef.current = currentKey
-            await handlePlayRoleMessage(
-                latestMessage.content,
-                activeConversation.characterVoicePluginId,
-                activeConversation.characterVoiceModel,
-                activeConversation.characterVoiceId,
-            )
-        }
-
-        void run()
-        return () => {
-            cancelled = true
-        }
+        void handlePlayRoleMessage(
+            turn.text,
+            activeConversation.characterVoicePluginId,
+            activeConversation.characterVoiceModel,
+            activeConversation.characterVoiceId,
+        )
     }, [
         activeConversation,
-        ctx.messages,
+        appSettings?.tts.auto_play,
+        ctx.completedAssistantTurn,
         handlePlayRoleMessage,
-        isCharacterConversation,
         ttsUnavailable,
     ])
 
-    useEffect(() => {
-        if (!isCharacterConversation || !activeConversation || activeConversation.characterAutoPlay != null) {
-            return
-        }
-
-        let cancelled = false
-        setting_get_settings()
-            .then((settings) => {
-                if (cancelled) return
-                setRoleplayAutoPlayFallback(settings.tts.auto_play)
-            })
-            .catch(() => {
-                if (cancelled) return
-                setRoleplayAutoPlayFallback(true)
-            })
-
-        return () => {
-            cancelled = true
-        }
-    }, [activeConversation, isCharacterConversation])
-
-    const effectiveRoleplayAutoPlay = activeConversation?.characterAutoPlay ?? roleplayAutoPlayFallback ?? true
+    const effectiveRoleplayAutoPlay = activeConversation?.characterAutoPlay ?? appSettings?.tts.auto_play ?? true
 
     const sidebarJsx = (
         <>
@@ -2009,9 +1932,9 @@ export default function AIChatContent({
                                                 lineHeight={1.5}
                                                 reasoning={message.reasoning || undefined}
                                                 streaming={isContinuing}
-                                                rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
+                                                rolePlaying={roleplayTtsEnabled && message.role === 'assistant' && !isContinuing}
                                                 onCopy={() => navigator.clipboard.writeText(message.content)}
-                                                onPlay={roleplayTtsEnabled && message.role === 'assistant'
+                                                onPlay={roleplayTtsEnabled && message.role === 'assistant' && !isContinuing
                                                     ? () => void handlePlayRoleMessage(
                                                         message.content,
                                                         activeConversation?.characterVoicePluginId,
@@ -2079,19 +2002,7 @@ export default function AIChatContent({
                                     lineHeight={1.5}
                                     streaming
                                     markdown
-                                    rolePlaying={roleplayTtsEnabled}
                                     toolCallDetail={'verbose'}
-                                    onPlay={roleplayTtsEnabled
-                                                ? () => void handlePlayRoleMessage(
-                                            ctx.streamingBlocks
-                                                .filter((block) => block.type === 'content')
-                                                    .map((block) => block.content)
-                                                    .join(''),
-                                            activeConversation?.characterVoicePluginId,
-                                            activeConversation?.characterVoiceModel,
-                                            activeConversation?.characterVoiceId,
-                                        )
-                                        : undefined}
                                 />
                             )}
                             <EntryEditorLinkPreview

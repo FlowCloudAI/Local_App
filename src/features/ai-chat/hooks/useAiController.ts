@@ -109,6 +109,7 @@ import {
     applyConversationModelSwitch,
     applyLatestTurnOutcome,
     appendOrMergeContinuation,
+    createCompletedAssistantTurn,
     isEmptyDraftConversation,
     isIncompleteMessage,
     isPendingConversationId,
@@ -752,6 +753,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const [inputValue, setInputValue] = useState('')
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [continuationSubmittingMessageId, setContinuationSubmittingMessageId] = useState<string | null>(null)
+    const [completedAssistantTurn, setCompletedAssistantTurn] = useState<AiContextValue['completedAssistantTurn']>(null)
+    const completedAssistantTurnSequenceRef = useRef(0)
     const continuationSubmittingRef = useRef(new Set<string>())
     const [sessionParams, setSessionParams] = useState<SessionParams>({thinking: true})
     const sessionParamsRef = useRef(sessionParams)
@@ -1036,6 +1039,30 @@ export function useAiController(focus: AiFocus): AiContextValue {
             ))?.id
             ?? null
 
+        const incomingMessage: Message = {
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            timestamp: message.timestamp,
+            reasoning: message.reasoning,
+            blocks: message.blocks,
+            nodeId: message.nodeId,
+            usage: message.usage,
+            calibrationFactor: message.calibrationFactor,
+            turnStatus: message.turnStatus,
+            finishReason: message.finishReason,
+            continuationOfNodeId: message.continuationOfNodeId,
+            error: message.turnStatus === 'cancelled'
+                || message.turnStatus === 'interrupted'
+                ? {
+                    code: message.turnStatus === 'cancelled'
+                        ? ErrorCode.CoreClientCancelled
+                        : ErrorCode.LlmStreamProtocolError,
+                    message: '本轮生成未完成，可从保留内容继续。',
+                    detail: {retryable: true},
+                }
+                : undefined,
+        }
         let latestUserMessageWithAttachments: Message | null = null
         setAiConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
@@ -1048,32 +1075,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ?? null
             return {
                 ...conversation,
-                messages: appendOrMergeContinuation(conversation.messages, {
-                    id: message.id,
-                    role: message.role,
-                    content: message.content,
-                    timestamp: message.timestamp,
-                    reasoning: message.reasoning,
-                    blocks: message.blocks,
-                    nodeId: message.nodeId,
-                    usage: message.usage,
-                    calibrationFactor: message.calibrationFactor,
-                    turnStatus: message.turnStatus,
-                    finishReason: message.finishReason,
-                    continuationOfNodeId: message.continuationOfNodeId,
-                    error: message.turnStatus === 'cancelled'
-                        || message.turnStatus === 'interrupted'
-                        ? {
-                            code: message.turnStatus === 'cancelled'
-                                ? ErrorCode.CoreClientCancelled
-                                : ErrorCode.LlmStreamProtocolError,
-                            message: '本轮生成未完成，可从保留内容继续。',
-                            detail: {retryable: true},
-                        }
-                        : undefined,
-                }),
+                messages: appendOrMergeContinuation(conversation.messages, incomingMessage),
             }
         }))
+        const nextSequence = completedAssistantTurnSequenceRef.current + 1
+        const completedTurn = createCompletedAssistantTurn(
+            incomingMessage,
+            resolvedConversationId,
+            activeConversationIdRef.current,
+            nextSequence,
+        )
+        if (completedTurn) {
+            completedAssistantTurnSequenceRef.current = nextSequence
+            setCompletedAssistantTurn(completedTurn)
+        }
         if (resolvedConversationId) {
             setAiUnreadConversationIds((prev) => {
                 const next = {...prev}
@@ -2952,6 +2967,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         activeConversationId,
         setActiveConversationId: selectConversation,
         messages,
+        completedAssistantTurn,
         documentContextItems,
         pendingDocumentAttachmentItems,
         addDocumentContextFiles,
@@ -3006,7 +3022,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }), [
         plugins, pluginsReady, selectedPlugin, selectedModel, historyConversations, activeConversationId,
         documentContextItems, pendingDocumentAttachmentItems,
-        messages, inputValue, editingMessageId, tools, webSearchEnabled, toolAccessMode,
+        messages, completedAssistantTurn, inputValue, editingMessageId, tools, webSearchEnabled, toolAccessMode,
         writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         compactingConversationId,

@@ -4,7 +4,7 @@
  * `conv_` 前缀表示尚未写入历史的前端对话；普通空对话只作为编辑态存在，
  * 角色与报告对话即使尚未落盘，也仍需保留在对话列表中。
  */
-import type {Conversation, Message} from './AiControllerTypes.ts'
+import type {CompletedAssistantTurn, Conversation, Message} from './AiControllerTypes.ts'
 
 export const isPendingConversationId = (id: string) => id.startsWith('conv_')
 
@@ -37,6 +37,28 @@ export const isIncompleteMessage = (message: Message) => hasMessageOutput(messag
     || message.turnStatus === 'interrupted'
     || message.turnStatus === 'error'
 )
+
+/** 把正式完成事件转换为即时助手回复；历史加载不会经过这个入口。 */
+export const createCompletedAssistantTurn = (
+    message: Pick<Message, 'role' | 'content' | 'turnStatus'>,
+    conversationId: string | null,
+    activeConversationId: string | null,
+    sequence: number,
+): CompletedAssistantTurn | null => {
+    if (
+        !conversationId
+        || message.role !== 'assistant'
+        || message.turnStatus !== 'ok'
+        || !message.content.trim()
+    ) return null
+
+    return {
+        sequence,
+        conversationId,
+        text: message.content,
+        activeAtCompletion: conversationId === activeConversationId,
+    }
+}
 
 type TurnOutcome = Pick<
     Message,

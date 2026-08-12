@@ -134,6 +134,14 @@ export interface ConversationRuntimeState {
     hasUnreadReply: boolean
 }
 
+/** 当前控制器生命周期内刚完成的助手回复；只用于即时行为，不参与持久化。 */
+export interface CompletedAssistantTurn {
+    sequence: number
+    conversationId: string
+    text: string
+    activeAtCompletion: boolean
+}
+
 export interface SessionParams {
     thinking: boolean
     maxToolRounds?: number | null
@@ -163,6 +171,7 @@ export interface AiContextValue {
     setActiveConversationId: (id: string | null) => void
 
     messages: Message[]
+    completedAssistantTurn: CompletedAssistantTurn | null
     documentContextItems: DocumentContextItem[]
     pendingDocumentAttachmentItems: DocumentContextItem[]
     addDocumentContextFiles: (filePaths: string[]) => Promise<void>
