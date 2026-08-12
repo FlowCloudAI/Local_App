@@ -274,6 +274,8 @@ const createDraftConversation = (
     characterEntryId: null,
     characterName: null,
     backgroundImageUrl: null,
+    characterVoicePluginId: null,
+    characterVoiceModel: null,
     characterVoiceId: null,
     characterAutoPlay: null,
     reportContext: null,
@@ -286,6 +288,8 @@ interface StoredCharacterConversationMeta {
     characterEntryId: string | null
     characterName: string | null
     backgroundImageUrl: string | null
+    characterVoicePluginId: string | null
+    characterVoiceModel: string | null
     characterVoiceId: string | null
     characterAutoPlay: boolean | null
     reportContext?: ReportConversationContext | null
@@ -317,6 +321,8 @@ function inferCharacterConversationMeta(title: string): StoredCharacterConversat
         characterEntryId: null,
         characterName: matched[1] || null,
         backgroundImageUrl: null,
+        characterVoicePluginId: null,
+        characterVoiceModel: null,
         characterVoiceId: null,
         characterAutoPlay: null,
     }
@@ -346,6 +352,8 @@ function writeStoredCharacterConversationMetaMap(conversations: Conversation[]) 
                 characterEntryId: conversation.characterEntryId ?? null,
                 characterName: conversation.characterName ?? null,
                 backgroundImageUrl: conversation.backgroundImageUrl ?? null,
+                characterVoicePluginId: conversation.characterVoicePluginId ?? null,
+                characterVoiceModel: conversation.characterVoiceModel ?? null,
                 characterVoiceId: conversation.characterVoiceId ?? null,
                 characterAutoPlay: conversation.characterAutoPlay ?? null,
                 reportContext: conversation.reportContext ?? null,
@@ -368,6 +376,8 @@ function normalizeStoredSpecialConversationMetaMap(
             characterEntryId: meta.characterEntryId ?? null,
             characterName: meta.characterName ?? null,
             backgroundImageUrl: meta.backgroundImageUrl ?? null,
+            characterVoicePluginId: meta.characterVoicePluginId ?? null,
+            characterVoiceModel: meta.characterVoiceModel ?? null,
             characterVoiceId: meta.characterVoiceId ?? null,
             characterAutoPlay: meta.characterAutoPlay ?? null,
             reportContext: (meta.reportContext as ReportConversationContext | null | undefined) ?? null,
@@ -386,6 +396,8 @@ function buildCharacterConversationMetaMap(conversations: Conversation[]): Recor
             characterEntryId: conversation.characterEntryId ?? null,
             characterName: conversation.characterName ?? null,
             backgroundImageUrl: conversation.backgroundImageUrl ?? null,
+            characterVoicePluginId: conversation.characterVoicePluginId ?? null,
+            characterVoiceModel: conversation.characterVoiceModel ?? null,
             characterVoiceId: conversation.characterVoiceId ?? null,
             characterAutoPlay: conversation.characterAutoPlay ?? null,
             reportContext: conversation.reportContext ?? null,
@@ -1729,6 +1741,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             characterEntryId: null,
             characterName: null,
             backgroundImageUrl: null,
+            characterVoicePluginId: null,
+            characterVoiceModel: null,
             characterVoiceId: null,
             characterAutoPlay: null,
             reportContext,
@@ -1781,6 +1795,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             characterEntryId: entryId,
             characterName: built.characterEntry.title,
             backgroundImageUrl: toEntryImageSrc(built.backgroundImage) ?? null,
+            characterVoicePluginId: built.characterVoicePluginId,
+            characterVoiceModel: built.characterVoiceModel,
             characterVoiceId: built.characterVoiceId,
             characterAutoPlay: built.characterAutoPlay,
             reportContext: null,
@@ -2995,6 +3011,8 @@ function buildConversationFromMeta(
         characterEntryId: characterMeta?.characterEntryId ?? null,
         characterName: characterMeta?.characterName ?? null,
         backgroundImageUrl: characterMeta?.backgroundImageUrl ?? null,
+        characterVoicePluginId: characterMeta?.characterVoicePluginId ?? null,
+        characterVoiceModel: characterMeta?.characterVoiceModel ?? null,
         characterVoiceId: characterMeta?.characterVoiceId ?? null,
         characterAutoPlay: characterMeta?.characterAutoPlay ?? null,
         reportContext: isReport ? (storedMeta?.reportContext ?? null) : null,

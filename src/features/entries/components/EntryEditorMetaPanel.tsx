@@ -1,6 +1,6 @@
 import type {CSSProperties} from 'react'
 import {Button, Select} from 'flowcloudai-ui'
-import type {Category, Entry, EntryTypeView, TagSchema} from '../../../api'
+import type {Category, Entry, EntryTypeView, PluginInfo, TagSchema} from '../../../api'
 import HighLightTagItem from './HighLightTagItem'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import {
@@ -15,9 +15,17 @@ import type {EntryImage} from '../lib/entryImage'
 import {getCoverImage, toEntryImageSrc} from '../lib/entryImage'
 import {
     CHARACTER_VOICE_AUTO_PLAY_TAG,
+    CHARACTER_VOICE_AUTO_PLAY_TAG_ID,
     CHARACTER_VOICE_ID_TAG,
+    CHARACTER_VOICE_ID_TAG_ID,
+    CHARACTER_VOICE_MODEL_TAG,
+    CHARACTER_VOICE_MODEL_TAG_ID,
+    CHARACTER_VOICE_PLUGIN_ID_TAG,
+    CHARACTER_VOICE_PLUGIN_ID_TAG_ID,
     readCharacterVoiceConfigFromDraftTags,
+    writeCharacterVoiceDraftTag,
 } from '../lib/characterVoice'
+import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 
 interface EntryEditorMetaPanelProps {
     entryId: string
@@ -51,9 +59,9 @@ interface EntryEditorMetaPanelProps {
         tagSchemaPickerValue: string | undefined
     }
     ttsVoice: {
-        options: { value: string; label: string }[]
-        selectable: boolean
-        pluginName: string | null
+        plugins: PluginInfo[]
+        defaultPluginId: string | null
+        defaultModel: string | null
         hint: string
     }
     actions: {
@@ -89,9 +97,9 @@ export default function EntryEditorMetaPanel({
         tagSchemaPickerValue,
     } = tagUi
     const {
-        options: ttsVoiceOptions,
-        selectable: ttsVoiceSelectable,
-        pluginName: ttsVoicePluginName,
+        plugins: ttsPlugins,
+        defaultPluginId: defaultTtsPluginId,
+        defaultModel: defaultTtsModel,
         hint: ttsVoiceHint,
     } = ttsVoice
     const {
@@ -115,7 +123,31 @@ export default function EntryEditorMetaPanel({
     const entryCreatedAtText = formatDate(entry?.['created_at'] as string | null | undefined)
     const entryUpdatedAtText = formatDate(entry?.updated_at as string | null | undefined)
     const isCharacterEntry = normalizeComparableType(draft.type) === 'character'
-    const characterVoiceConfig = readCharacterVoiceConfigFromDraftTags(draft.tags)
+    const characterVoiceConfig = readCharacterVoiceConfigFromDraftTags(draft.tags, localTagSchemas)
+    const globalTtsPlugin = resolvePreferredTtsPlugin(ttsPlugins, defaultTtsPluginId)
+    const selectedTtsPlugin = characterVoiceConfig.pluginId
+        ? ttsPlugins.find((plugin) => plugin.id === characterVoiceConfig.pluginId) ?? null
+        : globalTtsPlugin
+    const selectedTtsModel = characterVoiceConfig.model
+        && selectedTtsPlugin?.models.includes(characterVoiceConfig.model)
+        ? characterVoiceConfig.model
+        : (!characterVoiceConfig.pluginId
+        && defaultTtsModel
+        && selectedTtsPlugin?.models.includes(defaultTtsModel)
+            ? defaultTtsModel
+            : selectedTtsPlugin?.default_model ?? selectedTtsPlugin?.models[0] ?? '')
+    const ttsPluginOptions = [
+        {value: '', label: globalTtsPlugin ? `跟随全局默认 · ${globalTtsPlugin.name}` : '跟随全局默认'},
+        ...ttsPlugins.map((plugin) => ({value: plugin.id, label: plugin.name})),
+    ]
+    const ttsModelOptions = (selectedTtsPlugin?.models ?? []).map((model) => ({value: model, label: model}))
+    const ttsVoiceOptions = buildTtsVoiceOptions(selectedTtsPlugin, '使用插件默认音色')
+    const ttsVoiceSelectable = Boolean(selectedTtsPlugin && selectedTtsPlugin.supported_voices.length > 0)
+    const characterVoiceHint = ttsVoiceHint || (selectedTtsPlugin
+        ? selectedTtsPlugin.supported_voices.length > 0
+            ? `音色由「${selectedTtsPlugin.name}」提供`
+            : `插件「${selectedTtsPlugin.name}」未声明可选音色`
+        : '请先安装 AI 语音插件')
 
     const typeOptions = entryTypes.map((entryType) => {
         const kind = entryType.kind
@@ -401,12 +433,13 @@ export default function EntryEditorMetaPanel({
                     <div className="entry-editor-meta-panel__section">
                         <div className="entry-editor-field-label-row">
                             <label className="entry-editor-field-label">角色语音</label>
-                            <span
-                                className="entry-editor-field-note">留空时跟随全局 AI 语音默认音色{ttsVoicePluginName ? ` · 当前来源：${ttsVoicePluginName}` : ''}</span>
+                            <span className="entry-editor-field-note">可为当前角色单独选择语音插件、模型和音色</span>
                         </div>
                         {isBrowseMode ? (
                             <div className="entry-editor-readonly-summary">
-                                <div>音色 ID：{characterVoiceConfig.voiceId || '跟随全局默认'}</div>
+                                <div>插件：{selectedTtsPlugin?.name || '跟随全局默认'}</div>
+                                <div style={{marginTop: '0.35rem'}}>模型：{selectedTtsModel || '跟随插件默认'}</div>
+                                <div style={{marginTop: '0.35rem'}}>音色 ID：{characterVoiceConfig.voiceId || '跟随插件默认'}</div>
                                 <div style={{marginTop: '0.35rem'}}>
                                     自动播放：{characterVoiceConfig.autoPlay == null ? '跟随全局设置' : (characterVoiceConfig.autoPlay ? '开启' : '关闭')}
                                 </div>
@@ -414,34 +447,95 @@ export default function EntryEditorMetaPanel({
                         ) : (
                             <div className="entry-editor-character-voice">
                                 <Select
+                                    options={ttsPluginOptions}
+                                    value={characterVoiceConfig.pluginId ?? ''}
+                                    onValueChange={(value) => onDraftChange((current) => {
+                                        const pluginId = value ? normalizeComparableText(String(value)) : ''
+                                        const plugin = ttsPlugins.find((item) => item.id === pluginId) ?? null
+                                        let nextTags = writeCharacterVoiceDraftTag(
+                                            current.tags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_PLUGIN_ID_TAG, id: CHARACTER_VOICE_PLUGIN_ID_TAG_ID},
+                                            pluginId || null,
+                                        )
+                                        nextTags = writeCharacterVoiceDraftTag(
+                                            nextTags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_MODEL_TAG, id: CHARACTER_VOICE_MODEL_TAG_ID},
+                                            plugin ? (plugin.default_model ?? plugin.models[0] ?? null) : null,
+                                        )
+                                        nextTags = writeCharacterVoiceDraftTag(
+                                            nextTags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_ID_TAG, id: CHARACTER_VOICE_ID_TAG_ID},
+                                            null,
+                                        )
+                                        return {...current, tags: nextTags}
+                                    })}
+                                    disabled={saving || loading || ttsPlugins.length === 0}
+                                />
+                                <Select
+                                    options={ttsModelOptions}
+                                    value={selectedTtsModel}
+                                    onValueChange={(value) => onDraftChange((current) => {
+                                        if (!selectedTtsPlugin) return current
+                                        let nextTags = writeCharacterVoiceDraftTag(
+                                            current.tags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_PLUGIN_ID_TAG, id: CHARACTER_VOICE_PLUGIN_ID_TAG_ID},
+                                            selectedTtsPlugin.id,
+                                        )
+                                        nextTags = writeCharacterVoiceDraftTag(
+                                            nextTags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_MODEL_TAG, id: CHARACTER_VOICE_MODEL_TAG_ID},
+                                            value ? normalizeComparableText(String(value)) : null,
+                                        )
+                                        return {...current, tags: nextTags}
+                                    })}
+                                    disabled={saving || loading || !selectedTtsPlugin || ttsModelOptions.length === 0}
+                                />
+                                <Select
                                     options={ttsVoiceOptions}
                                     value={characterVoiceConfig.voiceId ?? ''}
                                     onValueChange={(value) => onDraftChange((current) => {
                                         const nextVoiceId = value ? normalizeComparableText(String(value)) : ''
-                                        const nextTags = {...current.tags}
-                                        if (nextVoiceId) {
-                                            nextTags[CHARACTER_VOICE_ID_TAG] = nextVoiceId
-                                        } else {
-                                            delete nextTags[CHARACTER_VOICE_ID_TAG]
-                                        }
-                                        return {
-                                            ...current,
-                                            tags: nextTags,
-                                        }
+                                        if (!selectedTtsPlugin) return current
+                                        let nextTags = writeCharacterVoiceDraftTag(
+                                            current.tags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_PLUGIN_ID_TAG, id: CHARACTER_VOICE_PLUGIN_ID_TAG_ID},
+                                            selectedTtsPlugin.id,
+                                        )
+                                        nextTags = writeCharacterVoiceDraftTag(
+                                            nextTags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_MODEL_TAG, id: CHARACTER_VOICE_MODEL_TAG_ID},
+                                            selectedTtsModel || null,
+                                        )
+                                        nextTags = writeCharacterVoiceDraftTag(
+                                            nextTags,
+                                            localTagSchemas,
+                                            {name: CHARACTER_VOICE_ID_TAG, id: CHARACTER_VOICE_ID_TAG_ID},
+                                            nextVoiceId || null,
+                                        )
+                                        return {...current, tags: nextTags}
                                     })}
                                     disabled={saving || loading || !ttsVoiceSelectable}
                                 />
-                                <div className="entry-editor-field-note">{ttsVoiceHint}</div>
+                                <div className="entry-editor-field-note">{characterVoiceHint}</div>
                                 <label className="entry-editor-character-voice__toggle">
                                     <input
                                         type="checkbox"
                                         checked={characterVoiceConfig.autoPlay ?? false}
                                         onChange={(event) => onDraftChange((current) => ({
                                             ...current,
-                                            tags: {
-                                                ...current.tags,
-                                                [CHARACTER_VOICE_AUTO_PLAY_TAG]: event.target.checked,
-                                            },
+                                            tags: writeCharacterVoiceDraftTag(
+                                                current.tags,
+                                                localTagSchemas,
+                                                {name: CHARACTER_VOICE_AUTO_PLAY_TAG, id: CHARACTER_VOICE_AUTO_PLAY_TAG_ID},
+                                                event.target.checked,
+                                            ),
                                         }))}
                                         disabled={saving || loading}
                                     />
@@ -452,11 +546,14 @@ export default function EntryEditorMetaPanel({
                                         type="button"
                                         className="entry-editor-character-voice__reset"
                                         onClick={() => onDraftChange((current) => {
-                                            const nextTags = {...current.tags}
-                                            delete nextTags[CHARACTER_VOICE_AUTO_PLAY_TAG]
                                             return {
                                                 ...current,
-                                                tags: nextTags,
+                                                tags: writeCharacterVoiceDraftTag(
+                                                    current.tags,
+                                                    localTagSchemas,
+                                                    {name: CHARACTER_VOICE_AUTO_PLAY_TAG, id: CHARACTER_VOICE_AUTO_PLAY_TAG_ID},
+                                                    null,
+                                                ),
                                             }
                                         })}
                                         disabled={saving || loading}
@@ -469,11 +566,14 @@ export default function EntryEditorMetaPanel({
                                         type="button"
                                         className="entry-editor-character-voice__reset"
                                         onClick={() => onDraftChange((current) => {
-                                            const nextTags = {...current.tags}
-                                            delete nextTags[CHARACTER_VOICE_AUTO_PLAY_TAG]
                                             return {
                                                 ...current,
-                                                tags: nextTags,
+                                                tags: writeCharacterVoiceDraftTag(
+                                                    current.tags,
+                                                    localTagSchemas,
+                                                    {name: CHARACTER_VOICE_AUTO_PLAY_TAG, id: CHARACTER_VOICE_AUTO_PLAY_TAG_ID},
+                                                    null,
+                                                ),
                                             }
                                         })}
                                         disabled={saving || loading}

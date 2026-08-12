@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {type EntryTag, type TagSchema} from '../../../api'
-import {CHARACTER_VOICE_AUTO_PLAY_TAG, CHARACTER_VOICE_ID_TAG} from '../lib/characterVoice'
+import {CHARACTER_VOICE_TAG_DEFINITIONS} from '../lib/characterVoice'
 
 export type EntryTagRuntimeValue = string | number | boolean | null
 
@@ -179,7 +179,8 @@ export function buildEntryTagsPayload(
     originalTags?: EntryTag[] | null,
 ): EntryTag[] | null {
     const schemaIds = new Set(tagSchemas.map(schema => schema.id))
-    const reservedExtraNames = new Set([CHARACTER_VOICE_ID_TAG, CHARACTER_VOICE_AUTO_PLAY_TAG])
+    const reservedExtraNames = new Set(CHARACTER_VOICE_TAG_DEFINITIONS.map((tag) => tag.name))
+    const reservedExtraIds = new Set(CHARACTER_VOICE_TAG_DEFINITIONS.map((tag) => tag.id))
     const preservedExtraByName = new Map(
         (originalTags ?? [])
             .filter(tag => (!tag.schema_id || !schemaIds.has(tag.schema_id)) && tag.name)
@@ -194,16 +195,19 @@ export function buildEntryTagsPayload(
             value,
         }]
     })
-    const nextReservedExtras = [...reservedExtraNames].flatMap((name) => {
-        const value = normalizeEntryTagValue(draftTags[name] ?? null)
+    const nextReservedExtras = CHARACTER_VOICE_TAG_DEFINITIONS.flatMap(({name, id}) => {
+        const value = normalizeEntryTagValue(draftTags[id] ?? draftTags[name] ?? null)
         if (value === null) return []
         return [{
             ...preservedExtraByName.get(name),
+            schema_id: id,
             name,
             value,
         }]
     })
-    const preservedExtras = [...preservedExtraByName.values()].filter(tag => !reservedExtraNames.has(tag.name ?? ''))
+    const preservedExtras = [...preservedExtraByName.values()].filter(tag => (
+        !reservedExtraNames.has(tag.name ?? '') && !reservedExtraIds.has(tag.schema_id ?? '')
+    ))
     const merged = [...preservedExtras, ...nextReservedExtras, ...schemaTags]
     logger.log('[entryTagUtils] 生成词条标签 payload', {
         draftTags,

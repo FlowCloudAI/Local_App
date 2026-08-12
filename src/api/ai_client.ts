@@ -117,6 +117,8 @@ export interface AiBuildCharacterProjectSnapshotResult {
     snapshot: CharacterChatProjectSnapshot
     characterEntry: Entry
     backgroundImage?: FCImage | null
+    characterVoicePluginId?: string | null
+    characterVoiceModel?: string | null
     characterVoiceId?: string | null
     characterAutoPlay?: boolean | null
 }
@@ -408,6 +410,8 @@ export interface CharacterConversationMeta {
     characterEntryId: string | null
     characterName: string | null
     backgroundImageUrl: string | null
+    characterVoicePluginId: string | null
+    characterVoiceModel: string | null
     characterVoiceId: string | null
     characterAutoPlay: boolean | null
     reportContext?: unknown | null

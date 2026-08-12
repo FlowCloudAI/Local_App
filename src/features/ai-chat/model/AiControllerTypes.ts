@@ -120,6 +120,8 @@ export interface Conversation {
     characterEntryId?: string | null
     characterName?: string | null
     backgroundImageUrl?: string | null
+    characterVoicePluginId?: string | null
+    characterVoiceModel?: string | null
     characterVoiceId?: string | null
     characterAutoPlay?: boolean | null
     reportContext?: ReportConversationContext | null

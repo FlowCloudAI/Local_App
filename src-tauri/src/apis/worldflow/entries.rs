@@ -40,6 +40,60 @@ pub struct SaveEntryBundleResponse {
     pub relations: Vec<EntryRelation>,
 }
 
+const CHARACTER_VOICE_TAG_SCHEMAS: [(&str, &str, &str); 4] = [
+    (
+        "c64f7bf6-737d-4c4d-9ad9-97f12b7bac01",
+        "fc_role_voice_plugin_id",
+        "string",
+    ),
+    (
+        "c64f7bf6-737d-4c4d-9ad9-97f12b7bac02",
+        "fc_role_voice_model",
+        "string",
+    ),
+    (
+        "c64f7bf6-737d-4c4d-9ad9-97f12b7bac03",
+        "fc_role_voice_id",
+        "string",
+    ),
+    (
+        "c64f7bf6-737d-4c4d-9ad9-97f12b7bac04",
+        "fc_role_voice_auto_play",
+        "boolean",
+    ),
+];
+
+/// 角色语音沿用词条标签存储；保存前补齐隐藏 schema，避免悬空外键。
+async fn ensure_character_voice_tag_schemas(
+    db: &SqliteDb,
+    project_id: &Uuid,
+    tags: Option<&[EntryTag]>,
+) -> Result<(), String> {
+    let Some(tags) = tags else {
+        return Ok(());
+    };
+    let requested_ids = tags.iter().map(|tag| tag.schema_id).collect::<HashSet<_>>();
+    for (id, name, value_type) in CHARACTER_VOICE_TAG_SCHEMAS {
+        let id = Uuid::parse_str(id).map_err(|error| error.to_string())?;
+        if !requested_ids.contains(&id) {
+            continue;
+        }
+        sqlx::query(
+            "INSERT OR IGNORE INTO tag_schemas
+             (id, project_id, name, description, type, target, default_val, range_min, range_max, sort_order)
+             VALUES (?, ?, ?, NULL, ?, '[]', NULL, NULL, NULL, -1)",
+        )
+        .bind(id)
+        .bind(project_id)
+        .bind(name)
+        .bind(value_type)
+        .execute(&db.pool)
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 fn normalize_entry_compare_text(value: &str) -> String {
     value
         .replace("\r\n", "\n")
@@ -1071,6 +1125,7 @@ pub async fn db_update_entry(
         .transpose()?;
     let db = open_entry_db(state.inner(), &id, project_id.as_ref()).await?;
     let current_entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
+    ensure_character_voice_tag_schemas(&db, &current_entry.project_id, tags.as_deref()).await?;
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, images)?;
     let cover_path = images.as_ref().map(|_| None);
     let category_id = category_id
@@ -1123,6 +1178,7 @@ pub async fn db_save_entry_bundle(
 
     let db = open_project_db(state.inner(), &project_id).await?;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
+    ensure_character_voice_tag_schemas(&db, &project_id, input.tags.as_deref()).await?;
     let previous_outgoing_links = db
         .list_outgoing_links(&entry_id)
         .await

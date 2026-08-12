@@ -1402,7 +1402,12 @@ export default function AIChatContent({
         await ctx.setToolAccessMode(mode)
     }, [ctx, onOpenWriterModeSettings, showAlert])
 
-    const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
+    const handlePlayRoleMessage = useCallback(async (
+        content: string,
+        overridePluginId?: string | null,
+        overrideModel?: string | null,
+        overrideVoiceId?: string | null,
+    ) => {
         const text = content.trim()
         if (!text) {
             await showAlert('当前消息没有可播放的文本内容。', 'warning', 'nonInvasive', 1800)
@@ -1426,7 +1431,10 @@ export default function AIChatContent({
             return
         }
 
-        const selectedPlugin = resolvePreferredTtsPlugin(plugins, settings.tts.plugin_id)
+        const selectedPlugin = resolvePreferredTtsPlugin(
+            plugins,
+            overridePluginId ?? settings.tts.plugin_id,
+        )
 
         if (!selectedPlugin) {
             await showAlert('默认语音插件不可用，请在设置中重新选择。', 'warning', 'nonInvasive', 2600)
@@ -1446,9 +1454,10 @@ export default function AIChatContent({
             return
         }
 
-        const model = settings.tts.default_model
-        && selectedPlugin.models.includes(settings.tts.default_model)
-            ? settings.tts.default_model
+        const preferredModel = overrideModel
+            ?? (overridePluginId ? null : settings.tts.default_model)
+        const model = preferredModel && selectedPlugin.models.includes(preferredModel)
+            ? preferredModel
             : (selectedPlugin.default_model ?? selectedPlugin.models[0] ?? '')
 
         if (!model) {
@@ -1498,7 +1507,12 @@ export default function AIChatContent({
             }
             if (!shouldAutoPlay || cancelled) return
             roleplayAutoPlayRef.current = currentKey
-            await handlePlayRoleMessage(latestMessage.content, activeConversation.characterVoiceId)
+            await handlePlayRoleMessage(
+                latestMessage.content,
+                activeConversation.characterVoicePluginId,
+                activeConversation.characterVoiceModel,
+                activeConversation.characterVoiceId,
+            )
         }
 
         void run()
@@ -2000,6 +2014,8 @@ export default function AIChatContent({
                                                 onPlay={roleplayTtsEnabled && message.role === 'assistant'
                                                     ? () => void handlePlayRoleMessage(
                                                         message.content,
+                                                        activeConversation?.characterVoicePluginId,
+                                                        activeConversation?.characterVoiceModel,
                                                         activeConversation?.characterVoiceId,
                                                     )
                                                     : undefined}
@@ -2066,11 +2082,13 @@ export default function AIChatContent({
                                     rolePlaying={roleplayTtsEnabled}
                                     toolCallDetail={'verbose'}
                                     onPlay={roleplayTtsEnabled
-                                        ? () => void handlePlayRoleMessage(
+                                                ? () => void handlePlayRoleMessage(
                                             ctx.streamingBlocks
                                                 .filter((block) => block.type === 'content')
-                                                .map((block) => block.content)
-                                                .join(''),
+                                                    .map((block) => block.content)
+                                                    .join(''),
+                                            activeConversation?.characterVoicePluginId,
+                                            activeConversation?.characterVoiceModel,
                                             activeConversation?.characterVoiceId,
                                         )
                                         : undefined}

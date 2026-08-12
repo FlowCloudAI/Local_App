@@ -111,16 +111,15 @@ import {
     parseDateValue,
 } from '../lib/entryCommon'
 import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
-import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
 
 type EditorMode = 'edit' | 'browse'
 type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
-    options: { value: string; label: string }[]
-    selectable: boolean
-    pluginName: string | null
+    plugins: PluginInfo[]
+    defaultPluginId: string | null
+    defaultModel: string | null
     hint: string
 }
 
@@ -169,9 +168,9 @@ interface EditorHistory {
 }
 
 const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
-    options: [{value: '', label: '请先在设置中选择默认 AI 语音插件'}],
-    selectable: false,
-    pluginName: null,
+    plugins: [],
+    defaultPluginId: null,
+    defaultModel: null,
     hint: '请先在设置中选择默认 AI 语音插件',
 }
 
@@ -431,45 +430,21 @@ export default function EntryEditor({
             .then(([settings, plugins]) => {
                 if (cancelled) return
 
-                const selectedPlugin = resolvePreferredTtsPlugin(plugins as PluginInfo[], settings.tts.plugin_id)
-                const options = buildTtsVoiceOptions(selectedPlugin, '跟随全局默认')
-
-                if (!selectedPlugin) {
-                    setTtsVoiceState({
-                        options,
-                        selectable: false,
-                        pluginName: null,
-                    hint: '当前没有可用的 AI 语音插件',
-                    })
-                    return
-                }
-
-                if (selectedPlugin.supported_voices.length === 0) {
-                    setTtsVoiceState({
-                        options,
-                        selectable: false,
-                        pluginName: selectedPlugin.name,
-                        hint: `插件「${selectedPlugin.name}」未声明可选音色`,
-                    })
-                    return
-                }
-
+                const ttsPlugins = plugins as PluginInfo[]
                 setTtsVoiceState({
-                    options,
-                    selectable: true,
-                    pluginName: selectedPlugin.name,
-                    hint: settings.tts.plugin_id
-                        ? `使用「${selectedPlugin.name}」提供的音色列表`
-                    : `当前未设置默认 AI 语音插件，暂按「${selectedPlugin.name}」的音色列表展示`,
+                    plugins: ttsPlugins,
+                    defaultPluginId: settings.tts.plugin_id,
+                    defaultModel: settings.tts.default_model,
+                    hint: ttsPlugins.length > 0 ? '' : '当前没有可用的 AI 语音插件',
                 })
             })
             .catch((loadError) => {
                 if (cancelled) return
                 logger.error('加载 TTS 音色列表失败', loadError)
                 setTtsVoiceState({
-                    options: [{value: '', label: '音色列表加载失败'}],
-                    selectable: false,
-                    pluginName: null,
+                    plugins: [],
+                    defaultPluginId: null,
+                    defaultModel: null,
                     hint: '音色列表加载失败',
                 })
             })

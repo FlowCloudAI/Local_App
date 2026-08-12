@@ -132,6 +132,8 @@ pub struct CharacterConversationMeta {
     pub character_entry_id: Option<String>,
     pub character_name: Option<String>,
     pub background_image_url: Option<String>,
+    pub character_voice_plugin_id: Option<String>,
+    pub character_voice_model: Option<String>,
     pub character_voice_id: Option<String>,
     pub character_auto_play: Option<bool>,
     pub report_context: Option<serde_json::Value>,

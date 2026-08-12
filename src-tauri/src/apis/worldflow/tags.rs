@@ -61,6 +61,20 @@ pub async fn db_list_tag_schemas(
     let db = open_project_db(state.inner(), &project_id).await?;
     db.list_tag_schemas(&project_id)
         .await
+        .map(|schemas| {
+            schemas
+                .into_iter()
+                .filter(|schema| {
+                    !matches!(
+                        schema.id.to_string().as_str(),
+                        "c64f7bf6-737d-4c4d-9ad9-97f12b7bac01"
+                            | "c64f7bf6-737d-4c4d-9ad9-97f12b7bac02"
+                            | "c64f7bf6-737d-4c4d-9ad9-97f12b7bac03"
+                            | "c64f7bf6-737d-4c4d-9ad9-97f12b7bac04"
+                    )
+                })
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 

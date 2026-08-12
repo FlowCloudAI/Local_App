@@ -22,8 +22,14 @@ const ENTRY_CONTENT_LIMIT: usize = 2400;
 const ENTRY_SUMMARY_LIMIT: usize = 600;
 const RELATION_CONTENT_LIMIT: usize = 400;
 const TAG_VALUE_LIMIT: usize = 160;
+const CHARACTER_VOICE_PLUGIN_ID_TAG: &str = "fc_role_voice_plugin_id";
+const CHARACTER_VOICE_MODEL_TAG: &str = "fc_role_voice_model";
 const CHARACTER_VOICE_ID_TAG: &str = "fc_role_voice_id";
 const CHARACTER_VOICE_AUTO_PLAY_TAG: &str = "fc_role_voice_auto_play";
+const CHARACTER_VOICE_PLUGIN_ID_TAG_ID: &str = "c64f7bf6-737d-4c4d-9ad9-97f12b7bac01";
+const CHARACTER_VOICE_MODEL_TAG_ID: &str = "c64f7bf6-737d-4c4d-9ad9-97f12b7bac02";
+const CHARACTER_VOICE_ID_TAG_ID: &str = "c64f7bf6-737d-4c4d-9ad9-97f12b7bac03";
+const CHARACTER_VOICE_AUTO_PLAY_TAG_ID: &str = "c64f7bf6-737d-4c4d-9ad9-97f12b7bac04";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +50,8 @@ pub struct CharacterProjectSnapshotBundle {
     pub snapshot: CharacterProjectSnapshot,
     pub character_entry: Entry,
     pub background_image: Option<FCImage>,
+    pub character_voice_plugin_id: Option<String>,
+    pub character_voice_model: Option<String>,
     pub character_voice_id: Option<String>,
     pub character_auto_play: Option<bool>,
 }
@@ -214,32 +222,41 @@ fn find_cover_image(entry: &Entry) -> Option<FCImage> {
 fn read_character_voice_config(
     tags: &[EntryTag],
     tag_schema_names: &HashMap<Uuid, String>,
-) -> (Option<String>, Option<bool>) {
+) -> (Option<String>, Option<String>, Option<String>, Option<bool>) {
+    let mut plugin_id = None;
+    let mut model = None;
     let mut voice_id = None;
     let mut auto_play = None;
 
     for tag in tags {
-        let Some(name) = tag_schema_names.get(&tag.schema_id) else {
-            continue;
-        };
-        if name == CHARACTER_VOICE_ID_TAG {
-            if let Some(value) = tag
-                .value
-                .as_str()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-            {
-                voice_id = Some(value.to_string());
-            }
-        }
-        if name == CHARACTER_VOICE_AUTO_PLAY_TAG {
+        let schema_id = tag.schema_id.to_string();
+        let name = tag_schema_names.get(&tag.schema_id).map(String::as_str);
+        let string_value = tag
+            .value
+            .as_str()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        if schema_id == CHARACTER_VOICE_PLUGIN_ID_TAG_ID
+            || name == Some(CHARACTER_VOICE_PLUGIN_ID_TAG)
+        {
+            plugin_id = string_value;
+        } else if schema_id == CHARACTER_VOICE_MODEL_TAG_ID
+            || name == Some(CHARACTER_VOICE_MODEL_TAG)
+        {
+            model = string_value;
+        } else if schema_id == CHARACTER_VOICE_ID_TAG_ID || name == Some(CHARACTER_VOICE_ID_TAG) {
+            voice_id = string_value;
+        } else if schema_id == CHARACTER_VOICE_AUTO_PLAY_TAG_ID
+            || name == Some(CHARACTER_VOICE_AUTO_PLAY_TAG)
+        {
             if let Some(value) = tag.value.as_bool() {
                 auto_play = Some(value);
             }
         }
     }
 
-    (voice_id, auto_play)
+    (plugin_id, model, voice_id, auto_play)
 }
 
 #[tauri::command]
@@ -336,7 +353,7 @@ pub async fn ai_build_character_project_snapshot(
         })
         .collect::<Vec<_>>();
     let background_image = find_cover_image(&character_entry);
-    let (character_voice_id, character_auto_play) =
+    let (character_voice_plugin_id, character_voice_model, character_voice_id, character_auto_play) =
         read_character_voice_config(&character_entry.tags.0, &tag_schema_names);
 
     Ok(CharacterProjectSnapshotBundle {
@@ -373,6 +390,8 @@ pub async fn ai_build_character_project_snapshot(
         },
         character_entry,
         background_image,
+        character_voice_plugin_id,
+        character_voice_model,
         character_voice_id,
         character_auto_play,
     })
