@@ -4,6 +4,7 @@ pub mod ai_contradiction;
 pub mod ai_summary;
 pub mod ai_world_check;
 pub mod app_settings;
+pub mod app_update;
 pub mod document_context;
 pub mod feedback;
 pub mod layout;

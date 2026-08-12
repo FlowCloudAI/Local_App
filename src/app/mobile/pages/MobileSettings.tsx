@@ -14,6 +14,7 @@ import {
     type ApiUsageByModel,
     type ApiUsageDaily,
     type ApiUsageSummary,
+    type PlatformOs,
     toApiError,
 } from '../../../api'
 import {openFileDialog} from '../../../api/dialog'
@@ -47,6 +48,7 @@ import {
     MobileSettingsUsageSection,
 } from './MobileSettingsSections'
 import MobileSettingsModelsSection from './MobileSettingsModelsSection'
+import MobileSettingsUpdateSection from './MobileSettingsUpdateSection'
 import {
     MobileSettingsFeedbackSection,
     MobileSettingsPermissionsSection,
@@ -59,6 +61,7 @@ interface Props {
     push?: (page: MobilePage) => void
     pop?: () => void
     page?: MobilePage | null
+    platformOs: PlatformOs
 }
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
@@ -71,6 +74,7 @@ type SettingsSection =
     | 'templates'
     | 'appearance'
     | 'usage'
+    | 'update'
     | 'feedback'
     | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
@@ -113,6 +117,7 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
         case 'settingsTemplates': return 'templates'
         case 'settingsAppearance': return 'appearance'
         case 'settingsUsage': return 'usage'
+        case 'settingsUpdate': return 'update'
         case 'settingsFeedback': return 'feedback'
         case 'settingsAbout': return 'about'
         default: return 'menu'
@@ -127,12 +132,13 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'templates') return '指令模板'
     if (section === 'appearance') return '外观'
     if (section === 'usage') return '用量与预算'
+    if (section === 'update') return '更新'
     if (section === 'feedback') return '提交反馈'
     if (section === 'about') return '关于'
     return '设置'
 }
 
-export default function MobileSettings({push, pop, page}: Props) {
+export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
     const appSettingsStore = useAppSettingsStore()
@@ -649,9 +655,12 @@ export default function MobileSettings({push, pop, page}: Props) {
 
             {section === 'feedback' && <MobileSettingsFeedbackSection/>}
 
+            {section === 'update' && (
+                <MobileSettingsUpdateSection version={version} supported={platformOs === 'android'}/>
+            )}
+
             {section === 'about' && (
                 <MobileSettingsAboutSection
-                    version={version}
                     logViewerOpen={logViewerOpen}
                     logSnapshot={logSnapshot}
                     logLoading={logLoading}

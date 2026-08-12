@@ -40,6 +40,7 @@ export interface MobilePageParamsMap {
     settingsTemplates: undefined
     settingsAppearance: undefined
     settingsUsage: undefined
+    settingsUpdate: undefined
     settingsFeedback: undefined
     settingsAbout: undefined
 }
@@ -55,6 +56,7 @@ export type MobileSettingsPageType =
     | 'settingsTemplates'
     | 'settingsAppearance'
     | 'settingsUsage'
+    | 'settingsUpdate'
     | 'settingsFeedback'
     | 'settingsAbout'
 

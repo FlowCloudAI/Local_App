@@ -501,7 +501,7 @@
 
 .mobile-settings-about-meta {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
     gap: var(--fc-space-sm);
     margin-top: var(--fc-space-md);
 }
@@ -1065,4 +1065,128 @@
     border: 0;
     background: transparent;
     box-shadow: none;
+}
+
+.mobile-settings-update {
+    display: grid;
+    gap: var(--fc-space-md);
+}
+
+.mobile-settings-update__status {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+}
+
+.mobile-settings-update__status > div {
+    display: grid;
+    min-width: 0;
+    gap: var(--fc-space-xs);
+}
+
+.mobile-settings-update__status .fc-btn {
+    flex: 0 0 auto;
+}
+
+.mobile-settings-update__message {
+    margin: 0;
+    color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.5;
+}
+
+.mobile-settings-update-log {
+    margin-top: var(--fc-space-sm);
+}
+
+.mobile-settings-update-log details {
+    border-top: var(--mobile-border-soft);
+}
+
+.mobile-settings-update-log summary {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    min-height: 2.75rem;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-weight: var(--fc-font-weight-semibold);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.mobile-settings-update-log summary::-webkit-details-marker {
+    display: none;
+}
+
+.mobile-settings-update-log summary svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex: 0 0 auto;
+    fill: currentColor;
+    transition: transform 120ms ease;
+}
+
+.mobile-settings-update-log details[open] summary svg {
+    transform: rotate(90deg);
+}
+
+.mobile-settings-update-log summary strong {
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.mobile-settings-update-log summary time {
+    margin-left: auto;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-normal);
+}
+
+.mobile-settings-update-log details > p {
+    margin: 0;
+    padding: 0 0 var(--fc-space-md) 1.25rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.65;
+    white-space: pre-line;
+}
+
+.mobile-startup-update-panel {
+    width: min(32rem, 92vw);
+}
+
+.mobile-startup-update-panel__content {
+    display: grid;
+    gap: var(--fc-space-md);
+    padding: 0 var(--fc-space-lg) var(--fc-space-lg);
+}
+
+.mobile-startup-update-panel__content time,
+.mobile-startup-update-panel__content p,
+.mobile-startup-update-panel__content strong {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.6;
+}
+
+.mobile-startup-update-panel__content p {
+    white-space: pre-line;
+}
+
+.mobile-startup-update-panel__content strong {
+    color: var(--fc-color-error);
+}
+
+.mobile-startup-update-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
 }

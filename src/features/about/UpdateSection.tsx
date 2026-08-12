@@ -9,6 +9,7 @@ import {
     installAppUpdate,
     isAutoCheckUpdateEnabled,
     setAutoCheckUpdateEnabled,
+    mergeUpdateChangelog,
     type DownloadEvent,
     type Update,
 } from './appUpdate'
@@ -96,14 +97,14 @@ export default function UpdateSection() {
             ? `${Math.round(downloadedBytes / 1024 / 1024 * 10) / 10} MB`
             : ''
 
-    const updateChangelog: readonly UpdateChangelogEntry[] = availableUpdate
-        && !UPDATE_CHANGELOG.some((entry) => entry.version === availableUpdate.version)
-        ? [{
+    const updateChangelog: readonly UpdateChangelogEntry[] = mergeUpdateChangelog(
+        UPDATE_CHANGELOG,
+        availableUpdate ? {
             version: availableUpdate.version,
             date: availableUpdate.date ?? '',
             notes: availableUpdate.body?.trim() || '此版本未提供更新说明。',
-        }, ...UPDATE_CHANGELOG]
-        : UPDATE_CHANGELOG
+        } : null,
+    )
 
     return (
         <>

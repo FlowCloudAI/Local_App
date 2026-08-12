@@ -183,8 +183,9 @@ export function MobileSettingsMenuSection({
         {
             label: '信息',
             items: [
+                {type: 'settingsUpdate', label: '更新', summary: version ? `当前版本 ${version}` : '检查更新与查看版本记录'},
                 {type: 'settingsFeedback', label: '提交反馈', summary: '提交建议或问题'},
-                {type: 'settingsAbout', label: '关于', summary: `流云AI 移动端${version ? ` · ${version}` : ''}`},
+                {type: 'settingsAbout', label: '关于', summary: '流云AI 移动端'},
             ],
         },
     ]

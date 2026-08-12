@@ -43,6 +43,7 @@ use apis::ai_contradiction::*;
 use apis::ai_summary::*;
 use apis::ai_world_check::*;
 use apis::app_settings::*;
+use apis::app_update::*;
 use apis::document_context::*;
 use apis::feedback::*;
 use apis::layout::*;
@@ -435,6 +436,7 @@ pub fn run() {
             show_main_window,
             exit_app,
             get_platform_info,
+            check_mobile_app_update,
             // 项目
             db_create_project,
             db_get_project,

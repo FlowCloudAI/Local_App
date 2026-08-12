@@ -4,7 +4,6 @@ import {type AppLogSnapshot} from '../../../api'
 import FontLicenseModal from '../../../features/about/FontLicenseModal'
 
 interface AboutSectionProps {
-    version: string
     logViewerOpen: boolean
     logSnapshot: AppLogSnapshot | null
     logLoading: boolean
@@ -82,7 +81,6 @@ function CopyIcon() {
 }
 
 export default function MobileSettingsAboutSection({
-    version,
     logViewerOpen,
     logSnapshot,
     logLoading,
@@ -110,14 +108,6 @@ export default function MobileSettingsAboutSection({
                     </div>
                 </div>
                 <div className="mobile-settings-about-meta">
-                    <div>
-                        <span>当前版本</span>
-                        <strong>{version || '加载中…'}</strong>
-                    </div>
-                    <div>
-                        <span>发布日期</span>
-                        <strong>2026-05-17</strong>
-                    </div>
                     <div>
                         <span>开源协议</span>
                         <strong>MIT License</strong>

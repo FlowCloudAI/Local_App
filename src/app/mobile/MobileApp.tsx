@@ -24,6 +24,7 @@ import {useProjectContextStore} from '../../features/projects/projectContextStor
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import type {WorldCheckDiscussionParams} from '../../features/project-editor/hooks/useWorldCheckController'
 import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './components/MobileCategoryDrawer'
+import MobileStartupUpdatePrompt from './MobileStartupUpdatePrompt'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
@@ -501,7 +502,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                         {/* 设置 Tab */}
                         {activeTab === 'settings' && (
-                            <MobileSettings {...pageProps} page={currentPage}/>
+                            <MobileSettings {...pageProps} page={currentPage} platformOs={platformInfo.os}/>
                         )}
                     </div>
 
@@ -511,6 +512,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
             <EntryEditModal/>
             <AiConfirmModal/>
+            <MobileStartupUpdatePrompt enabled={platformInfo.os === 'android'}/>
         </div>
     )
 }
