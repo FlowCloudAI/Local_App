@@ -2,10 +2,17 @@
 
 import {useCallback, useEffect, useState} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
-import {relaunch} from '@tauri-apps/plugin-process'
-import {check, type DownloadEvent, type Update} from '@tauri-apps/plugin-updater'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {logger} from '../../shared/logger'
+import {
+    checkAppUpdate,
+    installAppUpdate,
+    isAutoCheckUpdateEnabled,
+    setAutoCheckUpdateEnabled,
+    type DownloadEvent,
+    type Update,
+} from './appUpdate'
+import {UPDATE_CHANGELOG, type UpdateChangelogEntry} from './updateChangelog'
 import './AboutSection.css'
 
 export default function UpdateSection() {
@@ -17,6 +24,7 @@ export default function UpdateSection() {
     const [updateStatus, setUpdateStatus] = useState('')
     const [downloadedBytes, setDownloadedBytes] = useState(0)
     const [downloadTotalBytes, setDownloadTotalBytes] = useState<number | null>(null)
+    const [autoCheckUpdate, setAutoCheckUpdate] = useState(isAutoCheckUpdateEnabled)
 
     useEffect(() => {
         getVersion().then(setAppVersion).catch(logger.error)
@@ -29,7 +37,7 @@ export default function UpdateSection() {
         setDownloadedBytes(0)
         setDownloadTotalBytes(null)
         try {
-            const update = await check({timeout: 30000})
+            const update = await checkAppUpdate()
             if (!update) {
                 setUpdateStatus('当前已是最新版本')
                 void showAlert('当前已是最新版本', 'success', 'nonInvasive', 1800)
@@ -71,9 +79,7 @@ export default function UpdateSection() {
                     setUpdateStatus('下载完成，正在安装…')
                 }
             }
-            await availableUpdate.downloadAndInstall(onEvent)
-            setUpdateStatus('更新已安装，正在重启…')
-            await relaunch()
+            await installAppUpdate(availableUpdate, onEvent)
         } catch (error) {
             logger.error('安装更新失败:', error)
             const message = error instanceof Error ? error.message : String(error)
@@ -89,6 +95,15 @@ export default function UpdateSection() {
         : downloadedBytes > 0
             ? `${Math.round(downloadedBytes / 1024 / 1024 * 10) / 10} MB`
             : ''
+
+    const updateChangelog: readonly UpdateChangelogEntry[] = availableUpdate
+        && !UPDATE_CHANGELOG.some((entry) => entry.version === availableUpdate.version)
+        ? [{
+            version: availableUpdate.version,
+            date: availableUpdate.date ?? '',
+            notes: availableUpdate.body?.trim() || '此版本未提供更新说明。',
+        }, ...UPDATE_CHANGELOG]
+        : UPDATE_CHANGELOG
 
     return (
         <>
@@ -112,6 +127,21 @@ export default function UpdateSection() {
                             <strong>{downloadProgressLabel}</strong>
                         </div>
                     )}
+                    <label className="settings-checkbox-field about-section-auto-update">
+                        <input
+                            type="checkbox"
+                            checked={autoCheckUpdate}
+                            onChange={(event) => {
+                                const enabled = event.currentTarget.checked
+                                setAutoCheckUpdate(enabled)
+                                setAutoCheckUpdateEnabled(enabled)
+                            }}
+                        />
+                        <span>
+                            <strong>自动检查更新</strong>
+                            <small>软件启动时静默检查一次；只有发现新版本时才会提示。</small>
+                        </span>
+                    </label>
                 </div>
                 <div className="about-section-update-actions">
                     <Button
@@ -134,15 +164,19 @@ export default function UpdateSection() {
 
             <section className="settings-section fc-section-card">
                 <h2 className="settings-section-title fc-section-title">更新日志</h2>
-                <div className="about-section-update-meta">
-                    <span>{availableUpdate ? `版本 ${availableUpdate.version}` : `当前版本 ${appVersion || '加载中…'}`}</span>
-                    {availableUpdate?.date && <span>{availableUpdate.date}</span>}
+                <div className="about-section-changelog">
+                    {updateChangelog.map((entry) => (
+                        <details key={entry.version} open={entry.version === appVersion}>
+                            <summary>
+                                <span>版本 {entry.version}</span>
+                                {entry.version === appVersion && <strong>当前版本</strong>}
+                                {entry.version === availableUpdate?.version && <strong>可更新</strong>}
+                                {entry.date && <time>{entry.date}</time>}
+                            </summary>
+                            <p className="about-section-update-notes">{entry.notes}</p>
+                        </details>
+                    ))}
                 </div>
-                <p className="about-section-update-notes">
-                    {availableUpdate
-                        ? availableUpdate.body?.trim() || '此版本未提供更新说明。'
-                        : '检查到新版本后，这里会显示该版本的更新内容。'}
-                </p>
             </section>
         </>
     )

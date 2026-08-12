@@ -13,6 +13,7 @@ import {getCurrentWindow} from '@tauri-apps/api/window'
 import {listen} from '../../api/events'
 import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
+import StartupUpdatePrompt from '../../features/about/StartupUpdatePrompt'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
 import Settings, {type SettingsOpenIntent} from '../../pages/Settings'
@@ -1511,6 +1512,7 @@ function DesktopAppContent() {
             </div>
             <EntryEditModal/>
             <AiConfirmModal/>
+            <StartupUpdatePrompt/>
         </div>
     )
 }

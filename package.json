@@ -16,6 +16,7 @@
     "test:entry-map-binding": "node --test --experimental-strip-types ./src/features/maps/components/entryMapBinding.test.mjs",
     "test:map-preview-markers": "node --test --experimental-strip-types ./src/features/maps/components/MapShapeEditor/previewMarkers.test.mjs",
     "test:world-check-task": "node --test --experimental-test-isolation=none ./scripts/world-check-task-state.test.ts",
+    "test:app-update-policy": "node --experimental-strip-types ./scripts/app-update-policy.test.ts",
     "test:edge-geometry": "node ./scripts/check-edge-geometry.ts",
     "test:markdown-wiki-link-highlight": "node --experimental-strip-types ./scripts/markdown-wiki-link-highlight.test.mjs",
     "test:entry-markdown-toolbar": "node --experimental-strip-types ./scripts/entry-markdown-toolbar.test.mjs",
