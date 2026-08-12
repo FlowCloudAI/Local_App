@@ -394,6 +394,8 @@ export const ai_speak = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
 export const ai_play_tts = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
     command<void>('ai_play_tts', {pluginId, model, text, voiceId})
 
+export const ai_cancel_tts = () => command<void>('ai_cancel_tts')
+
 // ── 对话历史管理 ──────────────────────────────────────────────────────────────
 
 export interface ConversationMeta {

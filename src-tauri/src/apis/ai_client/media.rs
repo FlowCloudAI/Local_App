@@ -1,5 +1,45 @@
 use super::common::*;
 use flowcloudai_client::ErrorCode;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+/// 全应用只保留最新的一次即时语音请求；取消后不支持恢复。
+#[derive(Default)]
+pub(crate) struct TtsPlaybackState {
+    current: Mutex<Option<Arc<AtomicBool>>>,
+}
+
+impl TtsPlaybackState {
+    fn lock(&self) -> MutexGuard<'_, Option<Arc<AtomicBool>>> {
+        self.current
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn begin(&self) -> Arc<AtomicBool> {
+        let mut current = self.lock();
+        if let Some(previous) = current.replace(Arc::new(AtomicBool::new(false))) {
+            previous.store(true, Ordering::Release);
+        }
+        Arc::clone(current.as_ref().expect("刚写入的语音令牌必须存在"))
+    }
+
+    fn cancel_current(&self) {
+        if let Some(current) = self.lock().take() {
+            current.store(true, Ordering::Release);
+        }
+    }
+
+    fn finish(&self, token: &Arc<AtomicBool>) {
+        let mut current = self.lock();
+        if current
+            .as_ref()
+            .is_some_and(|active| Arc::ptr_eq(active, token))
+        {
+            current.take();
+        }
+    }
+}
 
 fn api_key_missing(plugin_id: &str) -> ApiError {
     ApiError::new(
@@ -153,23 +193,27 @@ pub async fn ai_speak(
     })
 }
 
-/// 文本转语音并直接播放（通过系统音频设备，后台播放，立即返回）
+/// 文本转语音并直接播放；新请求会作废旧请求，命令等待实际播放结束。
 #[tauri::command]
 pub async fn ai_play_tts(
     ai_state: State<'_, AiState>,
+    playback_state: State<'_, TtsPlaybackState>,
     plugin_id: String,
     model: String,
     text: String,
     voice_id: String,
 ) -> Result<(), ApiError> {
-    let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| api_key_missing(&plugin_id))?;
-    let client = ai_state.client.lock().await;
-    let session = client.create_tts_session(&plugin_id, &api_key, None)?;
-    drop(client);
+    let token = playback_state.begin();
+    let outcome = async {
+        let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| api_key_missing(&plugin_id))?;
+        let client = ai_state.client.lock().await;
+        let session = client.create_tts_session(&plugin_id, &api_key, None)?;
+        drop(client);
 
-    let result = session.speak(&model, &text, &voice_id).await?;
-
-    tauri::async_runtime::spawn(async move {
+        let result = session.speak(&model, &text, &voice_id).await?;
+        if token.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let source = if result.audio.is_empty() {
             match result.url {
                 Some(url) if !url.is_empty() => AudioSource::Url(url),
@@ -178,10 +222,46 @@ pub async fn ai_play_tts(
         } else {
             AudioSource::Raw(result.audio)
         };
-        if let Err(e) = AudioDecoder::play_source(&source, Some(&result.format)).await {
-            log::warn!("ai_play_tts 播放失败: {}", e);
-        }
-    });
+        AudioDecoder::play_source_cancelable(&source, Some(&result.format), Arc::clone(&token))
+            .await
+            .map_err(ApiError::from)
+    }
+    .await;
 
+    let outcome = if token.load(Ordering::Acquire) {
+        Ok(())
+    } else {
+        outcome
+    };
+    playback_state.finish(&token);
+    outcome
+}
+
+/// 作废当前即时语音；取消是生命周期清理，不保留恢复位置。
+#[tauri::command]
+pub fn ai_cancel_tts(playback_state: State<'_, TtsPlaybackState>) -> Result<(), ApiError> {
+    playback_state.cancel_current();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TtsPlaybackState;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn 新请求覆盖旧请求且旧任务不能清除新令牌() {
+        let state = TtsPlaybackState::default();
+        let first = state.begin();
+        let second = state.begin();
+        assert!(first.load(Ordering::Acquire));
+        assert!(!second.load(Ordering::Acquire));
+
+        state.finish(&first);
+        assert!(state.lock().is_some());
+
+        state.cancel_current();
+        assert!(second.load(Ordering::Acquire));
+        assert!(state.lock().is_none());
+    }
 }

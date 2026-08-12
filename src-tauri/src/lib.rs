@@ -272,6 +272,7 @@ pub fn run() {
             app.manage(NetworkState::new());
             app.manage(LayoutCacheState::new());
             app.manage(BackendReadyState::new());
+            app.manage(TtsPlaybackState::default());
 
             // 加载设置
             let settings_path = app_handle
@@ -542,6 +543,7 @@ pub fn run() {
             ai_merge_images,
             ai_speak,
             ai_play_tts,
+            ai_cancel_tts,
             ai_enable_tool,
             ai_disable_tool,
             ai_is_enabled,

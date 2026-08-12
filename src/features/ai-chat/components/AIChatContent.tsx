@@ -6,6 +6,7 @@ import {listen} from '../../../api/events'
 import {Button, MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
+    ai_cancel_tts,
     ai_play_tts,
     db_get_entry,
     db_list_entries,
@@ -668,10 +669,33 @@ export default function AIChatContent({
     const projectEntriesRef = useRef<EntryBrief[]>([])
     const lastScrollTopRef = useRef(0)
     const handledAssistantTurnSequenceRef = useRef(ctx.completedAssistantTurn?.sequence ?? 0)
+    const activeRoleplayConversationIdRef = useRef(isCharacterConversation ? ctx.activeConversationId : null)
+    const roleplayCancelTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
     const notifiedFailedDocumentIdsRef = useRef<Set<string>>(new Set())
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
+
+    useEffect(() => {
+        if (roleplayCancelTimerRef.current != null) {
+            window.clearTimeout(roleplayCancelTimerRef.current)
+            roleplayCancelTimerRef.current = null
+        }
+        const nextConversationId = isCharacterConversation ? ctx.activeConversationId : null
+        const previousConversationId = activeRoleplayConversationIdRef.current
+        activeRoleplayConversationIdRef.current = nextConversationId
+        if (previousConversationId && previousConversationId !== nextConversationId) {
+            void ai_cancel_tts().catch(() => undefined)
+        }
+
+        return () => {
+            if (!activeRoleplayConversationIdRef.current) return
+            roleplayCancelTimerRef.current = window.setTimeout(() => {
+                void ai_cancel_tts().catch(() => undefined)
+            })
+        }
+    }, [ctx.activeConversationId, isCharacterConversation])
+
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const visibleDocumentContextItems = ctx.documentContextItems
