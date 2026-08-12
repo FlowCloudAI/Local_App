@@ -219,6 +219,15 @@ pub async fn ai_play_tts(
                 Some(url) if !url.is_empty() => AudioSource::Url(url),
                 _ => AudioSource::Raw(result.audio),
             }
+        } else if result.format.eq_ignore_ascii_case("pcm") {
+            let sample_rate = result.sample_rate.ok_or_else(|| {
+                ApiError::new(ErrorCode::AudioDecodeFailed, "PCM 音频响应缺少采样率")
+            })?;
+            AudioSource::Pcm {
+                data: result.audio,
+                sample_rate,
+                channels: result.channels.unwrap_or(1),
+            }
         } else {
             AudioSource::Raw(result.audio)
         };
