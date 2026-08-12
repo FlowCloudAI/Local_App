@@ -11,7 +11,7 @@ import {
     useRef,
     useState,
 } from 'react'
-import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
+import {Button, Card, Input, RollingBox, Select, useAlert, useContextMenu} from 'flowcloudai-ui'
 import {
     type Category,
     db_delete_entry,
@@ -32,10 +32,16 @@ import EntryTypeIcon from '../EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
+type EntryPageRows = 2 | 5 | 10
 
 const SORT_OPTIONS: Array<{ key: Exclude<SortMode, 'name-asc' | 'name-desc'>; label: string }> = [
     {key: 'updated-desc', label: '更新时间'},
     {key: 'updated-asc', label: '创建时间'},
+]
+const ENTRY_PAGE_ROW_OPTIONS: Array<{ value: EntryPageRows; label: string }> = [
+    {value: 2, label: '每页 2 行'},
+    {value: 5, label: '每页 5 行'},
+    {value: 10, label: '每页 10 行'},
 ]
 const ENTRY_GRID_GAP = 16
 const ENTRY_GRID_MIN_COLUMN_WIDTH = 248
@@ -245,6 +251,7 @@ interface VirtualEntryGridProps {
     creatingEntry: boolean
     starredEntryIdSet: Set<string>
     scrollElement?: HTMLElement | null
+    onColumnCountChange?: (columnCount: number) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
     onEntryContextMenu?: (event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
@@ -264,6 +271,7 @@ function VirtualEntryGrid({
                                creatingEntry,
                                starredEntryIdSet,
                                scrollElement,
+                               onColumnCountChange,
                                onRequestCreateEntry,
                                onEntryContextMenu,
                                onOpenEntry,
@@ -357,6 +365,10 @@ function VirtualEntryGrid({
         [endIndex, entries, startIndex],
     )
     const cells = []
+
+    useEffect(() => {
+        onColumnCountChange?.(columnCount)
+    }, [columnCount, onColumnCountChange])
 
     useEffect(() => {
         if (!PROJECT_HOME_PERF_LOG_ENABLED) return
@@ -484,10 +496,15 @@ function CategoryView({
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
+    const [entryPageRows, setEntryPageRows] = useState<EntryPageRows>(2)
+    const [entryPage, setEntryPage] = useState(1)
+    const [entryGridColumnCount, setEntryGridColumnCount] = useState(3)
     const [starredEntryIds, setStarredEntryIds] = useState<string[]>([])
     const [renameEntry, setRenameEntry] = useState<EntryBrief | null>(null)
     const [entryActionBusy, setEntryActionBusy] = useState(false)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const entryGridRef = useRef<HTMLDivElement | null>(null)
+    const entriesScrollRef = useRef<HTMLDivElement | null>(null)
 
     const loadEntries = useCallback(async (
         query: string,
@@ -592,6 +609,7 @@ function CategoryView({
             typeFilter,
         })
         setSearchText(value)
+        setEntryPage(1)
         if (searchTimer.current) clearTimeout(searchTimer.current)
         searchTimer.current = setTimeout(() => {
             logger.info('[CategoryView] 触发防抖搜索', {
@@ -712,12 +730,46 @@ function CategoryView({
     }, [categoryId, creatingEntry, loadEntries, loading, onRequestCreateEntry, searchText, showContextMenu, typeFilter])
 
     const displayed = useMemo(() => sortEntries(entries, sortMode, starredEntryIdSet), [entries, sortMode, starredEntryIdSet])
+    const entryPageSize = Math.max(1, entryGridColumnCount * entryPageRows - 1)
+    const entryPageCount = Math.max(1, Math.ceil(displayed.length / entryPageSize))
+    const currentEntryPage = Math.min(entryPage, entryPageCount)
+    const paginatedEntries = useMemo(() => {
+        const start = (currentEntryPage - 1) * entryPageSize
+        return displayed.slice(start, start + entryPageSize)
+    }, [currentEntryPage, displayed, entryPageSize])
     const coverStats = useMemo(
-        () => PROJECT_HOME_PERF_LOG_ENABLED ? summarizeEntryCovers(displayed) : null,
-        [displayed],
+        () => PROJECT_HOME_PERF_LOG_ENABLED ? summarizeEntryCovers(paginatedEntries) : null,
+        [paginatedEntries],
     )
     const hasVisibleEntries = displayed.length > 0
     const showLoadingOverlay = loading && hasVisibleEntries
+
+    useEffect(() => {
+        setEntryPage(page => Math.min(page, entryPageCount))
+    }, [entryPageCount])
+
+    useEffect(() => {
+        entriesScrollRef.current?.scrollTo({top: 0})
+    }, [currentEntryPage])
+
+    useEffect(() => {
+        if (noScroll) return undefined
+        const grid = entryGridRef.current
+        if (!grid) return undefined
+
+        const updateColumnCount = () => {
+            const columns = window.getComputedStyle(grid).gridTemplateColumns
+                .split(' ')
+                .filter(Boolean)
+                .length
+            setEntryGridColumnCount(Math.max(1, columns))
+        }
+        updateColumnCount()
+
+        const observer = new ResizeObserver(updateColumnCount)
+        observer.observe(grid)
+        return () => observer.disconnect()
+    }, [loading, noScroll])
 
     useEffect(() => {
         if (!PROJECT_HOME_PERF_LOG_ENABLED) return
@@ -728,6 +780,9 @@ function CategoryView({
             mode: noScroll ? '项目主页内联虚拟网格' : '独立滚动网格',
             loadedEntryCards: entries.length,
             displayedEntryCards: displayed.length,
+            renderedEntryCards: paginatedEntries.length,
+            page: currentEntryPage,
+            pageCount: entryPageCount,
             createCards: 1,
             coverStats,
             entryTypeCount: entryTypes.length,
@@ -741,9 +796,12 @@ function CategoryView({
         categoryName,
         coverStats,
         displayed.length,
+        currentEntryPage,
         entries.length,
+        entryPageCount,
         entryTypes.length,
         noScroll,
+        paginatedEntries.length,
         prefetchedEntries,
         projectId,
         searchText,
@@ -752,8 +810,8 @@ function CategoryView({
     ])
 
     const renderEntryGrid = () => (
-        <div className="pe-entry-grid">
-            {displayed.map((entry) => (
+        <div ref={entryGridRef} className="pe-entry-grid">
+            {paginatedEntries.map((entry) => (
                 <EntryCardItem
                     key={entry.id}
                     projectId={projectId}
@@ -775,18 +833,19 @@ function CategoryView({
     const renderEntryContent = () => noScroll ? (
         <VirtualEntryGrid
             projectId={projectId}
-            entries={displayed}
+            entries={paginatedEntries}
             entryTypes={entryTypes}
             categoryId={categoryId}
             creatingEntry={creatingEntry}
             starredEntryIdSet={starredEntryIdSet}
             scrollElement={virtualScrollElement}
+            onColumnCountChange={setEntryGridColumnCount}
             onRequestCreateEntry={onRequestCreateEntry}
             onEntryContextMenu={handleEntryContextMenu}
             onOpenEntry={onOpenEntry}
         />
     ) : (
-        <RollingBox axis="y" className="pe-entries-scroll" thumbSize="thin">
+        <RollingBox ref={entriesScrollRef} axis="y" className="pe-entries-scroll" thumbSize="thin">
             {renderEntryGrid()}
         </RollingBox>
     )
@@ -816,6 +875,17 @@ function CategoryView({
                             value={searchText}
                             onValueChange={handleSearchChange}
                         />
+                        <Select
+                            className="pe-entry-page-size"
+                            options={ENTRY_PAGE_ROW_OPTIONS}
+                            value={entryPageRows}
+                            aria-label="每页显示行数"
+                            onValueChange={value => {
+                                const nextValue = Array.isArray(value) ? value[0] : value
+                                setEntryPageRows(Number(nextValue) as EntryPageRows)
+                                setEntryPage(1)
+                            }}
+                        />
                         <div className="pe-category-toolbar-actions">
                             <Button
                                 type="button"
@@ -831,14 +901,20 @@ function CategoryView({
                                 <button
                                     key={opt.key}
                                     className={`pe-sort-tab${sortMode === opt.key ? ' active' : ''}`}
-                                    onClick={() => setSortMode(opt.key)}
+                                    onClick={() => {
+                                        setSortMode(opt.key)
+                                        setEntryPage(1)
+                                    }}
                                 >
                                     {opt.label}
                                 </button>
                             ))}
                             <button
                                 className={`pe-sort-tab${sortMode === 'name-asc' || sortMode === 'name-desc' ? ' active' : ''}`}
-                                onClick={() => setSortMode(current => current === 'name-asc' ? 'name-desc' : 'name-asc')}
+                                onClick={() => {
+                                    setSortMode(current => current === 'name-asc' ? 'name-desc' : 'name-asc')
+                                    setEntryPage(1)
+                                }}
                             >
                                 {sortMode === 'name-desc' ? '标题 Z-A' : '标题 A-Z'}
                             </button>
@@ -849,7 +925,10 @@ function CategoryView({
                 <div className="pe-type-filter">
                     <button
                         className={`pe-type-chip${typeFilter === null ? ' active' : ''}`}
-                        onClick={() => setTypeFilter(null)}
+                        onClick={() => {
+                            setTypeFilter(null)
+                            setEntryPage(1)
+                        }}
                     >
                         全部
                     </button>
@@ -860,7 +939,10 @@ function CategoryView({
                                 key={key}
                                 className={`pe-type-chip${typeFilter === key ? ' active' : ''}`}
                                 style={{'--chip-color': et.color} as CSSProperties}
-                                onClick={() => setTypeFilter(typeFilter === key ? null : key)}
+                                onClick={() => {
+                                    setTypeFilter(typeFilter === key ? null : key)
+                                    setEntryPage(1)
+                                }}
                             >
                                 <EntryTypeIcon entryType={et} className="pe-type-chip-icon"/>
                                 {et.name}
@@ -904,6 +986,29 @@ function CategoryView({
                     </div>
                 )}
             </div>
+            {entryPageCount > 1 && (
+                <nav className="pe-entry-pagination" aria-label="词条列表分页">
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={currentEntryPage === 1}
+                        onClick={() => setEntryPage(page => Math.max(1, page - 1))}
+                    >
+                        上一页
+                    </Button>
+                    <span aria-live="polite">{currentEntryPage} / {entryPageCount}</span>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={currentEntryPage === entryPageCount}
+                        onClick={() => setEntryPage(page => Math.min(entryPageCount, page + 1))}
+                    >
+                        下一页
+                    </Button>
+                </nav>
+            )}
             </div>
         </>
     )

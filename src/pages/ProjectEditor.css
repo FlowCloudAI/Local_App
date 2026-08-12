@@ -1348,6 +1348,10 @@
     font-size: var(--pe-font-size-control, var(--fc-font-size-control, 0.875rem));
 }
 
+.pe-entry-page-size {
+    width: 7.5rem;
+}
+
 .pe-category-toolbar-actions {
     display: flex;
     align-items: center;
@@ -1569,6 +1573,29 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
     gap: var(--fc-space-lg);
+}
+
+.pe-entry-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-md) var(--fc-space-lg);
+}
+
+.pe-entry-pagination span {
+    min-width: 4rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.pe-entry-pagination .fc-btn {
+    height: var(--fc-control-height-md);
+    min-height: var(--fc-control-height-md);
+    padding-block: 0;
 }
 
 .pe-entry-virtual-grid {
