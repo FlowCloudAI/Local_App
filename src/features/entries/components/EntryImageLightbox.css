@@ -241,6 +241,7 @@
 }
 
 .entry-editor-lightbox__gallery-card {
+    position: relative;
     min-width: 0;
     display: grid;
     grid-template-rows: auto auto;
@@ -264,6 +265,33 @@
 .entry-editor-lightbox__gallery-card.is-active {
     border-color: var(--fc-color-primary);
     box-shadow: 0 0 0 2px var(--fc-color-primary-subtle);
+}
+
+.entry-editor-lightbox__gallery-card.is-selected {
+    border-color: var(--fc-color-primary);
+    background: var(--fc-color-primary-subtle);
+}
+
+.entry-editor-lightbox__selection-mark {
+    position: absolute;
+    top: var(--fc-space-md);
+    right: var(--fc-space-md);
+    z-index: 1;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--fc-color-border-hover);
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text-on-primary);
+    font-size: var(--fc-font-size-sm);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.entry-editor-lightbox__gallery-card.is-selected .entry-editor-lightbox__selection-mark {
+    border-color: var(--fc-color-primary);
+    background: var(--fc-color-primary);
 }
 
 .entry-editor-lightbox__gallery-media {

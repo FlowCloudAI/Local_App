@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
+import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
     ai_fill_image_prompt,
@@ -76,6 +76,8 @@ export default function EntryImageAddModal({
     const [results, setResults] = useState<ImageData[]>([])
     const [errorMessage, setErrorMessage] = useState('')
     const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
+    const [submitting, setSubmitting] = useState(false)
+    const submittingRef = useRef(false)
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -88,6 +90,8 @@ export default function EntryImageAddModal({
             setResults([])
             setErrorMessage('')
             setMissingApiKeyPluginId('')
+            setSubmitting(false)
+            submittingRef.current = false
             setPlugins([])
             setPluginLoadError('')
             setSelectedPlugin('')
@@ -140,7 +144,7 @@ export default function EntryImageAddModal({
     }, [prompt, selectedPlugin, selectedModel])
 
     const handleFillPrompt = async () => {
-        if (fillingPrompt || generateState === 'generating') return
+        if (fillingPrompt || generateState === 'generating' || submittingRef.current) return
         if (!aiPluginId) {
             void showAlert('当前还没有可用的 AI 对话插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
@@ -176,7 +180,7 @@ export default function EntryImageAddModal({
     }
 
     const handleGenerate = async () => {
-        if (!canGenerate) return
+        if (!canGenerate || submittingRef.current) return
 
         setGenerateState('generating')
         setErrorMessage('')
@@ -219,7 +223,9 @@ export default function EntryImageAddModal({
     }
 
     const handleAddToEntry = async () => {
-        if (results.length === 0) return
+        if (results.length === 0 || submittingRef.current) return
+        submittingRef.current = true
+        setSubmitting(true)
 
         try {
             const remoteUrls = results
@@ -246,10 +252,16 @@ export default function EntryImageAddModal({
             setErrorMessage(`下载图片失败: ${msg}`)
             setGenerateState('error')
             void showAlert(msg, 'error', 'nonInvasive', 3000)
+        } finally {
+            submittingRef.current = false
+            setSubmitting(false)
         }
     }
 
     const handleLocalUpload = async () => {
+        if (submittingRef.current) return
+        submittingRef.current = true
+        setSubmitting(true)
         try {
             const uploadedImages = await onUploadLocal()
             if (insertMode && Array.isArray(uploadedImages) && uploadedImages[0]) {
@@ -260,6 +272,9 @@ export default function EntryImageAddModal({
             const msg = formatApiError(toApiError(e))
             setErrorMessage(`上传图片失败: ${msg}`)
             void showAlert(msg, 'error', 'nonInvasive', 3000)
+        } finally {
+            submittingRef.current = false
+            setSubmitting(false)
         }
     }
 
@@ -287,6 +302,7 @@ export default function EntryImageAddModal({
         <FloatingPanel
             open={open}
             onClose={onClose}
+            dismissible={!submitting}
             title={insertMode ? '插入图片' : '添加图片'}
             ariaLabel="添加图片"
             className="entry-image-add-dialog"
@@ -296,6 +312,7 @@ export default function EntryImageAddModal({
                         <button
                             type="button"
                             className={`entry-image-add-tab${activeTab === 'existing' ? ' active' : ''}`}
+                            disabled={submitting}
                             onClick={() => setActiveTab('existing')}
                         >
                             设定集
@@ -304,6 +321,7 @@ export default function EntryImageAddModal({
                     <button
                         type="button"
                         className={`entry-image-add-tab${activeTab === 'local' ? ' active' : ''}`}
+                        disabled={submitting}
                         onClick={() => setActiveTab('local')}
                     >
                         本地上传
@@ -311,6 +329,7 @@ export default function EntryImageAddModal({
                     <button
                         type="button"
                         className={`entry-image-add-tab${activeTab === 'ai' ? ' active' : ''}`}
+                        disabled={submitting}
                         onClick={() => setActiveTab('ai')}
                     >
                         AI 生成
@@ -359,8 +378,8 @@ export default function EntryImageAddModal({
                             <p className="entry-image-add-local-desc">
                                 从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。
                             </p>
-                            <Button type="button" size="sm" radius="full" onClick={handleLocalUpload}>
-                                选择本地图片
+                            <Button type="button" size="sm" radius="full" disabled={submitting} onClick={handleLocalUpload}>
+                                {submitting ? '导入中…' : '选择本地图片'}
                             </Button>
                         </div>
                     ) : (
@@ -383,6 +402,7 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedPlugin}
+                                        disabled={submitting}
                                         onValueChange={(v) => {
                                             setSelectedPlugin(String(v))
                                             setMissingApiKeyPluginId('')
@@ -396,6 +416,7 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedModel}
+                                        disabled={submitting}
                                         onValueChange={(v) => setSelectedModel(String(v))}
                                         placeholder="选择模型"
                                         options={selectedPluginInfo?.models.map((m) => ({value: m, label: m})) ?? []}
@@ -412,7 +433,7 @@ export default function EntryImageAddModal({
                                             value: size,
                                             label: size
                                         })) ?? []}
-                                        disabled={!selectedPluginInfo || selectedPluginInfo.supported_sizes.length === 0}
+                                        disabled={submitting || !selectedPluginInfo || selectedPluginInfo.supported_sizes.length === 0}
                                     />
                                 </div>
                             </div>
@@ -430,7 +451,7 @@ export default function EntryImageAddModal({
                                     onKeyDown={handleKeyDown}
                                     placeholder="描述你想要生成的图像内容…"
                                     rows={3}
-                                    disabled={generateState === 'generating' || fillingPrompt}
+                                    disabled={submitting || generateState === 'generating' || fillingPrompt}
                                 />
                                 <span className="entry-image-add-ai__hint">按 Cmd / Ctrl + Enter 快速生成</span>
                             </div>
@@ -439,7 +460,7 @@ export default function EntryImageAddModal({
                                 <Button type="button"
                                     size="sm"
                                     radius="full"
-                                    disabled={fillingPrompt || generateState === 'generating'}
+                                    disabled={submitting || fillingPrompt || generateState === 'generating'}
                                     onClick={() => void handleFillPrompt()}
                                 >
                                     {fillingPrompt ? '填充中…' : 'AI 填充描述'}
@@ -447,7 +468,7 @@ export default function EntryImageAddModal({
                                 <Button type="button"
                                     size="sm"
                                     radius="full"
-                                    disabled={!canGenerate || generateState === 'generating' || fillingPrompt}
+                                    disabled={submitting || !canGenerate || generateState === 'generating' || fillingPrompt}
                                     onClick={() => void handleGenerate()}
                                 >
                                     {generateState === 'generating' ? '生成中…' : '开始生成'}
@@ -501,9 +522,10 @@ export default function EntryImageAddModal({
                                             size="sm"
                                             radius="full"
                                             variant="primary"
+                                            disabled={submitting}
                                             onClick={handleAddToEntry}
                                         >
-                                            {insertMode ? '添加并插入' : '添加到词条'}
+                                            {submitting ? '添加中…' : insertMode ? '添加并插入' : '添加到词条'}
                                         </Button>
                                     </div>
                                 </div>

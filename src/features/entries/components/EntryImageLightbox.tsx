@@ -31,6 +31,7 @@ interface EntryImageLightboxProps {
     onIndexChange: (index: number) => void
     onSetCover?: (index: number) => void
     onRemove?: (index: number) => void
+    onRemoveMany?: (indices: number[]) => void
     onAddImage?: () => void
     onInsertMarkdown?: (index: number) => void
 }
@@ -53,6 +54,7 @@ export default function EntryImageLightbox({
                                                onIndexChange,
                                                onSetCover,
                                                onRemove,
+                                               onRemoveMany,
                                                onAddImage,
                                                onInsertMarkdown,
                                            }: EntryImageLightboxProps) {
@@ -62,6 +64,8 @@ export default function EntryImageLightbox({
     const [offset, setOffset] = useState({x: 0, y: 0})
     const [isDragging, setIsDragging] = useState(false)
     const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+    const [selectionMode, setSelectionMode] = useState(false)
+    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => new Set())
     const previewThumbRefs = useRef<Record<number, HTMLButtonElement | null>>({})
     const dragStateRef = useRef({
         pointerId: -1,
@@ -115,6 +119,8 @@ export default function EntryImageLightbox({
         queueMicrotask(() => {
             resetPreviewTransform()
             setMoreMenuOpen(false)
+            setSelectionMode(false)
+            setSelectedIndices(new Set())
         })
     }, [open, currentIndex])
 
@@ -200,6 +206,25 @@ export default function EntryImageLightbox({
         const result = await showAlert('确认移除这张图片？', 'warning', 'confirm')
         if (result !== 'yes') return
         onRemove(safeIndex)
+    }
+
+    async function handleRemoveSelected() {
+        if (!onRemoveMany || selectedIndices.size === 0) return
+        const indices = [...selectedIndices].sort((left, right) => left - right)
+        const result = await showAlert(`确认移除选中的 ${indices.length} 张图片？`, 'warning', 'confirm')
+        if (result !== 'yes') return
+        onRemoveMany(indices)
+        setSelectionMode(false)
+        setSelectedIndices(new Set())
+    }
+
+    function toggleSelected(index: number) {
+        setSelectedIndices(current => {
+            const next = new Set(current)
+            if (next.has(index)) next.delete(index)
+            else next.add(index)
+            return next
+        })
     }
 
     async function handleOpenLocalPath() {
@@ -308,17 +333,28 @@ export default function EntryImageLightbox({
             <div className="entry-editor-lightbox__gallery-grid">
                 {images.map((image, index) => {
                     const active = index === safeIndex
+                    const selected = selectedIndices.has(index)
                     return (
                         <button
                             key={`${image.path ?? image.url ?? index}-${index}`}
                             type="button"
-                            className={`entry-editor-lightbox__gallery-card${active ? ' is-active' : ''}`}
+                            className={`entry-editor-lightbox__gallery-card${active && !selectionMode ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}
                             aria-current={active ? 'true' : undefined}
+                            aria-pressed={selectionMode ? selected : undefined}
                             onClick={() => {
+                                if (selectionMode) {
+                                    toggleSelected(index)
+                                    return
+                                }
                                 selectImage(index)
                                 setViewMode('preview')
                             }}
                         >
+                            {selectionMode && (
+                                <span className="entry-editor-lightbox__selection-mark" aria-hidden="true">
+                                    {selected ? '✓' : ''}
+                                </span>
+                            )}
                             <span className="entry-editor-lightbox__gallery-media">
                                 {image.src ? (
                                     <img
@@ -458,7 +494,42 @@ export default function EntryImageLightbox({
                     )}
 
                     <div className="entry-editor-lightbox__header-actions">
-                        {onInsertMarkdown && (
+                        {viewMode === 'gallery' && onRemoveMany ? selectionMode ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    radius="full"
+                                    onClick={() => {
+                                        setSelectionMode(false)
+                                        setSelectedIndices(new Set())
+                                    }}
+                                >
+                                    取消
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    size="sm"
+                                    radius="full"
+                                    disabled={selectedIndices.size === 0}
+                                    onClick={() => void handleRemoveSelected()}
+                                >
+                                    删除{selectedIndices.size > 0 ? ` ${selectedIndices.size} 张` : ''}
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                radius="full"
+                                onClick={() => setSelectionMode(true)}
+                            >
+                                多选
+                            </Button>
+                        ) : onInsertMarkdown && (
                             <Button
                                 type="button"
                                 size="sm"
@@ -468,7 +539,7 @@ export default function EntryImageLightbox({
                                 插入正文
                             </Button>
                         )}
-                        {showSetCoverAsPrimary && (
+                        {viewMode === 'preview' && showSetCoverAsPrimary && (
                             <Button
                                 type="button"
                                 size="sm"
@@ -478,7 +549,7 @@ export default function EntryImageLightbox({
                                 设为主图
                             </Button>
                         )}
-                        {hasMoreActions && (
+                        {viewMode === 'preview' && hasMoreActions && (
                             <Button
                                 type="button"
                                 variant="ghost"

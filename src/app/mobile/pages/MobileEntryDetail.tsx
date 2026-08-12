@@ -59,6 +59,7 @@ import {
     normalizeEntryImages,
     toEntryImageSrc,
 } from '../../../features/entries/lib/entryImage'
+import {removeEntryImages} from '../../../features/entries/lib/entryImageCollection'
 import {
     areRelationDraftsEqual,
     buildRelationDraft,
@@ -533,15 +534,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }, [])
 
     const handleRemoveImage = useCallback((targetIndex: number) => {
-        setImages(current => {
-            const nextImages = current.filter((_, index) => index !== targetIndex)
-            if (nextImages.length > 0 && !nextImages.some(image => image.is_cover)) {
-                nextImages[0] = {...nextImages[0], is_cover: true}
-            }
-            return nextImages
-        })
+        setImages(current => removeEntryImages(current, [targetIndex]))
         setLightboxIndex(current => Math.min(current, Math.max(0, images.length - 2)))
     }, [images.length])
+
+    const handleRemoveImages = useCallback((indices: number[]) => {
+        setImages(current => removeEntryImages(current, indices))
+        setLightboxIndex(0)
+    }, [])
 
     const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
         const image = images[targetIndex]
@@ -598,7 +598,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
             typeCreatorProps={{open: typeCreatorOpen, projectId, existingNames: entryTypes.map(type => type.name), onClose: () => setTypeCreatorOpen(false), onSaved: created => void handleTypeCreated(created)}}
             tagCreatorProps={{open: tagCreatorOpen, projectId, entryTypes, existingNames: entryTags.localTagSchemas.map(schema => schema.name), existingCount: entryTags.localTagSchemas.length, onClose: () => setTagCreatorOpen(false), onSaved: handleTagSchemaSaved}}
-            lightboxProps={{open: lightboxOpen, images: lightboxImages, currentIndex: lightboxIndex, infoTitle: title || entry.title || '未命名词条', onClose: () => setLightboxOpen(false), onIndexChange: setLightboxIndex, onSetCover: handleSetCover, onRemove: handleRemoveImage, onAddImage: () => { setLightboxOpen(false); setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
+            lightboxProps={{open: lightboxOpen, images: lightboxImages, currentIndex: lightboxIndex, infoTitle: title || entry.title || '未命名词条', onClose: () => setLightboxOpen(false), onIndexChange: setLightboxIndex, onSetCover: handleSetCover, onRemove: handleRemoveImage, onRemoveMany: handleRemoveImages, onAddImage: () => { setLightboxOpen(false); setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
             imageAddProps={{open: imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => setImageAddModalOpen(false), onUploadLocal: handleUploadImages, onAddAiImages: handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }, onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}}
         />
     }

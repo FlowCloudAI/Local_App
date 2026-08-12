@@ -85,6 +85,7 @@ import {
 } from '../lib/entryMarkdown'
 import {resolveMarkdownPreviewSourceContent} from '../lib/entryMarkdownPreviewState'
 import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
+import {removeEntryImages} from '../lib/entryImageCollection'
 import {
     deleteEntryDraftRecovery,
     type EntryDraftRecoveryField,
@@ -1339,19 +1340,14 @@ export default function EntryEditor({
     }
 
     function handleRemoveImage(targetIndex: number) {
-        updateDraftFromUser((current) => {
-            const nextImages = current.images.filter((_, index) => index !== targetIndex)
-            if (nextImages.length > 0 && !nextImages.some((image) => image.is_cover)) {
-                nextImages[0] = {
-                    ...nextImages[0],
-                    is_cover: true,
-                }
-            }
-            return {
-                ...current,
-                images: nextImages,
-            }
-        })
+        handleRemoveImages([targetIndex])
+    }
+
+    function handleRemoveImages(indices: number[]) {
+        updateDraftFromUser((current) => ({
+            ...current,
+            images: removeEntryImages(current.images, indices),
+        }))
     }
 
     function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {
@@ -1992,6 +1988,7 @@ export default function EntryEditor({
                 onIndexChange={setLightboxIndex}
                 onSetCover={editorMode === 'edit' ? handleSetCover : undefined}
                 onRemove={editorMode === 'edit' ? handleRemoveImage : undefined}
+                onRemoveMany={editorMode === 'edit' ? handleRemoveImages : undefined}
                 onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
                 onAddImage={() => {
                     reopenLightboxAfterImageAddRef.current = true
