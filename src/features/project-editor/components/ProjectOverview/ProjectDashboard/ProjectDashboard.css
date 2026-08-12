@@ -14,18 +14,6 @@
     gap: var(--fc-space-md);
 }
 
-.pe-dashboard-summary-grid {
-    display: grid;
-    grid-template-columns: minmax(15rem, 22rem) minmax(17rem, 1fr);
-    align-items: stretch;
-    gap: var(--fc-space-md);
-    min-width: 0;
-}
-
-.pe-dashboard-summary-grid > .pe-dashboard-panel--quality {
-    min-height: 100%;
-}
-
 .pe-dashboard-details-panel {
     width: min(72rem, calc(100vw - var(--fc-space-3xl) - var(--fc-space-3xl)));
     max-height: min(48rem, calc(100vh - var(--fc-space-3xl) - var(--fc-space-3xl)));
@@ -36,12 +24,6 @@
     flex-direction: column;
     gap: var(--fc-space-md);
     padding: 0 var(--fc-space-lg) var(--fc-space-lg);
-}
-
-@container (max-width: 639px) {
-    .pe-dashboard-summary-grid {
-        grid-template-columns: minmax(0, 1fr);
-    }
 }
 
 .pe-dashboard-action__badge {

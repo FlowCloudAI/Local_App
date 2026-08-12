@@ -41,13 +41,6 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
             severity: severityOf(projectStats?.missingSummaryEntryCount, 8),
         },
         {
-            key: 'isolated',
-            label: '孤立词条',
-            value: projectStats?.isolatedEntryCount,
-            hint: '没有关系或内链',
-            severity: severityOf(projectStats?.isolatedEntryCount, 5),
-        },
-        {
             key: 'short',
             label: '短正文',
             value: projectStats?.shortContentEntryCount,
@@ -111,7 +104,7 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
                     </div>
                 </RollingBox>
                 <div className="pe-risk-entry-footer">
-                <Button type="button" variant="primary" size="sm" radius="full" onClick={() => setActiveIssue(null)}>
+                    <Button type="button" variant="primary" size="sm" radius="full" onClick={() => setActiveIssue(null)}>
                         确认
                     </Button>
                 </div>

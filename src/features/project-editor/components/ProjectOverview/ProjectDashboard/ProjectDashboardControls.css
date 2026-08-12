@@ -20,10 +20,26 @@
     background: var(--fc-color-bg);
 }
 
-/* 质量监控行式列表：单列、无独立边框，靠分隔线提高密度 */
+/* 待处理问题按可用宽度自动排布，窄空间自然退化为单列。 */
 .pe-dashboard-issue-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.pe-dashboard-section > .pe-dashboard-panel--quality .pe-dashboard-issue-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@container (min-width: 1061px) {
+    .pe-dashboard-section > .pe-dashboard-panel--quality .pe-dashboard-issue-list {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+
+@container (max-width: 639px) {
+    .pe-dashboard-section > .pe-dashboard-panel--quality .pe-dashboard-issue-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .pe-dashboard-issue-row {
@@ -33,23 +49,16 @@
     column-gap: var(--fc-space-sm);
     align-items: center;
     padding: var(--fc-space-sm) var(--fc-space-md);
-    border-top: 1px dashed color-mix(in srgb, var(--fc-color-border) 48%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 48%, transparent);
     border-radius: var(--fc-radius-md);
 }
 
 button.pe-dashboard-issue-row {
     width: 100%;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: left;
-}
-
-.pe-dashboard-issue-row:first-child {
-    border-top: 0;
 }
 
 .pe-dashboard-issue-row--clickable {

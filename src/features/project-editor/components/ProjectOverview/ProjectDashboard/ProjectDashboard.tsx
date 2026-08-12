@@ -40,16 +40,19 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                 </Button>
             </div>
 
-            <div className="pe-dashboard-summary-grid">
+            <div className="pe-dashboard-status-strip">
                 <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
                     <HealthMeter score={dashboard.structureScore} entryCount={dashboard.effectiveEntryCount}/>
                 </article>
-                <ProjectDashboardRiskPanel
-                    projectStats={props.projectStats}
-                    riskSummary={props.riskSummary}
-                    onOpenEntry={props.onOpenEntry}
-                />
+                <div className="pe-dashboard-status-strip__kpis">
+                    <DashboardKpiStrip items={dashboard.kpiItems}/>
+                </div>
             </div>
+            <ProjectDashboardRiskPanel
+                projectStats={props.projectStats}
+                riskSummary={props.riskSummary}
+                onOpenEntry={props.onOpenEntry}
+            />
 
             <FloatingPanel
                 open={detailsOpen}
@@ -58,15 +61,6 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                 className="pe-dashboard-details-panel"
             >
                 <div className="pe-dashboard-details-content">
-                    <div className="pe-dashboard-status-strip">
-                        <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
-                            <HealthMeter score={dashboard.structureScore} entryCount={dashboard.effectiveEntryCount}/>
-                        </article>
-                        <div className="pe-dashboard-status-strip__kpis">
-                            <DashboardKpiStrip items={dashboard.kpiItems}/>
-                        </div>
-                    </div>
-
                     <div className="pe-dashboard-layout">
                         <div className="pe-dashboard-main-column">
                             <article className="pe-dashboard-panel pe-dashboard-panel--primary">
