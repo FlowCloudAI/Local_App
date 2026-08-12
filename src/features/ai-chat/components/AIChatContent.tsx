@@ -2076,18 +2076,19 @@ export default function AIChatContent({
                                     toolCallDetail={'verbose'}
                                 />
                             )}
-                            <EntryEditorLinkPreview
-                                linkPreview={linkPreview.linkPreview}
-                                linkPreviewPosition={linkPreview.linkPreviewPosition}
-                                linkPreviewEntry={linkPreview.linkPreviewEntry}
-                                panelRef={linkPreviewPanelRef}
-                                anchorRef={linkPreview.linkPreviewAnchorRef}
-                                onClearCloseTimer={linkPreview.clearLinkPreviewCloseTimer}
-                                onScheduleClose={linkPreview.scheduleLinkPreviewClose}
-                            />
                         </div>
                     )}
                 </RollingBox>
+
+                <EntryEditorLinkPreview
+                    linkPreview={linkPreview.linkPreview}
+                    linkPreviewPosition={linkPreview.linkPreviewPosition}
+                    linkPreviewEntry={linkPreview.linkPreviewEntry}
+                    panelRef={linkPreviewPanelRef}
+                    anchorRef={linkPreview.linkPreviewAnchorRef}
+                    onClearCloseTimer={linkPreview.clearLinkPreviewCloseTimer}
+                    onScheduleClose={linkPreview.scheduleLinkPreviewClose}
+                />
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
                     {ctx.activeConversationId && ctx.messages.length > 0 && !autoScroll && (
