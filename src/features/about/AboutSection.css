@@ -229,14 +229,23 @@
     list-style: none;
 }
 
-.about-section-changelog summary::before {
-    content: '›';
+.about-section-changelog summary::-webkit-details-marker {
+    display: none;
+}
+
+.about-section-changelog-caret {
+    width: 0.7rem;
+    height: 0.7rem;
+    flex: 0 0 auto;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-lg);
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
     transition: transform var(--fc-transition);
 }
 
-.about-section-changelog details[open] summary::before {
+.about-section-changelog details[open] .about-section-changelog-caret {
     transform: rotate(90deg);
 }
 

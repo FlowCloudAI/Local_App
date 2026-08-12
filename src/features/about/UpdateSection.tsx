@@ -168,6 +168,9 @@ export default function UpdateSection() {
                     {updateChangelog.map((entry) => (
                         <details key={entry.version} open={entry.version === appVersion}>
                             <summary>
+                                <svg className="about-section-changelog-caret" viewBox="0 0 16 16" aria-hidden="true">
+                                    <path d="M5 3.5 12 8l-7 4.5Z"/>
+                                </svg>
                                 <span>版本 {entry.version}</span>
                                 {entry.version === appVersion && <strong>当前版本</strong>}
                                 {entry.version === availableUpdate?.version && <strong>可更新</strong>}
