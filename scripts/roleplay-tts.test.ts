@@ -3,7 +3,18 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {createCompletedAssistantTurn} from '../src/features/ai-chat/model/conversationState.ts'
+import {
+    createCompletedAssistantTurn,
+    toRoleplayTtsText,
+} from '../src/features/ai-chat/model/conversationState.ts'
+
+test('发送语音前删除中英文括号及其嵌套内容', () => {
+    assert.equal(
+        toRoleplayTtsText('你好（笑着说（悄悄话））！(pause (slowly))继续。'),
+        '你好！继续。',
+    )
+    assert.equal(toRoleplayTtsText('（只有动作）'), '')
+})
 
 test('只把当前会话成功完成的助手正文标记为前台即时回复', () => {
     assert.deepEqual(createCompletedAssistantTurn(

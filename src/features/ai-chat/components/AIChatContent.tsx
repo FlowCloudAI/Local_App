@@ -54,7 +54,7 @@ import {readCharacterVoiceConfigFromTags} from '../../entries/lib/characterVoice
 import {subscribeAppSettings, useAppSettingsStore} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
 import AiResponsePendingIndicator from './AiResponsePendingIndicator'
-import {isIncompleteMessage} from '../model/conversationState'
+import {isIncompleteMessage, toRoleplayTtsText} from '../model/conversationState'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './AIChatContent.css'
@@ -1408,7 +1408,7 @@ export default function AIChatContent({
         trigger: 'auto' | 'manual',
     ) => {
         const conversationId = activeConversation?.id ?? null
-        const text = content.trim()
+        const text = toRoleplayTtsText(content)
         if (!text) {
             await showAlert('当前消息没有可播放的文本内容。', 'warning', 'nonInvasive', 1800)
             return

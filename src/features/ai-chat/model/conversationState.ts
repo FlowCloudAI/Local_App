@@ -38,6 +38,17 @@ export const isIncompleteMessage = (message: Message) => hasMessageOutput(messag
     || message.turnStatus === 'error'
 )
 
+/** 删除角色台词中不会交给语音插件朗读的括号内容。 */
+export const toRoleplayTtsText = (text: string) => {
+    let result = text
+    let previous: string
+    do {
+        previous = result
+        result = result.replace(/\([^()]*\)|（[^（）]*）/g, '')
+    } while (result !== previous)
+    return result.trim()
+}
+
 /** 把正式完成事件转换为即时助手回复；历史加载不会经过这个入口。 */
 export const createCompletedAssistantTurn = (
     message: Pick<Message, 'role' | 'content' | 'turnStatus'>,
