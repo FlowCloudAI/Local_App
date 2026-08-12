@@ -105,6 +105,7 @@ import type {
 } from '../model/AiControllerTypes'
 import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {
+    applyConversationModelSwitch,
     applyLatestTurnOutcome,
     appendOrMergeContinuation,
     isEmptyDraftConversation,
@@ -1881,32 +1882,36 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const switchActiveConversationModel = useCallback(async (pluginId: string, model: string) => {
         if (!pluginId || !model) return
-        setAiSelectedPluginModel(pluginId, model)
 
-        const conv = activeConversationRef.current
-        if (!conv) return
-        if (conv.pluginId === pluginId && conv.model === model) return
+        const conversationSnapshot = getAiConversationSnapshot()
+        const conv = conversationSnapshot.conversations.find(
+            (conversation) => conversation.id === conversationSnapshot.activeConversationId,
+        )
+        if (!conv) {
+            setAiSelectedPluginModel(pluginId, model)
+            return
+        }
+        if (conv.pluginId === pluginId && conv.model === model) {
+            setAiSelectedPluginModel(pluginId, model)
+            return
+        }
         if (conv.runId && session.isRunStreaming(conv.runId)) return
 
-        if (conv.sessionId) {
-            await session.closeSession(conv.sessionId)
-        }
+        const switchModel = (conversation: Conversation) =>
+            applyConversationModelSwitch(conversation, conv.id, pluginId, model)
+        const nextConversations = conversationSnapshot.conversations.map(switchModel)
+        conversationsRef.current = nextConversations
+        activeConversationRef.current = switchModel(conv)
+        setAiConversations(nextConversations)
+        setAiSelectedPluginModel(pluginId, model)
+        session.activateSession(null, null)
+
         if (conv.sessionId && conv.runId) {
             deleteRuntimeConversation(conv.sessionId, conv.runId)
         }
-
-        setAiConversations((prev) => prev.map((conversation) =>
-            conversation.id === conv.id
-                ? {
-                    ...conversation,
-                    pluginId,
-                    model,
-                    sessionId: null,
-                    runId: null,
-                }
-                : conversation,
-        ))
-        session.activateSession(null, null)
+        if (conv.sessionId) {
+            await session.closeSession(conv.sessionId)
+        }
     }, [session])
 
     useEffect(() => () => {

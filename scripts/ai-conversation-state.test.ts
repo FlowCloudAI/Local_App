@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type {Conversation} from '../src/features/ai-chat/model/AiControllerTypes.ts'
 import {
+    applyConversationModelSwitch,
     isEmptyDraftConversation,
     isPendingConversationId,
     toConversationHistory,
@@ -47,4 +48,22 @@ test('历史列表只排除普通空草稿', () => {
     assert.equal(isEmptyDraftConversation(draft), true)
     assert.equal(isEmptyDraftConversation(report), false)
     assert.deepEqual(toConversationHistory([draft, report, stored]), [report, stored])
+})
+
+test('切换模型会断开目标对话的旧运行时', () => {
+    const target = conversation('session_target', {
+        sessionId: 'session_old',
+        runId: 'run_old',
+    })
+    const other = conversation('session_other', {
+        sessionId: 'session_other',
+        runId: 'run_other',
+    })
+    const switchModel = (item: Conversation) =>
+        applyConversationModelSwitch(item, target.id, 'minimax', 'MiniMax-M2')
+
+    assert.deepEqual([target, other].map(switchModel), [
+        {...target, pluginId: 'minimax', model: 'MiniMax-M2', sessionId: null, runId: null},
+        other,
+    ])
 })
