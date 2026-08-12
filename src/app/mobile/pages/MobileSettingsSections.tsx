@@ -6,11 +6,6 @@ import {
     type LocalPluginInfo,
     type RemotePluginInfo,
 } from '../../../api'
-import {
-    formatUsageAmount,
-    formatUsageCosts,
-    type UsageBudgetWarning,
-} from '../../../features/settings/usageCost'
 import {usePluginPageCapacity} from '../../../features/plugins/usePluginPageCapacity'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {MobileSearchIcon} from '../components/MobileTopControls'
@@ -32,7 +27,6 @@ interface MenuSectionProps {
     apiKeyStatusLabel: string
     writerModeEnabled: boolean
     searchEngineLabel: string
-    budgetSummary: string
     version: string
     onOpenPage: (type: MobileSettingsPageType) => void
 }
@@ -89,15 +83,6 @@ interface UsageSectionProps {
     byModel: ApiUsageByModel[]
     loading: boolean
     error: string
-    monthlyUsageAmount: number
-    budgetCurrency: string
-    budgetWarning: UsageBudgetWarning | null
-    monthlyBudgetAmount: number | null
-    budgetWarnRatio: number
-    onMonthlyBudgetAmountChange: (value: number | null) => void
-    onBudgetCurrencyChange: (value: string) => void
-    onBudgetWarnRatioChange: (value: number) => void
-    onSaveSettings: () => void | Promise<void>
     onRefresh: () => void | Promise<void>
 }
 
@@ -147,7 +132,6 @@ export function MobileSettingsMenuSection({
     apiKeyStatusLabel,
     writerModeEnabled,
     searchEngineLabel,
-    budgetSummary,
     version,
     onOpenPage,
 }: MenuSectionProps) {
@@ -177,7 +161,7 @@ export function MobileSettingsMenuSection({
                     summary: `${writerModeEnabled ? '作家模式已允许' : '作家模式未允许'} · ${searchEngineLabel}`,
                 },
                 {type: 'settingsTemplates', label: '指令模板', summary: '应用感知指令与模板文件'},
-                {type: 'settingsUsage', label: '用量与预算', summary: budgetSummary},
+                {type: 'settingsUsage', label: '用量统计', summary: 'AI 使用次数与消耗统计'},
             ],
         },
         {
@@ -674,63 +658,10 @@ export function MobileSettingsUsageSection({
     byModel,
     loading,
     error,
-    monthlyUsageAmount,
-    budgetCurrency,
-    budgetWarning,
-    monthlyBudgetAmount,
-    budgetWarnRatio,
-    onMonthlyBudgetAmountChange,
-    onBudgetCurrencyChange,
-    onBudgetWarnRatioChange,
-    onSaveSettings,
     onRefresh,
 }: UsageSectionProps) {
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
-            <section className="mobile-settings-panel mobile-settings-form-stack">
-                <h2 className="mobile-settings-panel__title">费用与月度预算</h2>
-                <div className="mobile-settings-two-column-fields">
-                    <label className="mobile-settings-field-block">
-                        <span>月度预算</span>
-                        <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={monthlyBudgetAmount ?? ''}
-                            placeholder="不设置则不告警"
-                            radius="full"
-                            onValueChange={value => {
-                                const amount = Number(value)
-                                onMonthlyBudgetAmountChange(Number.isFinite(amount) && amount > 0 ? amount : null)
-                            }}
-                        />
-                    </label>
-                    <label className="mobile-settings-field-block">
-                        <span>预算币种</span>
-                        <Input
-                            value={budgetCurrency}
-                            radius="full"
-                            onValueChange={value => onBudgetCurrencyChange(String(value).trim().toUpperCase() || 'USD')}
-                        />
-                    </label>
-                </div>
-                <label className="mobile-settings-range-field">
-                    <span>预算告警比例</span>
-                    <Slider
-                        min={1}
-                        max={100}
-                        step={1}
-                        value={Math.round(budgetWarnRatio * 100)}
-                        tooltip
-                        onValueChange={value => onBudgetWarnRatioChange(readSliderNumber(value) / 100)}
-                    />
-                    <strong>{Math.round(budgetWarnRatio * 100)}%</strong>
-                </label>
-                <p className="mobile-settings-field-hint">预算只提醒，不会中断 AI 服务；未知单价不计入金额。</p>
-                <Button type="button" radius="full" onClick={() => void onSaveSettings()}>
-                    保存预算设置
-                </Button>
-            </section>
             <div className="mobile-settings-section__header">
                 <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
                 <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()} disabled={loading}>
@@ -739,15 +670,6 @@ export function MobileSettingsUsageSection({
             </div>
             {loading && !summary && <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>}
             {error && <div className="mobile-settings-plugin-error">加载失败：{error}</div>}
-            <div className="mobile-settings-plugin-count">
-                本月已知费用：{formatUsageAmount(monthlyUsageAmount, budgetCurrency)}
-            </div>
-            {budgetWarning && (
-                <div className="mobile-settings-budget-warning" role="alert">
-                    已达到月度预算的 {Math.round((budgetWarning.spent / budgetWarning.budget) * 100)}%
-                    （{formatUsageAmount(budgetWarning.spent, budgetWarning.currency)} / {formatUsageAmount(budgetWarning.budget, budgetWarning.currency)}）。
-                </div>
-            )}
             {summary && (
                 <div className="mobile-settings-usage-grid">
                     <div className="mobile-settings-usage-card">
@@ -766,12 +688,6 @@ export function MobileSettingsUsageSection({
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_completion_tokens)}</div>
                         <div className="mobile-settings-usage-card__label">应答消耗</div>
                     </div>
-                    <div className="mobile-settings-usage-card">
-                        <div className="mobile-settings-usage-card__value">
-                            {formatUsageCosts(summary.costs, summary.unknown_price_count)}
-                        </div>
-                        <div className="mobile-settings-usage-card__label">已知费用</div>
-                    </div>
                 </div>
             )}
             <div className="mobile-settings-subtitle">按模型统计</div>
@@ -788,7 +704,6 @@ export function MobileSettingsUsageSection({
                             <span>{row.provider}</span>
                             <span>{formatUsageNumber(row.call_count)} 次</span>
                             <span>{formatUsageNumber(row.total_tokens)} 消耗</span>
-                            <span>{formatUsageCosts(row.costs, row.unknown_price_count)}</span>
                         </div>
                     </div>
                 ))}

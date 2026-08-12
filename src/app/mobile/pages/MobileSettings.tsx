@@ -3,7 +3,6 @@ import {useCallback, useEffect, useMemo, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_get_usage_by_model,
-    ai_get_usage_daily,
     ai_get_usage_summary,
     exit_app,
     formatApiError,
@@ -12,7 +11,6 @@ import {
     type AppLogSnapshot,
     type AppSettings,
     type ApiUsageByModel,
-    type ApiUsageDaily,
     type ApiUsageSummary,
     type PlatformOs,
     toApiError,
@@ -26,10 +24,6 @@ import {
     useAppSettingsStore,
 } from '../../../features/settings/appSettingsStore'
 import {resolveApiKeyPluginId} from '../../../features/settings/aiSettingsSelection'
-import {
-    currentMonthUsageAmount,
-    getUsageBudgetWarning,
-} from '../../../features/settings/usageCost'
 import {
     installLocalPlugin,
     installMarketPlugin,
@@ -131,7 +125,7 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'permissions') return '权限与工具'
     if (section === 'templates') return '指令模板'
     if (section === 'appearance') return '外观'
-    if (section === 'usage') return '用量与预算'
+    if (section === 'usage') return '用量统计'
     if (section === 'update') return '更新'
     if (section === 'feedback') return '提交反馈'
     if (section === 'about') return '关于'
@@ -172,7 +166,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const [logError, setLogError] = useState('')
     const [usageSummary, setUsageSummary] = useState<ApiUsageSummary | null>(null)
     const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
-    const [usageDaily, setUsageDaily] = useState<ApiUsageDaily[]>([])
     const [usageLoading, setUsageLoading] = useState(false)
     const [usageError, setUsageError] = useState('')
 
@@ -431,14 +424,12 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
         setUsageLoading(true)
         setUsageError('')
         try {
-            const [summary, byModel, daily] = await Promise.all([
+            const [summary, byModel] = await Promise.all([
                 ai_get_usage_summary(),
                 ai_get_usage_by_model(),
-                ai_get_usage_daily(),
             ])
             setUsageSummary(summary)
             setUsageByModel(byModel)
-            setUsageDaily(daily)
         } catch (error) {
             const message = formatApiError(toApiError(error))
             logger.error('[MobileSettings] 加载用量统计失败', error)
@@ -466,13 +457,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const updateLlmDraft = (patch: Partial<AppSettings['llm']>) => {
         setSettings(current => current ? {...current, llm: {...current.llm, ...patch}} : current)
     }
-    const monthlyUsageAmount = currentMonthUsageAmount(usageDaily, settings.llm.monthly_budget_currency)
-    const budgetWarning = getUsageBudgetWarning(
-        usageDaily,
-        settings.llm.monthly_budget_amount,
-        settings.llm.monthly_budget_currency,
-        settings.llm.budget_warn_ratio,
-    )
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
     const defaultPluginApiKeyStatusLabel = getApiKeyStatusLabel(!settings.llm.plugin_id
         ? 'unknown'
@@ -485,10 +469,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const searchEngineLabel = settings.search_engine === 'baidu'
         ? '百度'
         : settings.search_engine === 'duckduckgo' ? 'DuckDuckGo' : '必应'
-    const budgetSummary = settings.llm.monthly_budget_amount
-        ? `月度预算 ${settings.llm.monthly_budget_amount} ${settings.llm.monthly_budget_currency}`
-        : 'AI 使用、费用与预算告警'
-
     const themeOptions = [
         {value: 'system', label: '跟随系统'},
         {value: 'light', label: '浅色'},
@@ -525,7 +505,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     apiKeyStatusLabel={defaultPluginApiKeyStatusLabel}
                     writerModeEnabled={settings.llm.writer_mode_enabled}
                     searchEngineLabel={searchEngineLabel}
-                    budgetSummary={budgetSummary}
                     version={version}
                     onOpenPage={openSettingsPage}
                 />
@@ -640,15 +619,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     byModel={usageByModel}
                     loading={usageLoading}
                     error={usageError}
-                    monthlyUsageAmount={monthlyUsageAmount}
-                    budgetCurrency={settings.llm.monthly_budget_currency}
-                    budgetWarning={budgetWarning}
-                    monthlyBudgetAmount={settings.llm.monthly_budget_amount}
-                    budgetWarnRatio={settings.llm.budget_warn_ratio}
-                    onMonthlyBudgetAmountChange={value => updateLlmDraft({monthly_budget_amount: value})}
-                    onBudgetCurrencyChange={value => updateLlmDraft({monthly_budget_currency: value})}
-                    onBudgetWarnRatioChange={value => updateLlmDraft({budget_warn_ratio: value})}
-                    onSaveSettings={handleSave}
                     onRefresh={loadUsageStats}
                 />
             )}

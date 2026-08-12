@@ -11,7 +11,6 @@ import {createPortal, flushSync} from 'react-dom'
 import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import AiBudgetWarning from '../../../features/ai-chat/components/AiBudgetWarning'
 import {
     getAppSettingsSnapshot,
     subscribeAppSettings,
@@ -807,8 +806,6 @@ export default function MobileAiChat({
                     ]}
                 />}
             />
-
-            <AiBudgetWarning/>
 
             <MobileAiMessageList
                 messages={messages}

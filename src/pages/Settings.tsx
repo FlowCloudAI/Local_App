@@ -31,7 +31,6 @@ import {
     type AppSettings,
     type LlmCompactDetail,
     type LocalPluginInfo,
-    type ModelPriceOverride,
     open_in_file_manager,
     type RemotePluginInfo,
     type SearchSourceSettings,
@@ -47,12 +46,6 @@ import {
     type TemplateSaveResult,
     type TemplateValidationError,
 } from '../api'
-import {
-    currentMonthUsageAmount,
-    formatUsageAmount,
-    formatUsageCosts,
-    getUsageBudgetWarning,
-} from '../features/settings/usageCost'
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
 import {resolveDroppedPluginPath} from '../features/plugins/pluginFileDrop'
 import {usePluginPageCapacity} from '../features/plugins/usePluginPageCapacity'
@@ -123,7 +116,7 @@ const SETTINGS_GROUPS: Array<{
             {value: 'models', label: '模型管理'},
             {value: 'permissions', label: '权限与工具'},
             {value: 'templates', label: '指令模板'},
-            {value: 'usage', label: '用量与预算'},
+            {value: 'usage', label: '用量统计'},
         ],
     },
     {
@@ -1315,18 +1308,6 @@ function PluginsPanel({
                             <small>也可以点击选择文件</small>
                         </span>
                     </button>
-                    <div className="plugins-section-actions settings-plugin-library-actions">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={loadingMarket}
-                            onClick={onRefreshMarket}
-                        >
-                            {loadingMarket ? '加载中…' : '刷新'}
-                        </Button>
-                    </div>
-
                     <div className="plugins-filter-bar">
                         <Input
                             placeholder="搜索名称或作者…"
@@ -1352,6 +1333,15 @@ function PluginsPanel({
                                 </button>
                             ))}
                         </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="settings-plugin-library-refresh"
+                            disabled={loadingMarket}
+                            onClick={onRefreshMarket}
+                        >
+                            {loadingMarket ? '加载中…' : '刷新'}
+                        </Button>
                     </div>
 
                     {marketError && (
@@ -2083,42 +2073,6 @@ export default function Settings({
         () => getPluginById('tts', settings?.tts.plugin_id ?? null),
         [getPluginById, settings?.tts.plugin_id],
     )
-    const selectedLlmPlugin = getPluginById('llm', settings?.llm.plugin_id ?? null)
-    const selectedLlmModelInfo = selectedLlmPlugin?.model_infos.find(
-        model => model.id === settings?.llm.default_model,
-    )
-    const selectedLlmPriceKey = selectedLlmPlugin && settings?.llm.default_model
-        ? `${selectedLlmPlugin.id}:${settings.llm.default_model}`
-        : null
-    const selectedLlmPriceOverride = selectedLlmPriceKey
-        ? settings?.llm.model_price_overrides[selectedLlmPriceKey]
-        : undefined
-
-    const toggleSelectedLlmPriceOverride = (enabled: boolean) => {
-        if (!selectedLlmPriceKey) return
-        const next = {...settings?.llm.model_price_overrides}
-        if (!enabled) {
-            delete next[selectedLlmPriceKey]
-        } else {
-            next[selectedLlmPriceKey] = {
-                prompt_price_per_m: selectedLlmModelInfo?.prompt_price_per_m ?? 0,
-                completion_price_per_m: selectedLlmModelInfo?.completion_price_per_m ?? 0,
-                currency: selectedLlmModelInfo?.currency ?? settings?.llm.monthly_budget_currency ?? 'USD',
-            }
-        }
-        updateLlmDefaults({model_price_overrides: next})
-    }
-
-    const updateSelectedLlmPriceOverride = (patch: Partial<ModelPriceOverride>) => {
-        if (!selectedLlmPriceKey || !selectedLlmPriceOverride) return
-        updateLlmDefaults({
-            model_price_overrides: {
-                ...settings?.llm.model_price_overrides,
-                [selectedLlmPriceKey]: {...selectedLlmPriceOverride, ...patch},
-            },
-        })
-    }
-
     const ttsVoiceOptions = useMemo(
         () => buildTtsVoiceOptions(selectedTtsPlugin, '未选择'),
         [selectedTtsPlugin],
@@ -2134,17 +2088,6 @@ export default function Settings({
         ? Math.round(usageSummary.total_tokens / usageSummary.call_count)
         : 0
     const usageTopModel = usageByModel[0] ?? null
-    const monthlyUsageAmount = currentMonthUsageAmount(
-        usageDaily,
-        settings?.llm.monthly_budget_currency ?? 'USD',
-    )
-    const usageBudgetWarning = getUsageBudgetWarning(
-        usageDaily,
-        settings?.llm.monthly_budget_amount,
-        settings?.llm.monthly_budget_currency ?? 'USD',
-        settings?.llm.budget_warn_ratio ?? 0.8,
-    )
-
     if (loading || !settings) {
         return (
             <div className="settings-outer">
@@ -2513,7 +2456,7 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">模型管理</h1>
-                                    <p className="fc-page-subtitle">配置默认模型、生成参数、上下文策略和模型价格。</p>
+                                    <p className="fc-page-subtitle">配置默认模型、生成参数和上下文策略。</p>
                                 </div>
                             </div>
 
@@ -2609,68 +2552,6 @@ export default function Settings({
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">模型价格</h2>
-                                {!selectedLlmPriceKey ? (
-                                    <div className="settings-empty-state">请先选择 AI 对话插件和模型。</div>
-                                ) : (
-                                    <>
-                                        <label className="settings-checkbox-row">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(selectedLlmPriceOverride)}
-                                                onChange={event => toggleSelectedLlmPriceOverride(event.currentTarget.checked)}
-                                            />
-                                            <span>覆盖插件声明的价格</span>
-                                        </label>
-                                        {selectedLlmPriceOverride && (
-                                            <div className="settings-row">
-                                                <label className="settings-field">
-                                                    <span className="settings-label-wide">输入价 / 百万 token</span>
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        step={0.0001}
-                                                        value={selectedLlmPriceOverride.prompt_price_per_m}
-                                                        onValueChange={value => updateSelectedLlmPriceOverride({
-                                                            prompt_price_per_m: Math.max(0, Number(value) || 0),
-                                                        })}
-                                                    />
-                                                </label>
-                                                <label className="settings-field">
-                                                    <span className="settings-label-wide">输出价 / 百万 token</span>
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        step={0.0001}
-                                                        value={selectedLlmPriceOverride.completion_price_per_m}
-                                                        onValueChange={value => updateSelectedLlmPriceOverride({
-                                                            completion_price_per_m: Math.max(0, Number(value) || 0),
-                                                        })}
-                                                    />
-                                                </label>
-                                                <label className="settings-field">
-                                                    <span className="settings-label-wide">币种</span>
-                                                    <Input
-                                                        value={selectedLlmPriceOverride.currency}
-                                                        onValueChange={value => updateSelectedLlmPriceOverride({
-                                                            currency: String(value).trim().toUpperCase(),
-                                                        })}
-                                                    />
-                                                </label>
-                                            </div>
-                                        )}
-                                        <span className="settings-field-hint">
-                                            {selectedLlmModelInfo?.prompt_price_per_m != null
-                                            && selectedLlmModelInfo.completion_price_per_m != null
-                                            && selectedLlmModelInfo.currency
-                                                ? `插件声明：输入 ${formatUsageAmount(selectedLlmModelInfo.prompt_price_per_m, selectedLlmModelInfo.currency)}，输出 ${formatUsageAmount(selectedLlmModelInfo.completion_price_per_m, selectedLlmModelInfo.currency)} / 百万 token。`
-                                                : '插件未声明价格；未启用覆盖时，新记录的金额将显示为“—”。'}
-                                        </span>
-                                    </>
-                                )}
                             </section>
 
                             {/* 文本模型配置 */}
@@ -2945,8 +2826,8 @@ export default function Settings({
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">用量与预算</h1>
-                                    <p className="fc-page-subtitle">查看模型用量、费用明细和月度预算状态。</p>
+                                    <h1 className="fc-page-title">用量统计</h1>
+                                    <p className="fc-page-subtitle">查看模型调用次数与消耗明细。</p>
                                 </div>
                             </div>
 
@@ -2961,71 +2842,12 @@ export default function Settings({
                                 </div>
                             ) : (
                                 <>
-                                    <section className="settings-section fc-section-card usage-budget-panel">
-                                        <h2 className="settings-section-title fc-section-title">费用与月度预算</h2>
-                                        <div className="settings-row">
-                                            <label className="settings-field">
-                                                <span className="settings-label-wide">月度预算</span>
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    step={1}
-                                                    value={settings.llm.monthly_budget_amount ?? ''}
-                                                    placeholder="不设置则不告警"
-                                                    onValueChange={value => {
-                                                        const amount = Number(value)
-                                                        updateLlmDefaults({
-                                                            monthly_budget_amount: Number.isFinite(amount) && amount > 0
-                                                                ? amount
-                                                                : null,
-                                                        })
-                                                    }}
-                                                />
-                                            </label>
-                                            <label className="settings-field">
-                                                <span className="settings-label-wide">预算币种</span>
-                                                <Input
-                                                    value={settings.llm.monthly_budget_currency}
-                                                    onValueChange={value => updateLlmDefaults({
-                                                        monthly_budget_currency: String(value).trim().toUpperCase() || 'USD',
-                                                    })}
-                                                />
-                                            </label>
-                                            <label className="settings-field">
-                                                <span className="settings-label-wide">告警比例</span>
-                                                <Input
-                                                    type="number"
-                                                    min={1}
-                                                    max={100}
-                                                    step={1}
-                                                    value={Math.round(settings.llm.budget_warn_ratio * 100)}
-                                                    onValueChange={value => updateLlmDefaults({
-                                                        budget_warn_ratio: Math.min(1, Math.max(0.01, (Number(value) || 80) / 100)),
-                                                    })}
-                                                />
-                                                <span className="settings-span">%</span>
-                                            </label>
-                                        </div>
-                                        <span className="settings-field-hint">
-                                            费用按每次调用时保存的单价快照计算，不做汇率换算；单价未知的调用不会计入金额。
-                                        </span>
-                                        <div className="usage-budget-summary">
-                                            本月已知费用：{formatUsageAmount(monthlyUsageAmount, settings.llm.monthly_budget_currency)}
-                                        </div>
-                                        {usageBudgetWarning && (
-                                            <div className="usage-budget-warning" role="alert">
-                                                本月费用已达到预算的 {Math.round((usageBudgetWarning.spent / usageBudgetWarning.budget) * 100)}%
-                                                （{formatUsageAmount(usageBudgetWarning.spent, usageBudgetWarning.currency)} / {formatUsageAmount(usageBudgetWarning.budget, usageBudgetWarning.currency)}）。
-                                            </div>
-                                        )}
-                                    </section>
-
                                     <section className="usage-activity-panel">
                                         <div className="usage-activity-header">
                                             <h2 className="settings-section-title fc-section-title">AI 使用热力图</h2>
                                             <div className="usage-activity-total">
                                                 {usageSummary
-                                                    ? `${usageSummary.total_tokens.toLocaleString()} tokens · ${formatUsageCosts(usageSummary.costs, usageSummary.unknown_price_count)}`
+                                                    ? `${usageSummary.total_tokens.toLocaleString()} tokens`
                                                     : '暂无数据'}
                                             </div>
                                         </div>
@@ -3127,7 +2949,6 @@ export default function Settings({
                                                         <th>提问消耗</th>
                                                         <th>应答消耗</th>
                                                         <th>总消耗</th>
-                                                        <th>金额</th>
                                                     </tr>
                                                     </thead>
                                                     <tbody>
@@ -3146,7 +2967,6 @@ export default function Settings({
                                                             <td>{row.completion_tokens.toLocaleString()}</td>
                                                             <td className="usage-total-col">
                                                                 {row.total_tokens.toLocaleString()}</td>
-                                                            <td>{formatUsageCosts(row.costs, row.unknown_price_count)}</td>
                                                         </tr>
                                                     ))}
                                                     </tbody>

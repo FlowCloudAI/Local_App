@@ -1,5 +1,5 @@
 import {Button, Input, Select, Slider} from 'flowcloudai-ui'
-import type {AppSettings, LlmCompactDetail, ModelPriceOverride, PluginInfo} from '../../../api'
+import type {AppSettings, LlmCompactDetail, PluginInfo} from '../../../api'
 import {CONVERSATION_TEMPERATURE_MAX} from '../../../features/ai-chat/model/AiControllerTypes'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../../../features/plugins/ttsVoice'
 
@@ -49,14 +49,6 @@ export default function MobileSettingsModelsSection({
     const selectedLlmPlugin = llmPlugins.find(plugin => plugin.id === settings.llm.plugin_id) ?? null
     const selectedImagePlugin = imagePlugins.find(plugin => plugin.id === settings.image.plugin_id) ?? null
     const selectedTtsPlugin = ttsPlugins.find(plugin => plugin.id === settings.tts.plugin_id) ?? null
-    const selectedLlmModelInfo = selectedLlmPlugin?.model_infos.find(model => model.id === settings.llm.default_model)
-    const selectedPriceKey = selectedLlmPlugin && settings.llm.default_model
-        ? `${selectedLlmPlugin.id}:${settings.llm.default_model}`
-        : null
-    const selectedPriceOverride = selectedPriceKey
-        ? settings.llm.model_price_overrides[selectedPriceKey]
-        : undefined
-
     const updateLlm = (patch: Partial<AppSettings['llm']>) => {
         onChange({...settings, llm: {...settings.llm, ...patch}})
     }
@@ -79,31 +71,6 @@ export default function MobileSettingsModelsSection({
                 plugin_id: pluginId || null,
                 default_model: defaultModel,
                 voice_id: normalizeVoiceIdWithPlugin(plugin, settings.tts.voice_id),
-            },
-        })
-    }
-
-    const togglePriceOverride = (enabled: boolean) => {
-        if (!selectedPriceKey) return
-        const next = {...settings.llm.model_price_overrides}
-        if (!enabled) {
-            delete next[selectedPriceKey]
-        } else {
-            next[selectedPriceKey] = {
-                prompt_price_per_m: selectedLlmModelInfo?.prompt_price_per_m ?? 0,
-                completion_price_per_m: selectedLlmModelInfo?.completion_price_per_m ?? 0,
-                currency: selectedLlmModelInfo?.currency ?? settings.llm.monthly_budget_currency,
-            }
-        }
-        updateLlm({model_price_overrides: next})
-    }
-
-    const updatePriceOverride = (patch: Partial<ModelPriceOverride>) => {
-        if (!selectedPriceKey || !selectedPriceOverride) return
-        updateLlm({
-            model_price_overrides: {
-                ...settings.llm.model_price_overrides,
-                [selectedPriceKey]: {...selectedPriceOverride, ...patch},
             },
         })
     }
@@ -321,66 +288,6 @@ export default function MobileSettingsModelsSection({
                             </label>
                         </div>
                     </div>
-                )}
-            </section>
-
-            <section className="mobile-settings-panel">
-                <h2 className="mobile-settings-panel__title">模型价格</h2>
-                {!selectedPriceKey ? (
-                    <p className="mobile-settings-field-hint">先选择对话插件和模型后，才能覆盖插件声明的价格。</p>
-                ) : (
-                    <>
-                        <label className="mobile-settings-switch-field">
-                            <span>覆盖插件声明的价格</span>
-                            <input
-                                type="checkbox"
-                                checked={Boolean(selectedPriceOverride)}
-                                onChange={event => togglePriceOverride(event.currentTarget.checked)}
-                            />
-                        </label>
-                        {selectedPriceOverride && (
-                            <div className="mobile-settings-form-stack">
-                                <div className="mobile-settings-two-column-fields">
-                                    <label className="mobile-settings-field-block">
-                                        <span>输入价 / 百万消耗</span>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            step={0.0001}
-                                            value={selectedPriceOverride.prompt_price_per_m}
-                                            radius="full"
-                                            onValueChange={value => updatePriceOverride({
-                                                prompt_price_per_m: Math.max(0, Number(value) || 0),
-                                            })}
-                                        />
-                                    </label>
-                                    <label className="mobile-settings-field-block">
-                                        <span>输出价 / 百万消耗</span>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            step={0.0001}
-                                            value={selectedPriceOverride.completion_price_per_m}
-                                            radius="full"
-                                            onValueChange={value => updatePriceOverride({
-                                                completion_price_per_m: Math.max(0, Number(value) || 0),
-                                            })}
-                                        />
-                                    </label>
-                                </div>
-                                <label className="mobile-settings-field-block">
-                                    <span>币种</span>
-                                    <Input
-                                        value={selectedPriceOverride.currency}
-                                        radius="full"
-                                        onValueChange={value => updatePriceOverride({
-                                            currency: String(value).trim().toUpperCase() || 'USD',
-                                        })}
-                                    />
-                                </label>
-                            </div>
-                        )}
-                    </>
                 )}
             </section>
 

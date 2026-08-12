@@ -54,7 +54,6 @@ import {
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import {subscribeAppSettings, useAppSettingsStore} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
-import AiBudgetWarning from './AiBudgetWarning'
 import AiResponsePendingIndicator from './AiResponsePendingIndicator'
 import {isIncompleteMessage} from '../model/conversationState'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
@@ -1915,8 +1914,6 @@ export default function AIChatContent({
                         </DockPanelIconButton>
                     </div>
                 </DockPanelTopbar>
-
-                <AiBudgetWarning/>
 
                 <RollingBox axis="y"
                     className="ai-messages-container"
