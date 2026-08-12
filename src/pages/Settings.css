@@ -1044,6 +1044,62 @@
   margin-bottom: 0;
 }
 
+.settings-plugin-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fc-space-md);
+  width: 100%;
+  min-height: 4.5rem;
+  margin-bottom: var(--fc-space-lg);
+  padding: var(--fc-space-md) var(--fc-space-lg);
+  border: 1px dashed var(--fc-color-border);
+  border-radius: var(--fc-radius-lg);
+  background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
+  color: var(--fc-color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--fc-transition);
+}
+
+.settings-plugin-dropzone:hover,
+.settings-plugin-dropzone.is-active {
+  border-color: var(--fc-color-primary);
+  background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+  color: var(--fc-color-primary);
+}
+
+.settings-plugin-dropzone:disabled {
+  cursor: wait;
+}
+
+.settings-plugin-dropzone svg {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.settings-plugin-dropzone span {
+  display: grid;
+  gap: var(--fc-space-xs);
+}
+
+.settings-plugin-dropzone strong {
+  color: var(--fc-color-text);
+  font-size: var(--fc-font-size-sm);
+}
+
+.settings-plugin-dropzone small {
+  color: var(--fc-color-text-secondary);
+  font-size: var(--fc-font-size-xs);
+}
+
 .plugins-list-viewport {
   flex: 1;
   min-height: 0;

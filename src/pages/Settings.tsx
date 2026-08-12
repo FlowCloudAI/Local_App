@@ -15,7 +15,7 @@ import {
     useAlert,
     useTheme
 } from 'flowcloudai-ui'
-import {openFileDialog} from '../api/dialog'
+import {listenNativeFileDrop, openFileDialog} from '../api/dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '../api/events'
 import AboutSection, {FeedbackSection} from '../features/about/AboutSection'
@@ -54,6 +54,7 @@ import {
     getUsageBudgetWarning,
 } from '../features/settings/usageCost'
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
+import {resolveDroppedPluginPath} from '../features/plugins/pluginFileDrop'
 import {usePluginPageCapacity} from '../features/plugins/usePluginPageCapacity'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
 import {CONVERSATION_TEMPERATURE_MAX} from '../features/ai-chat/model/AiControllerTypes'
@@ -982,6 +983,7 @@ interface PluginsPanelProps {
     onRefreshLocal: () => void | Promise<void>
     onRefreshMarket: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
+    onInstallDroppedFile: (paths: readonly string[]) => void | Promise<void>
     onUninstall: (pluginId: string) => void | Promise<void>
     onInstall: (pluginId: string) => void | Promise<void>
     onSearchTextChange: (value: string) => void
@@ -1053,6 +1055,7 @@ function PluginsPanel({
                           onRefreshLocal,
                           onRefreshMarket,
                           onInstallFromFile,
+                          onInstallDroppedFile,
                           onUninstall,
                           onInstall,
                           onSearchTextChange,
@@ -1066,6 +1069,8 @@ function PluginsPanel({
     const [pluginLibraryOpen, setPluginLibraryOpen] = useState(false)
     const [installedPage, setInstalledPage] = useState(1)
     const [marketPage, setMarketPage] = useState(1)
+    const [nativeFileDragActive, setNativeFileDragActive] = useState(false)
+    const pluginDropZoneRef = useRef<HTMLButtonElement>(null)
     const installedPluginMap = new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
     const installedIds = new Set(installedPluginMap.keys())
     const marketPluginMap = new Map(marketPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
@@ -1108,6 +1113,44 @@ function PluginsPanel({
         setMarketPage(page => Math.min(page, marketPageCount))
     }, [marketPageCount])
 
+    useEffect(() => {
+        let disposed = false
+        let unlisten: (() => void) | undefined
+        const isInsideDropZone = (position: {x: number; y: number}) => {
+            const rect = pluginDropZoneRef.current?.getBoundingClientRect()
+            if (!rect) return false
+            // Tauri 使用物理像素，DOM 矩形使用 CSS 像素。
+            const scale = window.devicePixelRatio || 1
+            const x = position.x / scale
+            const y = position.y / scale
+            return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+        }
+
+        void listenNativeFileDrop((event) => {
+            if (event.type === 'leave') {
+                setNativeFileDragActive(false)
+                return
+            }
+            const inside = isInsideDropZone(event.position)
+            if (event.type === 'drop') {
+                setNativeFileDragActive(false)
+                if (inside && !installingLocalFile) void onInstallDroppedFile(event.paths)
+                return
+            }
+            setNativeFileDragActive(inside)
+        }).then((release) => {
+            if (disposed) release()
+            else unlisten = release
+        }).catch((error) => {
+            if (!disposed) logger.warn('[Settings] 监听插件文件拖放失败', error)
+        })
+
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [installingLocalFile, onInstallDroppedFile])
+
     return (
         <>
             <div className="settings-container settings-plugin-page fc-page-shell fc-page-shell--narrow">
@@ -1140,6 +1183,22 @@ function PluginsPanel({
                             </Button>
                         </div>
                     </div>
+
+                    <button
+                        ref={pluginDropZoneRef}
+                        type="button"
+                        className={`settings-plugin-dropzone${nativeFileDragActive ? ' is-active' : ''}`}
+                        disabled={installingLocalFile}
+                        onClick={onInstallFromFile}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+                        </svg>
+                        <span>
+                            <strong>{installingLocalFile ? '正在安装插件…' : nativeFileDragActive ? '松开以安装插件' : '拖入 .fcplug 安装本地插件'}</strong>
+                            <small>也可以点击选择文件</small>
+                        </span>
+                    </button>
 
                     {localError && (
                         <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
@@ -1984,6 +2043,15 @@ export default function Settings({
         }
     }
 
+    const handleInstallPluginPath = useCallback(async (filePath: string) => {
+        try {
+            const info = await installLocalPlugin(filePath)
+            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
+        } catch (e) {
+            void showAlert('本地插件安装失败: ' + e, 'error')
+        }
+    }, [showAlert])
+
     const handleInstallFromFile = async () => {
         const selected = await openFileDialog({
             multiple: false,
@@ -1998,13 +2066,17 @@ export default function Settings({
         })
         if (!selected || Array.isArray(selected)) return
 
-        try {
-            const info = await installLocalPlugin(selected)
-            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
-        } catch (e) {
-            void showAlert('本地插件安装失败: ' + e, 'error')
-        }
+        await handleInstallPluginPath(selected)
     }
+
+    const handleInstallDroppedFile = useCallback(async (paths: readonly string[]) => {
+        const result = resolveDroppedPluginPath(paths)
+        if (!result.ok) {
+            await showAlert(result.error, 'warning', 'nonInvasive', 2400)
+            return
+        }
+        await handleInstallPluginPath(result.path)
+    }, [handleInstallPluginPath, showAlert])
 
     const handleUninstall = async (pluginId: string) => {
         const res = await showAlert('确认删除', 'warning', 'confirm')
@@ -2866,6 +2938,7 @@ export default function Settings({
                             onRefreshLocal={loadLocal}
                             onRefreshMarket={loadMarket}
                             onInstallFromFile={handleInstallFromFile}
+                            onInstallDroppedFile={handleInstallDroppedFile}
                             onUninstall={handleUninstall}
                             onInstall={handleInstall}
                             onSearchTextChange={setSearchText}
