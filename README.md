@@ -32,6 +32,16 @@ iOS 环境检查、真机调试、Archive 与 IPA 导出统一见
 npm run ios:doctor
 ```
 
+### macOS
+
+macOS 原生窗口、日常调试、DMG、Developer ID 签名与公证流程见
+[`docs/tauri_macos_debug_and_release.md`](docs/tauri_macos_debug_and_release.md)。首次准备执行：
+
+```bash
+npm run macos:doctor
+npm run macos:dev
+```
+
 ### 最小示例
 
 1. 启动桌面端并创建一个世界观项目。  
@@ -43,7 +53,7 @@ npm run ios:doctor
 - 世界观项目、实体与关系编辑。  
 - 地图与关系可视化预览。  
 - AI 会话、插件加载、会话结果回写。  
-- 桌面端签名与多平台构建（Windows/Linux/Android/iOS）。
+- 桌面端签名与多平台构建（Windows/macOS/Linux/Android/iOS）。
 
 ## 技术栈
 

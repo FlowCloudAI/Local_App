@@ -31,7 +31,7 @@
         "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-features=Spellcheck,AutofillServerCommunication,Translate,AudioServiceOutOfProcess --proxy-bypass-list=*.localhost"      }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://fcimg.localhost https://www.flowcloudai.cn",
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://fcimg.localhost https://www.flowcloudai.cn",
       "capabilities": [
         "default",
         "desktop-lifecycle"

@@ -122,13 +122,23 @@ pub fn open_in_file_manager(app: AppHandle, path: String) -> Result<(), String> 
 
 /// 显示主窗口（前端加载完成后调用）
 #[tauri::command]
-pub fn show_main_window(window: Window) -> Result<&'static str, &'static str> {
+pub fn show_main_window(window: Window) -> Result<&'static str, String> {
     #[cfg(desktop)]
     {
-        match window.show() {
-            Ok(_) => {}
-            Err(_) => return Err("failed to show the window"),
-        };
+        let visible_before = window.is_visible().unwrap_or(false);
+        window
+            .show()
+            .map_err(|error| format!("failed to show the window: {error}"))?;
+        if let Err(error) = window.set_focus() {
+            log::warn!("主窗口已显示，但获取焦点失败: {}", error);
+        }
+        let visible_after = window.is_visible().unwrap_or(false);
+        log::info!(
+            "主窗口显示完成 platform={} visible_before={} visible_after={}",
+            std::env::consts::OS,
+            visible_before,
+            visible_after
+        );
     }
     unsafe {
         env::set_var("TAURI_DEBUG", "1");

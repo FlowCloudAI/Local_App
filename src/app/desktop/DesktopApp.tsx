@@ -10,7 +10,7 @@ import {useAIChatPanel} from '../../features/ai-chat/useAIChatPanel'
 import {type HelpPanelRequest, useHelpPanel} from '../../features/help/useHelpPanel'
 import {useSnapshotPanel} from '../../features/snapshots/useSnapshotPanel'
 import {getCurrentWindow} from '@tauri-apps/api/window'
-import {listen} from '../../api/events'
+import {listen, releaseTauriListener} from '../../api/events'
 import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import StartupUpdatePrompt from '../../features/about/StartupUpdatePrompt'
@@ -312,7 +312,7 @@ function useBackendStartupStatus() {
 
         return () => {
             disposed = true
-            statusListener.then(fn => fn())
+            releaseTauriListener(statusListener, '后端状态')
         }
     }, [])
 
@@ -362,11 +362,12 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         const shouldShowWindow = backendStatus.phase === 'ready' || backendStatus.phase === 'failed'
         if (!shouldShowWindow || !platformInfo.windowControls || desktopWindowShown) return
         desktopWindowShown = true
-        requestAnimationFrame(() => {
-            showWindow().catch((error) => {
-                desktopWindowShown = false
-                logger.error('显示桌面窗口失败', error)
-            })
+        // macOS 会暂停隐藏 WKWebView 的 requestAnimationFrame；若在下一帧里调用 show，
+        // 就会形成“窗口不显示便没有下一帧”的启动死锁。useEffect 已经晚于本次 DOM 提交，
+        // 此处可以直接显示窗口，同时仍避免把尚未提交的启动界面暴露给用户。
+        showWindow().catch((error) => {
+            desktopWindowShown = false
+            logger.error('显示桌面窗口失败', error)
         })
     }, [backendStatus.phase, platformInfo.windowControls])
 
@@ -374,11 +375,12 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         return <BackendStartupScreen status={backendStatus}/>
     }
 
-    return <DesktopAppContent/>
+    return <DesktopAppContent platformInfo={platformInfo}/>
 }
 
-function DesktopAppContent() {
+function DesktopAppContent({platformInfo}: DesktopAppProps) {
     const win = getCurrentWindow()
+    const usesNativeWindowControls = platformInfo.os === 'macos'
     const {showAlert} = useAlert()
     const windowClosingRef = useRef(false)
 
@@ -387,7 +389,7 @@ function DesktopAppContent() {
         win.isMaximized().then(setIsMaximized)
         const unlisten = win.onResized(() => win.isMaximized().then(setIsMaximized))
         return () => {
-            unlisten.then(fn => fn())
+            releaseTauriListener(unlisten, '窗口尺寸')
         }
     }, [win])
 
@@ -864,7 +866,7 @@ function DesktopAppContent() {
             await handleWindowClose()
         })
         return () => {
-            p.then(fn => fn())
+            releaseTauriListener(p, '窗口关闭')
         }
     }, [handleWindowClose, win])
 
@@ -1269,7 +1271,7 @@ function DesktopAppContent() {
     ]
 
     return (
-        <div className="app-layout">
+        <div className={`app-layout app-layout--${platformInfo.os}`}>
             <div className="top-bar" data-tauri-drag-region>
                 <div className="app-logo" data-tauri-drag-region aria-hidden="true">
                     <svg
@@ -1351,7 +1353,7 @@ function DesktopAppContent() {
                         }}
                     />
                 </div>
-                <div className="top-bar-actions" data-tauri-drag-region>
+                {!usesNativeWindowControls && <div className="top-bar-actions" data-tauri-drag-region>
                     <Button type="button"
                         className="window-control-btn"
                         variant="ghost"
@@ -1420,7 +1422,7 @@ function DesktopAppContent() {
                             <line x1="5" y1="5" x2="19" y2="19"/>
                         </svg>
                     </Button>
-                </div>
+                </div>}
             </div>
             <div className="main-content">
                 <div className="workspace-content">

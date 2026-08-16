@@ -124,6 +124,16 @@ targets:
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
 {{/each}}
       - script: |
+          ICON_SOURCE_DIR="${SRCROOT}/../../icons/ios"
+          ICON_TARGET_DIR="${SRCROOT}/Assets.xcassets/AppIcon.appiconset"
+          if [ ! -d "${ICON_SOURCE_DIR}" ] || [ ! -d "${ICON_TARGET_DIR}" ]; then
+            echo "error: iOS AppIcon 目录不存在；请检查 src-tauri/icons/ios 与生成工程。" >&2
+            exit 1
+          fi
+          /bin/cp -f "${ICON_SOURCE_DIR}/"*.png "${ICON_TARGET_DIR}/"
+        name: Sync iOS AppIcon
+        basedOnDependencyAnalysis: false
+      - script: |
           /bin/zsh "${SRCROOT}/../../../scripts/ios-xcode-build.sh" -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false

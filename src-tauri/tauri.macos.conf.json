@@ -1,0 +1,34 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "流云AI",
+        "label": "main",
+        "width": 800,
+        "height": 600,
+        "minWidth": 600,
+        "minHeight": 400,
+        "resizable": true,
+        "zoomHotkeysEnabled": true,
+        "fullscreen": false,
+        "visible": false,
+        "transparent": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true
+    }
+  }
+}

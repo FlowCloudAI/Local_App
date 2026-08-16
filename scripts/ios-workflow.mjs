@@ -23,6 +23,8 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
 const tauriDir = join(repoRoot, 'src-tauri')
 const generatedAppleDir = join(tauriDir, 'gen', 'apple')
+const iosIconSourceDir = join(tauriDir, 'icons', 'ios')
+const generatedIosAppIconDir = join(generatedAppleDir, 'Assets.xcassets', 'AppIcon.appiconset')
 const tauriBin = join(repoRoot, 'node_modules', '.bin', 'tauri')
 const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
 const tauriConfig = JSON.parse(readFileSync(join(tauriDir, 'tauri.conf.json'), 'utf8'))
@@ -38,6 +40,7 @@ function printHelp() {
 命令：
   doctor              检查 Xcode、Rust、CocoaPods、签名与生成工程
   init                初始化或更新 src-tauri/gen/apple
+  sync-icons          将受 Git 跟踪的 iOS AppIcon 同步到生成工程
   dev                 热更新调试，可追加设备名称或 --open
   run                 使用已打包前端运行，适合稳定性回归
   build-debug         生成 debugging IPA
@@ -80,6 +83,58 @@ function runTauri(args) {
   if (result.status !== 0) {
     throw new Error(`Tauri 命令失败，退出码 ${result.status ?? 'unknown'}。`)
   }
+}
+
+function resolveIosAppIconFiles() {
+  const manifestPath = join(generatedIosAppIconDir, 'Contents.json')
+  if (!existsSync(iosIconSourceDir)) {
+    throw new Error(`未找到 iOS 图标源目录：${iosIconSourceDir}`)
+  }
+  if (!existsSync(manifestPath)) {
+    throw new Error(`未找到生成的 AppIcon 清单：${manifestPath}；请先执行 npm run ios:init。`)
+  }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const fileNames = [...new Set(
+    (manifest.images ?? [])
+      .map((image) => image.filename)
+      .filter((fileName) => typeof fileName === 'string' && fileName.endsWith('.png')),
+  )]
+  if (fileNames.length === 0) {
+    throw new Error(`AppIcon 清单没有可同步的 PNG：${manifestPath}`)
+  }
+
+  for (const fileName of fileNames) {
+    const source = join(iosIconSourceDir, fileName)
+    if (!existsSync(source)) {
+      throw new Error(`iOS 图标源文件缺失：${source}`)
+    }
+  }
+  return fileNames
+}
+
+function inspectIosAppIcons() {
+  try {
+    const fileNames = resolveIosAppIconFiles()
+    const staleFiles = fileNames.filter((fileName) => {
+      const source = readFileSync(join(iosIconSourceDir, fileName))
+      const generated = readFileSync(join(generatedIosAppIconDir, fileName))
+      return !source.equals(generated)
+    })
+    return staleFiles.length === 0
+      ? { ok: true, detail: `已同步 ${fileNames.length} 个图标` }
+      : { ok: false, detail: `${staleFiles.length} 个生成图标与 src-tauri/icons/ios 不一致` }
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+function syncIosAppIcons() {
+  const fileNames = resolveIosAppIconFiles()
+  for (const fileName of fileNames) {
+    copyFileSync(join(iosIconSourceDir, fileName), join(generatedIosAppIconDir, fileName))
+  }
+  console.log(`[iOS] 已从 src-tauri/icons/ios 同步 ${fileNames.length} 个 AppIcon 文件。`)
 }
 
 function assertFlagAbsent(args, flag) {
@@ -241,6 +296,13 @@ function doctor() {
     existsSync(join(generatedAppleDir, 'project.yml')) ? '已初始化' : '请执行 npm run ios:init',
     false,
   )
+  const iconStatus = inspectIosAppIcons()
+  add(
+    iconStatus.ok,
+    'iOS AppIcon',
+    iconStatus.detail,
+    existsSync(join(generatedAppleDir, 'project.yml')),
+  )
 
   const signingIdentities = capture('security', ['find-identity', '-v', '-p', 'codesigning'])
   const signingOutput = `${signingIdentities.stdout ?? ''}\n${signingIdentities.stderr ?? ''}`
@@ -282,6 +344,7 @@ function doctor() {
 
 async function buildIpa(mode, exportMethod, debug, forwardedArgs) {
   requireSigningTeam()
+  syncIosAppIcons()
   assertFlagAbsent(forwardedArgs, '--export-method')
   assertFlagAbsent(forwardedArgs, '--build-number')
   assertFlagAbsent(forwardedArgs, '--config')
@@ -319,11 +382,17 @@ async function main() {
     case 'init':
       requireSigningTeam()
       runTauri(['ios', 'init', ...forwardedArgs])
+      syncIosAppIcons()
+      break
+    case 'sync-icons':
+      syncIosAppIcons()
       break
     case 'dev':
+      syncIosAppIcons()
       runTauri(['ios', 'dev', ...forwardedArgs])
       break
     case 'run':
+      syncIosAppIcons()
       runTauri(['ios', 'run', ...forwardedArgs])
       break
     case 'build-debug':
@@ -337,6 +406,7 @@ async function main() {
       break
     case 'archive': {
       requireSigningTeam()
+      syncIosAppIcons()
       assertFlagAbsent(forwardedArgs, '--build-number')
       assertFlagAbsent(forwardedArgs, '--config')
       assertFlagAbsent(forwardedArgs, '-c')

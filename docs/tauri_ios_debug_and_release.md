@@ -30,6 +30,18 @@
 
 `ios:init` 使用仓库内的 [`src-tauri/ios/project.yml`](../src-tauri/ios/project.yml)。Xcode 构建 Rust 时会进入 [`scripts/ios-xcode-build.sh`](../scripts/ios-xcode-build.sh)，因此重新生成工程后无需再手工修改 `PATH`。
 
+### AppIcon 来源与同步
+
+受 Git 跟踪的 [`src-tauri/icons/ios`](../src-tauri/icons/ios) 是 iOS AppIcon 的唯一来源。仓库工作流会在 `ios:init`、`ios:dev`、`ios:run`、Archive 与 IPA 构建前，把这些图标同步到生成工程的 `Assets.xcassets/AppIcon.appiconset`；`ios:doctor` 会把生成图标过期视为失败。
+
+如果只从 Xcode 打开既有生成工程、没有先运行上述工作流，执行一次：
+
+```zsh
+npm run ios:sync-icons
+```
+
+Xcode 工程的 Pre-build 阶段也会再次同步。不要直接把 `src-tauri/gen/apple` 中的默认 Tauri 图标当成长期来源或提交生成目录。
+
 ## 2. 日常调试
 
 ### 真机热更新

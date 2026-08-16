@@ -2,7 +2,7 @@
 
 ## 项目概览
 
-`app_main` 是 FlowCloudAI 的 Tauri + React（TypeScript）主应用，同时承载 Windows、Linux、Android 与 iOS 外壳，提供世界观建模、关系图编辑、地图展示与插件入口。
+`app_main` 是 FlowCloudAI 的 Tauri + React（TypeScript）主应用，同时承载 Windows、Linux、macOS、Android 与 iOS 外壳，提供世界观建模、关系图编辑、地图展示与插件入口。
 
 ## 构建 / 运行 / 测试 / lint
 
@@ -28,6 +28,32 @@ cargo test
 
 `app_main` 的前端命令以 `app_main/package.json` 为准，Rust 命令以 `app_main/src-tauri/Cargo.toml` 为准。
 
+## macOS 调试与打包（仅 macOS）
+
+macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri_macos_debug_and_release.md)。修改 Mac 窗口或发布链路前先读该文档。
+
+### 文件职责与平台边界
+
+- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前不固化 `trafficLightPosition`，使用系统默认坐标；后续调整时必须同步检查 `src/App.css` 中 Logo/Tab 的左侧避让，并在不同缩放与内外接屏幕上验证，未经验收不要提交坐标值。
+- `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
+- `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄，macOS 下也必须保留；原生窗口边框负责缩放不等于可以把该变量设为 `0`。
+- `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规。启用 `zoomHotkeysEnabled` 时，桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。修改共享 CSP/capability 后要回归 Windows、Linux 与移动端，不能把它们当成纯 Mac 配置。
+
+### 日常调试与窗口启动
+
+- `npm run macos:dev` 只构建当前 Mac 架构并在当前终端持续输出 Vite、Rust、WebKit 与前端转发日志。React/TypeScript/CSS 保存后走 Vite HMR；Rust 自动重编译；`tauri.macos.conf.json` 等原生窗口配置会触发应用重建/重启，不能靠 HMR 验证。
+- 主窗口初始为 `visible: false`，前端后端状态变为 ready/failed 后直接调用 `showWindow()`。禁止重新把显示操作包进 `requestAnimationFrame`：macOS 可能暂停隐藏 WKWebView 的帧回调，形成“窗口不显示就没有下一帧”的启动死锁。正常启动日志必须出现 `主窗口显示完成 platform=macos ... visible_after=true`。
+- React StrictMode/HMR 可能让 Tauri 原生监听器先于 React cleanup 被释放；事件清理统一经过 `src/api/events.ts` 的安全释放逻辑，窗口 resize/close 监听也不能直接调用异步 unlisten 而留下未处理拒绝。
+- 同时只运行一个 macOS dev/Release 实例与一套 Vite 服务。程序坞有图标但没有窗口时，先检查端口和旧进程，再看窗口显示日志，不要先归因于前端白屏。
+
+### Release 与签名边界
+
+- `npm run macos:build:local` 生成当前架构、优化后的 `.app`/`.dmg`，使用 ad-hoc 签名，只适合本机安装与功能验收；它不是可公开分发的已公证包。
+- `MACOS_BUILD_NUMBER=... npm run macos:build:release` 默认构建 Apple Silicon + Intel Universal 包，并强制检查 `APPLE_SIGNING_IDENTITY`、Apple 公证凭据和 `TAURI_SIGNING_PRIVATE_KEY`。这些材料只放本机钥匙串、环境变量或 CI secrets，禁止提交；Personal Team 不能替代 Developer ID Application 站外签名。
+- 当前发行边界是官网 DMG，不是 Mac App Store。启用 App Sandbox 前必须专项验证自定义数据目录、插件、文件导入、Keychain 与网络能力，不能直接复用站外包配置。
+- `target/release/bundle/` 是可再生产物，不提交。前端或 Tauri 配置变化会重新嵌入资源并触发 Release 链接，本项目在 Apple Silicon 开发机上可能耗时数分钟，这不是默认的全平台编译。
+- 构建成功不等于适配完成：必须实际运行最终 `.app`，检查模板/数据库/插件初始化、窗口显示、CSP 与未处理拒绝日志，并验证原生交通灯、拖拽/全屏/关闭拦截、Command 快捷键、项目与聊天恢复、插件/文件访问、Keychain、自定义数据目录。DMG 还要做完整性校验；Gatekeeper 与公证状态只能用正式 Developer ID 包验收。
+
 ## iOS 调试与打包（仅 macOS）
 
 iOS 的完整操作手册是 [`docs/tauri_ios_debug_and_release.md`](docs/tauri_ios_debug_and_release.md)。修改 iOS 构建链路前先读该文档；以下内容用于说明仓库内各文件的职责与常用入口。
@@ -35,6 +61,7 @@ iOS 的完整操作手册是 [`docs/tauri_ios_debug_and_release.md`](docs/tauri_
 ### 仓库内文件与生成目录
 
 - `scripts/ios-workflow.mjs`：统一执行环境自检、工程初始化、真机调试、Archive 与 IPA 导出，并检查构建锁、版本号和产物 SHA-256。
+- `src-tauri/icons/ios/`：受 Git 跟踪的 iOS AppIcon 唯一来源；`ios:init`、`ios:dev`、`ios:run` 与打包命令会同步到生成的 `Assets.xcassets`。若只在 Xcode 中操作，先执行 `npm run ios:sync-icons`；禁止把 Tauri 默认图标留在 `src-tauri/gen/apple` 后直接打包。
 - `scripts/ios-xcode-build.sh`：Xcode Build Phase 到 Node、Cargo 与本地 Tauri CLI 的桥接脚本；重新生成 Xcode 工程后不应再手工补 PATH。
 - `src-tauri/ios/project.yml`：受 Git 跟踪的 XcodeGen 模板，是 iOS 原生工程配置的长期来源。
 - `src-tauri/gen/apple/`：Tauri/Xcode 生成目录，已忽略且可随时重建。禁止把长期修改只写在这里，否则 `ios:init` 后会丢失。
@@ -159,8 +186,9 @@ app_main/
 ## 项目特有坑点
 
 - `app_main/src-tauri/tauri.conf.json` 的桌面/iOS `devUrl` 与 `app_main/vite.config.ts` 必须对齐（`5175`，HMR `1421`）；Android 覆盖为 `5176`/`1422`，三处同步规则见 Android 章节。
-- 无边框透明窗口对初始化顺序敏感，常见白屏问题通常来自启动顺序和窗口可见性设置。  
+- Windows 无边框透明窗口与 macOS 隐藏 Overlay 窗口都对初始化顺序敏感；macOS 禁止在隐藏 WKWebView 的 `requestAnimationFrame` 中显示窗口。
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
+- macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
 
-文档同步时间：2026-08-16 21:34:41 +08:00
+文档同步时间：2026-08-16 23:33:51 +08:00
