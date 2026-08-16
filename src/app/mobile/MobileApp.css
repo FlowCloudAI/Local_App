@@ -84,6 +84,8 @@
     color: var(--fc-color-text);
     font-family: var(--fc-font-family);
     -webkit-tap-highlight-color: transparent;
+    /* 允许单指横纵滚动，但禁止 WebView 把双指手势解释成整页缩放。 */
+    touch-action: pan-x pan-y;
     overflow: hidden;
 }
 

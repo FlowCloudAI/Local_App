@@ -1990,26 +1990,38 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [])
 
     const switchConversation = useCallback(async (convId: string) => {
-        if (convId === activeConversationIdRef.current) return
-        setAiActiveConversationId(convId)
-        activeConversationIdRef.current = convId
-        setAiUnreadConversationIds((prev) => {
-            if (!prev[convId]) return prev
-            const next = {...prev}
-            delete next[convId]
-            return next
-        })
-        setInputValue('')
-        setEditingMessageId(null)
-        setAutoScroll(true)
-
         const targetConv = conversationsRef.current.find((conversation) => conversation.id === convId)
+        const alreadyActive = convId === activeConversationIdRef.current
+        const needsStoredMessages = Boolean(
+            targetConv
+            && targetConv.messages.length === 0
+            && !isPendingConversationId(targetConv.id),
+        )
+        if (alreadyActive && !needsStoredMessages) return
+
+        if (!alreadyActive) {
+            setAiActiveConversationId(convId)
+            activeConversationIdRef.current = convId
+            setAiUnreadConversationIds((prev) => {
+                if (!prev[convId]) return prev
+                const next = {...prev}
+                delete next[convId]
+                return next
+            })
+            setInputValue('')
+            setEditingMessageId(null)
+            setAutoScroll(true)
+        }
+
         if (targetConv) {
             session.activateSession(targetConv.sessionId, targetConv.runId)
             setAiSelectedPluginModel(targetConv.pluginId, targetConv.model)
 
-            if (targetConv.messages.length === 0 && !isPendingConversationId(targetConv.id)) {
-                const stored = await ai_get_conversation(targetConv.id).catch(() => null)
+            if (needsStoredMessages) {
+                const stored = await ai_get_conversation(targetConv.id).catch((error) => {
+                    logger.error('[useAiController] 恢复会话消息失败', error)
+                    return null
+                })
                 if (stored) {
                     setAiConversations((prev) => prev.map((conversation) =>
                         conversation.id === convId

@@ -83,7 +83,7 @@ use tauri::{
 };
 use tauri_plugin_log;
 use tokio::sync::Mutex;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use worldflow_core::SnapshotConfig;
 use worldflow_core::{SqliteDb, WorldStore, WorldStoreConfig};
 
@@ -216,7 +216,7 @@ pub fn run() {
             //   文件目标过滤至 Info 级，避免 wasmtime/cranelift Debug 噪音。
             // debug 模式：桌面仅 stdout；移动端同时写 app.log，便于在关于页查看。
             {
-                #[cfg(any(not(debug_assertions), target_os = "android"))]
+                #[cfg(any(not(debug_assertions), target_os = "android", target_os = "ios"))]
                 let log_config_dir = app
                     .handle()
                     .path()
@@ -236,9 +236,9 @@ pub fn run() {
                         && !target.starts_with("reqwest::")
                         && !target.starts_with("cranelift_codegen::timing")
                 });
-                #[cfg(all(debug_assertions, not(target_os = "android")))]
+                #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
                 let log_targets = [stdout_target];
-                #[cfg(any(not(debug_assertions), target_os = "android"))]
+                #[cfg(any(not(debug_assertions), target_os = "android", target_os = "ios"))]
                 let log_targets = [
                     stdout_target,
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
@@ -281,15 +281,24 @@ pub fn run() {
                 .unwrap_or_else(|_| std::env::current_dir().unwrap())
                 .join("settings.json");
 
-            let settings = AppSettings::load(&settings_path);
+            let mut settings = AppSettings::load(&settings_path);
             if let Err(error) =
                 apply_shell_acrylic_setting(&app_handle, settings.shell_acrylic_enabled)
             {
                 log::warn!("应用窗口 Acrylic 效果失败: {}", error);
             }
 
-            // 解析用户自定义路径（在 settings 移入 manage 之前读取）
+            // 在 settings 移入 manage 之前应用平台存储策略。
             let data_root = default_data_root(&app_handle);
+            if enforce_platform_storage_policy(&mut settings) {
+                log::warn!(
+                    "移动端已取消自定义存储目录，将使用当前系统沙箱 {}",
+                    data_root.display()
+                );
+                if let Err(error) = settings.save(&settings_path) {
+                    log::error!("保存移动端存储策略失败: {}", error);
+                }
+            }
 
             // Android 无系统密钥链，API Key 改存应用私有目录的明文文件，此处注入存储目录。
             #[cfg(target_os = "android")]
@@ -641,13 +650,13 @@ async fn init_db(db_path: &Path, snapshot_dir: Option<&Path>) -> Result<SqliteDb
         .replace('\\', "/");
     log::info!("Connecting to database: {}", path_str);
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let _ = snapshot_dir;
         SqliteDb::new(&path_str).await.map_err(Into::into)
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if let Some(dir) = snapshot_dir {
         std::fs::create_dir_all(dir)?;
         let config = SnapshotConfig {
@@ -677,10 +686,22 @@ fn prepare_db_path(_app: &AppHandle, db_dir: &Path) -> Result<PathBuf> {
     log::info!("Database path: {:?}", db_path);
 
     if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)?;
+        // 先区分“目录已存在”和“目录确实需要创建”，让路径错误保留准确上下文。
+        if !parent.is_dir() {
+            std::fs::create_dir_all(parent).map_err(|error| {
+                anyhow::anyhow!("无法创建数据库目录 {}: {}", parent.display(), error)
+            })?;
+        }
         let test_file = parent.join(".write_test");
-        std::fs::write(&test_file, b"test").map_err(|e| anyhow::anyhow!("目录不可写: {}", e))?;
-        let _ = std::fs::remove_file(test_file);
+        std::fs::write(&test_file, b"test")
+            .map_err(|error| anyhow::anyhow!("数据库目录不可写 {}: {}", parent.display(), error))?;
+        if let Err(error) = std::fs::remove_file(&test_file) {
+            log::warn!(
+                "数据库目录写入测试文件清理失败 {}: {}",
+                test_file.display(),
+                error
+            );
+        }
     }
 
     Ok(db_path)

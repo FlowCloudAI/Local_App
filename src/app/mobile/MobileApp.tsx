@@ -15,8 +15,9 @@ import {
 } from 'react'
 import {listen} from '../../api/events'
 import {
+    type BackendStartupStatus,
     exit_app,
-    setting_is_backend_ready,
+    setting_get_backend_status,
     showWindow,
     type PlatformInfo,
 } from '../../api'
@@ -90,6 +91,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
+    const [backendError, setBackendError] = useState<string | null>(null)
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
     const reportDiscussionRef = useRef<((params: WorldCheckDiscussionParams) => Promise<void>) | null>(null)
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
@@ -105,6 +107,24 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const ideaDrawerEnabled = activeTab === 'ideas'
     const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled || ideaDrawerEnabled
     const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : ideaDrawerEnabled ? 'idea' : null
+
+    useEffect(() => {
+        /*
+         * WKWebView 在部分 iOS 版本会忽略 viewport 的缩放限制。只拦截 WebKit 的页面级
+         * gesture 事件，不拦 touchmove，避免破坏抽屉、滚动区和业务组件自己的触摸逻辑。
+         */
+        const preventPageZoom = (event: Event) => event.preventDefault()
+        const options: AddEventListenerOptions = {passive: false}
+        document.addEventListener('gesturestart', preventPageZoom, options)
+        document.addEventListener('gesturechange', preventPageZoom, options)
+        document.addEventListener('gestureend', preventPageZoom, options)
+        return () => {
+            document.removeEventListener('gesturestart', preventPageZoom, options)
+            document.removeEventListener('gesturechange', preventPageZoom, options)
+            document.removeEventListener('gestureend', preventPageZoom, options)
+        }
+    }, [])
+
     // 当前页离开前的统一闸门：返回键、边缘返回手势、切 Tab 都必须先过它，
     // 否则未保存内容会随页面卸载静默丢失。
     const runLeaveGuard = useCallback(async (intent: MobileNavigationIntent) => {
@@ -174,9 +194,32 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         // 浏览器预览无后端信号，跳过监听（backendReady 初始已为 true）。
         if (isBrowserPreview()) return
         let disposed = false
-        const mark = () => { if (!disposed) setBackendReady(true) }
-        const p = listen('backend-ready', mark)
-        setting_is_backend_ready().then(ready => { if (ready) mark() }).catch(() => {})
+        let marked = false
+        const mark = () => {
+            if (disposed || marked) return
+            marked = true
+            setBackendError(null)
+            setBackendReady(true)
+            logger.info('[MobileApp] 后端已就绪')
+        }
+        const applyStatus = (status: BackendStartupStatus) => {
+            if (disposed) return
+            if (status.phase === 'ready') {
+                mark()
+                return
+            }
+            if (status.phase === 'failed') {
+                const message = status.message || '后端初始化失败'
+                setBackendError(message)
+                logger.error('[MobileApp] 后端启动失败', message)
+            }
+        }
+        const p = listen<BackendStartupStatus>('backend-status-changed', event => {
+            applyStatus(event.payload)
+        })
+        setting_get_backend_status().then(applyStatus).catch(error => {
+            logger.warn('[MobileApp] 检查后端启动状态失败', error)
+        })
         return () => { disposed = true; p.then(fn => fn()) }
     }, [])
 
@@ -373,7 +416,14 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 height: '100vh', background: 'var(--fc-color-bg)',
                 color: 'var(--fc-color-text-secondary)', fontSize: 'var(--fc-font-size-sm)',
             }}>
-                正在启动…
+                {backendError ? (
+                    <div role="alert" style={{maxWidth: 'min(88vw, 32rem)', textAlign: 'center'}}>
+                        <div style={{color: 'var(--fc-color-error)', marginBottom: 'var(--fc-spacing-sm)'}}>
+                            启动失败
+                        </div>
+                        <div style={{overflowWrap: 'anywhere'}}>{backendError}</div>
+                    </div>
+                ) : '正在启动…'}
             </div>
         )
     }

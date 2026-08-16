@@ -1,5 +1,9 @@
 use super::common::*;
 use std::fs::File;
+#[cfg(all(debug_assertions, target_os = "ios"))]
+use std::fs::OpenOptions;
+#[cfg(all(debug_assertions, target_os = "ios"))]
+use std::io::Write;
 use std::io::{Read, Seek, SeekFrom};
 use tauri::Manager;
 
@@ -22,11 +26,14 @@ pub struct AppLogSnapshot {
 }
 
 #[tauri::command]
-pub fn log_message(level: &str, message: &str, source: Option<String>) {
+pub fn log_message(_app: AppHandle, level: &str, message: &str, source: Option<String>) {
     let message = match source.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(source) => format!("[{source}] {message}"),
         None => message.to_string(),
     };
+
+    #[cfg(all(debug_assertions, target_os = "ios"))]
+    append_ios_debug_log(&_app, level, &message);
 
     match level {
         "info" => log::info!("{message}"),
@@ -35,6 +42,27 @@ pub fn log_message(level: &str, message: &str, source: Option<String>) {
         "warn" => log::warn!("{message}"),
         _ => log::debug!("{message}"),
     }
+}
+
+/// iOS Debug 下不启用 tauri-plugin-log 文件目标：该目标会阻塞后端初始化。
+/// 前端诊断日志改由 IPC 命令直接追加，避免日志设施成为启动关键路径。
+#[cfg(all(debug_assertions, target_os = "ios"))]
+fn append_ios_debug_log(app: &AppHandle, level: &str, message: &str) {
+    let Ok(log_dir) = app.path().app_config_dir() else {
+        return;
+    };
+    if std::fs::create_dir_all(&log_dir).is_err() {
+        return;
+    }
+    let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_dir.join("app.log"))
+    else {
+        return;
+    };
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let _ = writeln!(file, "[{timestamp}][{}] {message}", level.to_uppercase());
 }
 
 /// 读取应用日志末尾内容，移动端用于页面内查看，避免打开私有目录失败。

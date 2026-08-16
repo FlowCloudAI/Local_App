@@ -67,9 +67,9 @@ export function MobileSettingsStorageSection({
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
             <section className="mobile-settings-panel">
-                <h2 className="mobile-settings-panel__title">Android 存储</h2>
+                <h2 className="mobile-settings-panel__title">移动端存储</h2>
                 <p className="mobile-settings-field-hint">
-                    项目数据库、媒体和插件由 Android 私有存储管理；移动端不开放目录迁移，避免受分区存储限制后失去访问权限。
+                    项目数据库、媒体、插件和备份由系统私有存储管理；移动端不开放目录迁移，避免系统沙箱变化后失去访问权限。
                 </p>
             </section>
             <section className="mobile-settings-panel">

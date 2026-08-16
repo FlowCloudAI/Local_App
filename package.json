@@ -28,6 +28,7 @@
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
     "tauri:build:windows:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-windows-signed.ps1",
     "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "ios:build:sim:debug": "node ./scripts/prepare-ios-build-output.mjs arm64-sim && tauri ios build --debug --target aarch64-sim",
     "android:dev": "node ./scripts/android-dev.cjs",
     "android:build:apk": "tauri android build --apk",
     "android:sign:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1",

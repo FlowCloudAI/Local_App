@@ -50,9 +50,38 @@ pub(crate) fn default_data_root(app: &AppHandle) -> PathBuf {
     }
 }
 
+/// 应用各平台的存储策略。
+///
+/// 移动系统会管理应用沙箱，重装或升级时容器的绝对路径可能变化。iOS 与 Android 因此不
+/// 持久化任何自定义存储路径，每次启动都从 Tauri 当前返回的系统目录动态解析实际位置。
+pub(crate) fn enforce_platform_storage_policy(settings: &mut AppSettings) -> bool {
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        return clear_mobile_storage_overrides(settings);
+    }
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        let _ = settings;
+        false
+    }
+}
+
+fn clear_mobile_storage_overrides(settings: &mut AppSettings) -> bool {
+    let changed = settings.media_dir.is_some()
+        || settings.db_path.is_some()
+        || settings.plugins_path.is_some()
+        || settings.backup_dir.is_some();
+    settings.media_dir = None;
+    settings.db_path = None;
+    settings.plugins_path = None;
+    settings.backup_dir = None;
+    changed
+}
+
 // ── 设置读写 ──────────────────────────────────────────────────────────────────
 
-/// 读取全部设置；若 db_path/plugins_path 为空则自动填充默认值并保存
+/// 读取全部设置。桌面端会补齐默认路径；移动端保留空值并在使用时动态解析系统目录。
 #[tauri::command]
 pub async fn setting_get_settings(
     app: AppHandle,
@@ -60,19 +89,25 @@ pub async fn setting_get_settings(
 ) -> Result<AppSettings, String> {
     let mut settings = state.settings.lock().await;
 
-    // 检查是否需要填充默认路径
-    let data_root = default_data_root(&app);
-    let mut need_save = false;
+    let need_save = enforce_platform_storage_policy(&mut settings);
 
-    if settings.db_path.is_none() {
-        settings.db_path = Some(data_root.join("db").to_string_lossy().to_string());
-        need_save = true;
-    }
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    let need_save = {
+        let data_root = default_data_root(&app);
+        let mut need_save = need_save;
+        if settings.db_path.is_none() {
+            settings.db_path = Some(data_root.join("db").to_string_lossy().to_string());
+            need_save = true;
+        }
 
-    if settings.plugins_path.is_none() {
-        settings.plugins_path = Some(data_root.join("plugins").to_string_lossy().to_string());
-        need_save = true;
-    }
+        if settings.plugins_path.is_none() {
+            settings.plugins_path = Some(data_root.join("plugins").to_string_lossy().to_string());
+            need_save = true;
+        }
+        need_save
+    };
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    let _ = &app;
 
     // 如果填充了默认值，立即保存
     if need_save {
@@ -84,13 +119,16 @@ pub async fn setting_get_settings(
 
 /// 覆盖全部设置并持久化到 settings.json。
 /// 若 db_path / plugins_path 发生变更，自动将旧目录下的文件复制到新目录。
+/// 移动端会丢弃全部自定义存储路径，始终使用系统托管目录。
 /// 返回迁移摘要（无变更时为空字符串）。
 #[tauri::command]
 pub async fn setting_update_settings(
     app: AppHandle,
     state: State<'_, SettingsState>,
-    new_settings: AppSettings,
+    mut new_settings: AppSettings,
 ) -> Result<String, String> {
+    enforce_platform_storage_policy(&mut new_settings);
+
     // 同步搜索工具状态（供 AI 工具实时读取）
     if let Some(se_state) = app.try_state::<SearchEngineState>() {
         *se_state.engine.lock().await = new_settings.search_engine.clone();
@@ -375,4 +413,27 @@ pub fn setting_has_api_key(plugin_id: String) -> bool {
 #[tauri::command]
 pub fn setting_delete_api_key(plugin_id: String) -> Result<(), String> {
     ApiKeyStore::delete(&plugin_id).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mobile_storage_policy_clears_all_path_overrides() {
+        let mut settings = AppSettings {
+            media_dir: Some("/custom/media".to_string()),
+            db_path: Some("/old-container/app-data/db".to_string()),
+            plugins_path: Some("/old-container/app-data/plugins".to_string()),
+            backup_dir: Some("/old-container/app-data/db/backup".to_string()),
+            ..AppSettings::default()
+        };
+
+        assert!(clear_mobile_storage_overrides(&mut settings));
+        assert!(settings.media_dir.is_none());
+        assert!(settings.db_path.is_none());
+        assert!(settings.plugins_path.is_none());
+        assert!(settings.backup_dir.is_none());
+        assert!(!clear_mobile_storage_overrides(&mut settings));
+    }
 }

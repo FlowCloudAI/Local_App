@@ -1,6 +1,9 @@
 use super::common::*;
 
+#[cfg(target_os = "android")]
 const SNAPSHOT_UNSUPPORTED_MESSAGE: &str = "Android 端暂不支持快照功能";
+#[cfg(target_os = "ios")]
+const SNAPSHOT_UNSUPPORTED_MESSAGE: &str = "iOS 端暂不支持快照功能";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

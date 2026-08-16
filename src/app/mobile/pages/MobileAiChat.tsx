@@ -104,11 +104,12 @@ export default function MobileAiChat({
     const topActionsRef = useRef<HTMLDivElement>(null)
     const lastScrollTopRef = useRef(0)
     const scrollFrameRef = useRef<number | null>(null)
+    const initialConversationRestoreAttemptedRef = useRef(false)
 
     const controller = useAiController(aiFocus)
     const {
         conversations, activeConversationId, activeConversation: controllerActiveConversation,
-        isComposingNewConversation, setActiveConversationId,
+        isComposingNewConversation,
         messages, sendMessage, stopStreaming,
         regenerateMessage, compactAndRetryMessage, continueMessage,
         inputValue, setInputValue, isStreaming, isCompacting, streamingBlocks, continuationNodeId,
@@ -265,10 +266,14 @@ export default function MobileAiChat({
     }, [setAutoScroll])
 
     useEffect(() => {
-        if (conversations.length > 0 && !activeConversationId) {
-            setActiveConversationId(conversations[0].id)
-        }
-    }, [conversations, activeConversationId, setActiveConversationId])
+        if (initialConversationRestoreAttemptedRef.current || conversations.length === 0) return
+        initialConversationRestoreAttemptedRef.current = true
+
+        const activeHistoryConversation = activeConversationId
+            ? conversations.find((conversation) => conversation.id === activeConversationId)
+            : null
+        void switchConversation(activeHistoryConversation?.id ?? conversations[0].id)
+    }, [conversations, activeConversationId, switchConversation])
 
     useEffect(() => {
         setDrawerRoot(document.getElementById('mobile-ai-conversation-drawer-root'))
