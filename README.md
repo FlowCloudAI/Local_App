@@ -23,6 +23,25 @@ cargo check
 cargo test
 ```
 
+### iOS
+
+iOS 环境检查、真机调试、Archive 与 IPA 导出统一见
+[`docs/tauri_ios_debug_and_release.md`](docs/tauri_ios_debug_and_release.md)。首次在 Mac 上进入仓库后先执行：
+
+```bash
+npm run ios:doctor
+```
+
+### macOS
+
+macOS 原生窗口、日常调试、DMG、Developer ID 签名与公证流程见
+[`docs/tauri_macos_debug_and_release.md`](docs/tauri_macos_debug_and_release.md)。首次准备执行：
+
+```bash
+npm run macos:doctor
+npm run macos:dev
+```
+
 ### 最小示例
 
 1. 启动桌面端并创建一个世界观项目。  
@@ -34,7 +53,7 @@ cargo test
 - 世界观项目、实体与关系编辑。  
 - 地图与关系可视化预览。  
 - AI 会话、插件加载、会话结果回写。  
-- 桌面端签名与多平台构建（Windows/Linux/Android）。  
+- 桌面端签名与多平台构建（Windows/macOS/Linux/Android/iOS）。
 
 ## 技术栈
 
@@ -58,4 +77,4 @@ app_main/
 - PR 需补充 `npm run lint`、`npm run build`、`cd src-tauri && cargo test` 结果与关键复现步骤。  
 - 提交信息默认中文，描述风险与回退策略。  
 
-文档同步时间：2026-06-08 13:20:10 +08:00
+文档同步时间：2026-08-16 21:20:00 +08:00

@@ -92,6 +92,12 @@ body {
     user-select: none;
 }
 
+/* macOS 使用 AppKit 原生交通灯与 Overlay 标题栏，只避让左上角交通灯。
+   --app-drag-handle-width 同时承载桌面 shell 留白和 Dock 面板手柄宽度，必须沿用桌面默认值。 */
+.app-layout--macos .top-bar {
+    padding-left: 5.25rem;
+}
+
 .top-bar-title {
     font-size: 2rem;
     font-weight: 700;

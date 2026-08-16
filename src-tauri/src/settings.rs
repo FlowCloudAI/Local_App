@@ -17,13 +17,13 @@ use std::{collections::HashMap, path::Path};
 pub struct AppSettings {
     // ── 存储 ──────────────────────────────
     /// 媒体文件根目录（图片、音频）
-    /// None = 使用默认 Documents/FlowCloudAI
+    /// None = 使用默认 Documents/FlowCloudAI；移动端始终忽略自定义值
     pub media_dir: Option<String>,
     /// 数据库文件目录
-    /// None = Windows 使用 Documents/FlowCloudAI，其他平台使用 app_data_dir()
+    /// None = Windows 使用 Documents/FlowCloudAI，其他平台使用 app_data_dir()；移动端始终忽略自定义值
     pub db_path: Option<String>,
     /// 插件目录
-    /// None = Windows 使用 Documents/FlowCloudAI/plugins，其他平台使用 app_data_dir()/plugins
+    /// None = Windows 使用 Documents/FlowCloudAI/plugins，其他平台使用 app_data_dir()/plugins；移动端始终忽略自定义值
     pub plugins_path: Option<String>,
     /// 首页项目卡片的本机星标项目 ID。
     pub starred_project_ids: Vec<String>,
@@ -47,7 +47,7 @@ pub struct AppSettings {
     pub auto_save_secs: u32,
     /// 自动备份间隔（秒），0 = 关闭
     pub auto_backup_secs: u32,
-    /// CSV 自动备份目录。None = 数据库目录下的 backup
+    /// CSV 自动备份目录。None = 数据库目录下的 backup；移动端始终忽略自定义值
     pub backup_dir: Option<String>,
     /// 最多保留多少组自动备份
     pub max_backup_count: u32,

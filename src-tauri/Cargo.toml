@@ -7,6 +7,11 @@ license = "MIT"
 repository = "https://github.com/FlowCloudAI/Local_App/"
 edition = "2024"
 
+# iOS 26 模拟器中，tauri-runtime-wry 2.11.4 的 WebKit 版本探测会触发
+# NSBundle/CFRelease 崩溃。此补丁仅在 iOS 跳过无意义的运行时存在性探测。
+[patch.crates-io]
+tauri-runtime-wry = { path = "patches/tauri-runtime-wry-2.11.4" }
+
 [profile.release]
 opt-level = "s"
 lto = true
@@ -92,6 +97,10 @@ jni = "0.22.4"
 rustls = "0.23.40"
 rustls-platform-verifier = "0.7.0"
 webpki-roots = "1.0.8"
+worldflow_core = { path = "../../core_world_data", default-features = false, features = ["sqlite"] }
+
+# iOS 与 Android 一样使用纯 SQLite 数据层，不启用依赖 libgit2 的快照能力。
+[target.'cfg(target_os = "ios")'.dependencies]
 worldflow_core = { path = "../../core_world_data", default-features = false, features = ["sqlite"] }
 
 [target.'cfg(windows)'.dependencies]
