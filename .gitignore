@@ -30,6 +30,7 @@ package-lock.json
 .claude/
 .codegraph/
 src-tauri/gen/
+/artifacts/ios/
 
 bugreport-sdk_gphone*
 /.lingma/
