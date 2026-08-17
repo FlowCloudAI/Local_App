@@ -34,7 +34,7 @@ macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri
 
 ### 文件职责与平台边界
 
-- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前不固化 `trafficLightPosition`，使用系统默认坐标；后续调整时必须同步检查 `src/App.css` 中 Logo/Tab 的左侧避让，并在不同缩放与内外接屏幕上验证，未经验收不要提交坐标值。
+- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
 - `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
 - `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄，macOS 下也必须保留；原生窗口边框负责缩放不等于可以把该变量设为 `0`。
 - `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规。启用 `zoomHotkeysEnabled` 时，桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。修改共享 CSP/capability 后要回归 Windows、Linux 与移动端，不能把它们当成纯 Mac 配置。
