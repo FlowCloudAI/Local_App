@@ -60,6 +60,7 @@
 | 问题 | 实现状态 | 验证边界 |
 |---|---|---|
 | IOS-001 | 已实现 | Tauri 配置、README、iOS 工作流均统一到 16.2；重新生成 Xcode 工程后，模拟器包以 `arm64-apple-ios16.2-simulator` 成功链接。工作流会拒绝继续使用版本过期的生成工程 |
+| IOS-002 | 默认移动字号标尺已实现，Dynamic Type 待实现 | `MobileApp` 单独加载 touch-density 字体标尺，iOS/Android 共用 12～24px 的移动语义字号；变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响。系统 Content Size Category 原生桥接与动态倍率仍待实现 |
 | IOS-018 | 已升级为双层原生式过渡，真机调优中 | iOS/Android 共用拖动进度、慢速拖动 35% 屏宽阈值（限定 120～240px）、速度提前结算、取消回弹和 Reduced Motion 降级；页面栈保留带稳定 key 的相邻两层，前景页跟手滑出时下层页同步视差显露，提交后直接由下层接管，不重新播放入场动画。纯计算测试、lint 和前端构建通过；iPhone 15 Pro 首轮真机验证暴露的固定 72px 阈值与单层切页观感均已重做，当前版本待真机复验，Android APK 亦待复验 |
 | IOS-020 | 已实现，待目标页视觉验收 | 相机、图库和世界地图均为原生 `disabled` 控件，原因持续可见且进入可访问名称；不再绑定失败提示操作。前端构建和 iOS 模拟器原生启动通过，目标页仍需人工进入确认最终排版 |
 
@@ -78,6 +79,7 @@
 - **证据**：`../lib_ui/ui/src/style/index.css:143-152` 使用固定 `rem` 字号；系统从 `large` 切到 `accessibility-extra-extra-extra-large` 后，首页内容区截图仅 6 个像素发生不超过 3 级的噪声变化，排版、字高和换行完全不变。
 - **影响**：低视力用户无法通过系统字号获得更大文本；固定高度、`nowrap` 与行截断还会在未来补上缩放后产生裁切风险。
 - **已决策方案**：增加小型 iOS 原生桥接，读取 Dynamic Type category 并写入根级缩放 token；正文、标题、控件文字分别设上限，并以最大辅助字号逐页验证换行、滚动和控件高度。
+- **阶段进展**：已先完成 iOS/Android 共用的默认移动字号标尺。touch density 将辅助信息、次要正文、正文/控件和标题分别映射到 12～13px、15px、17px 和 20～24px；桌面 comfortable density 继续使用共享组件库原值。该阶段解决默认字号相对移动平台偏小的问题，但不会随系统 Content Size Category 变化，不能替代后续 Dynamic Type 原生桥接。
 
 ### IOS-003：15px 输入触发 iOS 自动缩放并留下“粘住的放大态”
 

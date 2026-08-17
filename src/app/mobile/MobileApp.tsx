@@ -3,6 +3,7 @@ import {isBrowserPreview} from '../../shared/devPreview'
 import {closeTopOverlay} from '../../shared/ui/overlay'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
+import './mobileTypography.css'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {

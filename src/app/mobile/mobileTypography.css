@@ -1,0 +1,20 @@
+/*
+ * 移动端公共字体标尺。
+ *
+ * iOS 与 Android 构建都会由 formFactor 写入 data-fc-density="touch"；桌面构建保持
+ * comfortable 且不写该属性。变量放在根节点而不是 .mobile-app 上，是为了让挂到 body
+ * 的 Overlay、BottomSheet 等 portal 也继承同一字号，避免页面与浮层出现两套标尺。
+ */
+:root[data-fc-density="touch"] {
+    --fc-font-size-2xs: 0.75rem; /* 12px：极短辅助信息，不低于平台可读下限 */
+    --fc-font-size-xs: 0.8125rem; /* 13px：注释、时间、次级元数据 */
+    --fc-font-size-caption: 0.8125rem; /* 13px：说明文字 */
+    --fc-font-size-sm: 0.9375rem; /* 15px：次要正文、列表摘要 */
+    --fc-font-size-control: 1.0625rem; /* 17px：输入与操作控件 */
+    --fc-font-size-reading: 1.0625rem; /* 17px：连续阅读正文 */
+    --fc-font-size-md: 1.0625rem; /* 17px：默认正文与主要标签 */
+    --fc-font-size-body: 1.0625rem; /* 17px：正文基准 */
+    --fc-font-size-lg: 1.25rem; /* 20px：三级标题 */
+    --fc-font-size-title-sm: 1.375rem; /* 22px：二级标题 */
+    --fc-font-size-xl: 1.5rem; /* 24px：页面主标题 */
+}

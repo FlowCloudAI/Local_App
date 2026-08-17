@@ -147,7 +147,7 @@
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-primary) 90%, black);
     color: var(--fc-color-text-on-primary);
-    font-size: var(--fc-font-size-xxs);
+    font-size: var(--fc-font-size-2xs);
     font-weight: var(--fc-font-weight-semibold);
 }
 

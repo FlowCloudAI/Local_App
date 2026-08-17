@@ -47,7 +47,7 @@
 }
 
 .mobile-nav__label {
-    font-size: 0.68rem;
+    font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-medium);
     line-height: 1;
 }
