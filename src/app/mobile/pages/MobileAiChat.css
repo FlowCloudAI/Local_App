@@ -638,6 +638,19 @@
     touch-action: manipulation;
 }
 
+.mobile-ai-more-sheet__quick button small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.mobile-ai-more-sheet__quick button:disabled {
+    border-style: dashed;
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-text-secondary);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 .mobile-ai-more-sheet__quick button.active {
     border-color: color-mix(in srgb, var(--fc-color-primary) 32%, transparent);
     background: color-mix(in srgb, var(--fc-color-primary) 10%, var(--fc-color-bg-elevated));

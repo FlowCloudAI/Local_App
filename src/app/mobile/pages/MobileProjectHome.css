@@ -236,9 +236,17 @@
     font-size: var(--fc-font-size-xs);
 }
 
+.mobile-project-home__tool:disabled {
+    border-style: dashed;
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-text-secondary);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 .mobile-project-home__description:active,
 .mobile-project-home__cell:active,
-.mobile-project-home__tool:active {
+.mobile-project-home__tool:active:not(:disabled) {
     transform: scale(0.98);
 }
 

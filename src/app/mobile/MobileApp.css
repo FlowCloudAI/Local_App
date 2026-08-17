@@ -152,13 +152,22 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     border-left: solid 1px transparent;
-    transform: translate3d(var(--mobile-entry-drawer-shift, 0), 0, 0);
+    transform: translate3d(
+        var(--mobile-entry-drawer-shift, 0px),
+        0,
+        0
+    );
     transition:
         transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
         border-radius 260ms cubic-bezier(0.22, 1, 0.36, 1),
         box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
     touch-action: pan-y;
+}
+
+/* 完整滑出的短暂窗口内禁止二次点击，页面栈只能在动画结束时提交一次。 */
+.mobile-app-side-drawer-shell.is-edge-back-committing .mobile-app-side-drawer-shell__surface {
+    pointer-events: none;
 }
 
 .mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface {
@@ -205,10 +214,10 @@
 }
 
 .mobile-app__content {
+    position: relative;
     flex: 1;
     min-height: 0;
     box-sizing: border-box;
-    padding-top: env(safe-area-inset-top, 0);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -216,14 +225,98 @@
 }
 
 /*
- * 栈内页面容器：承载 push/pop 转场动画。
- * 布局必须和 .mobile-app__content 的内层保持一致，否则 .mobile-page 的 flex:1 + 滚动会塌。
+ * Tab 视图与页面栈都使用绝对叠层：底层页保持挂载，栈顶独立跟手移动。
+ * safe area 收口在 Tab 视图上，避免绝对定位绕过原 .mobile-app__content padding。
  */
-.mobile-app__page {
+.mobile-app__tab-view {
+    position: absolute;
+    z-index: 2;
+    top: env(safe-area-inset-top, 0);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.mobile-app__tab-view[hidden] {
+    display: none;
+}
+
+.mobile-app__tab-view.is-active {
+    z-index: 2;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.mobile-app__tab-view.is-cross-tab-underlay {
+    z-index: 1;
+    visibility: visible;
+    transform: translate3d(var(--mobile-edge-back-underlay-shift, 0), 0, 0);
+}
+
+.mobile-page-transition-host {
+    position: relative;
     display: flex;
     min-height: 0;
     flex: 1;
     flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+}
+
+.mobile-page-transition-host__layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.mobile-page-transition-host__layer.is-top {
+    z-index: 2;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.mobile-page-transition-host__layer.is-underlay.is-edge-back-underlay {
+    z-index: 1;
+    visibility: visible;
+    transform: translate3d(var(--mobile-edge-back-underlay-shift, 0), 0, 0);
+}
+
+.mobile-page-transition-host__underlay-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
+    opacity: var(--mobile-edge-back-underlay-scrim-opacity, 0);
+    pointer-events: none;
+}
+
+.mobile-page-transition-host__layer.is-edge-back-foreground,
+.mobile-app__tab-view.is-edge-back-foreground {
+    z-index: 3;
+    visibility: visible;
+    border-left: var(--mobile-border);
+    box-shadow: var(--mobile-shadow-drawer-surface);
+    transform: translate3d(var(--mobile-edge-back-shift, 0), 0, 0);
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-app-side-drawer-shell.is-dragging .mobile-page-transition-host__layer.is-edge-back-foreground,
+.mobile-app-side-drawer-shell.is-dragging .mobile-app__tab-view.is-edge-back-foreground {
+    transition: none;
 }
 
 /*
@@ -263,6 +356,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .mobile-page-transition-host__layer.is-edge-back-foreground,
+    .mobile-app__tab-view.is-edge-back-foreground {
+        transition: none;
+    }
+
     .mobile-app__page[data-mobile-nav="push"],
     .mobile-app__page[data-mobile-nav="pop"] {
         animation: none;

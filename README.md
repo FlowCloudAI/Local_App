@@ -25,6 +25,8 @@ cargo test
 
 ### iOS
 
+iOS 客户端最低支持 iOS 16.2。
+
 iOS 环境检查、真机调试、Archive 与 IPA 导出统一见
 [`docs/tauri_ios_debug_and_release.md`](docs/tauri_ios_debug_and_release.md)。首次在 Mac 上进入仓库后先执行：
 

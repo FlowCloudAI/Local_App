@@ -608,10 +608,6 @@ export default function MobileAiChat({
         }
     }, [showAlert])
 
-    const handleUnavailableMobileAiTool = useCallback((label: string) => {
-        void showAlert(`移动端暂未开放「${label}」入口。`, 'info', 'nonInvasive', 1800)
-    }, [showAlert])
-
     const handleAttachDocuments = useCallback(async () => {
         if (!activeConversation || isArchivedConversation) return
         try {
@@ -847,8 +843,6 @@ export default function MobileAiChat({
                 activeModelOptions={activeModelOptions} activeModelId={activeModelId}
                 onSelectModel={modelId => void handleSelectModel(modelId)} onSelectPlugin={pluginId => void handleSelectPlugin(pluginId)}
                 topMenuOpen={topMenuOpen} onCloseTopMenu={closeTopMenu} activeConversationMenuItems={activeConversationMenuItems}
-                onUnavailable={handleUnavailableMobileAiTool}
-                onGallery={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
                 onAttachDocuments={() => void handleAttachDocuments()} webSearchEnabled={webSearchEnabled} onToggleWebSearch={() => void toggleWebSearch()}
                 conversationControls={conversationControls} conversationActionTarget={conversationActionTarget}
                 onCloseConversationAction={() => setConversationActionTarget(null)} conversationActionMenuItems={conversationActionMenuItems}

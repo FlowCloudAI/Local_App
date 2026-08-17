@@ -27,6 +27,7 @@ import type {WorldCheckDiscussionParams} from '../../features/project-editor/hoo
 import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './components/MobileCategoryDrawer'
 import MobileStartupUpdatePrompt from './MobileStartupUpdatePrompt'
 import MobileNav, {type MobileTab} from './MobileNav'
+import MobilePageTransitionHost from './MobilePageTransitionHost'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
 import MobileEntryTypeManager from './pages/MobileEntryTypeManager'
@@ -43,9 +44,14 @@ import MobileTimeline from './pages/MobileTimeline'
 import MobileWorldCheck from './pages/MobileWorldCheck'
 import {
     type MobileBeforeLeave,
+    type MobileBackTarget,
     type MobileNavigationIntent,
     resolveMobileBackTarget,
 } from './mobileBackNavigation'
+import {
+    getMobilePageTransitionLayers,
+    type MobilePageTransitionLayer,
+} from './mobilePageTransition'
 import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 
@@ -68,11 +74,18 @@ type PageProps = {
     startReportDiscussion: (params: WorldCheckDiscussionParams) => Promise<void>
 }
 
+interface MobileEdgeBackOrigin {
+    tab: MobileTab
+    pageKey: string
+}
+
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
+    const pendingEdgeBackTargetRef = useRef<MobileBackTarget | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
+    const [edgeBackOrigin, setEdgeBackOrigin] = useState<MobileEdgeBackOrigin | null>(null)
     const homeStack = usePageStack()
     const aiStack = usePageStack()
     const ideasStack = usePageStack()
@@ -88,6 +101,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const activeStack = stacks[activeTab]
     const currentPage = activeStack.currentPage
     const pageType = currentPage?.type ?? ''
+    const edgeBackTarget = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
 
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
@@ -133,41 +147,79 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         return await beforeLeave(intent)
     }, [])
 
-    const runBackNavigation = useCallback(() => {
-        void (async () => {
-            if (!await runLeaveGuard('back')) return
-            const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
-            if (target === 'page') {
-                activeStack.pop()
-                return
-            }
-            if (target === 'home') {
-                setActiveTab('home')
-                return
-            }
+    const commitBackTarget = useCallback(async (target: MobileBackTarget): Promise<boolean> => {
+        if (target === 'page') {
+            if (!activeStack.canGoBack) return false
+            activeStack.pop()
+            return true
+        }
+        if (target === 'home') {
+            setActiveTab('home')
+            return true
+        }
 
-            const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
-            if (result === 'yes') {
-                if (closingRef.current) return
-                closingRef.current = true
-                try {
-                    await exit_app()
-                } catch (error) {
-                    closingRef.current = false
-                    logger.error('关闭移动端窗口失败', error)
-                }
-            }
-        })()
-    }, [activeStack, activeTab, runLeaveGuard, showAlert])
+        if (closingRef.current) return false
+        closingRef.current = true
+        try {
+            await exit_app()
+            return true
+        } catch (error) {
+            closingRef.current = false
+            logger.error('关闭移动端窗口失败', error)
+            return false
+        }
+    }, [activeStack])
+
+    const confirmExit = useCallback(async (): Promise<boolean> => {
+        const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
+        return result === 'yes' && !closingRef.current
+    }, [showAlert])
+
+    const runBackNavigation = useCallback(async (): Promise<boolean> => {
+        if (!await runLeaveGuard('back')) return false
+        const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
+        if (target === 'exit' && !await confirmExit()) return false
+        return await commitBackTarget(target)
+    }, [activeStack.canGoBack, activeTab, commitBackTarget, confirmExit, runLeaveGuard])
+
+    const prepareEdgeBackNavigation = useCallback(async (): Promise<boolean> => {
+        pendingEdgeBackTargetRef.current = null
+        if (!await runLeaveGuard('back')) return false
+        const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
+        if (target === 'exit' && !await confirmExit()) return false
+        pendingEdgeBackTargetRef.current = target
+        return true
+    }, [activeStack.canGoBack, activeTab, confirmExit, runLeaveGuard])
+
+    const commitPreparedEdgeBackNavigation = useCallback(async (): Promise<boolean> => {
+        const target = pendingEdgeBackTargetRef.current
+        pendingEdgeBackTargetRef.current = null
+        if (!target) return false
+        if (target === 'page') {
+            if (!activeStack.canGoBack) return false
+            activeStack.popWithoutAnimation()
+            return true
+        }
+        return await commitBackTarget(target)
+    }, [activeStack, commitBackTarget])
     /*
      * 分类树是否正在拖拽。用 ref 不用 state：它只在手势回调里被读，
      * 走 state 会在每次拖拽起止时重渲染整个移动端外壳，白白掉帧。
      */
     const categoryDragActiveRef = useRef(false)
+    const handleEdgeBackStart = useCallback(() => {
+        setEdgeBackOrigin({
+            tab: activeTab,
+            pageKey: activeStack.currentPageKey || `${activeTab}-root`,
+        })
+    }, [activeStack.currentPageKey, activeTab])
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
         surfaceOffset: sideDrawerSurfaceOffset,
+        edgeBackOffset,
+        edgeBackProgress,
+        edgeBackPhase,
         openDrawer: openSideDrawer,
         closeDrawer: closeSideDrawer,
         pointerHandlers: sideDrawerPointerHandlers,
@@ -175,10 +227,15 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
-        onEdgeBackGesture: runBackNavigation,
+        beforeEdgeBackGesture: prepareEdgeBackNavigation,
+        onEdgeBackGesture: commitPreparedEdgeBackNavigation,
+        onEdgeBackStart: handleEdgeBackStart,
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })
+    useEffect(() => {
+        if (edgeBackPhase === 'idle') setEdgeBackOrigin(null)
+    }, [edgeBackPhase])
     const sideDrawerProgress = categoryDrawerWidth > 0
         ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
         : 0
@@ -344,6 +401,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
+        if (edgeBackPhase !== 'idle') return
         // 再点一次当前 Tab = 回到该 Tab 根页（移动端通用约定）。
         // 深在词条详情里点「首页」原本毫无反应，用户没有快速逃生口。
         if (tab === activeTab) {
@@ -362,21 +420,26 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             // 切 Tab 是横向跳转，不该重放目标 Tab 上一次 push/pop 的方向动画。
             stacks[tab].resetNavigation()
         })()
-    }, [activeStack, activeTab, closeCategoryDrawer, runLeaveGuard, stacks])
+    }, [activeStack, activeTab, closeCategoryDrawer, edgeBackPhase, runLeaveGuard, stacks])
 
     const setBeforeLeave = useCallback((handler: MobileBeforeLeave | null) => {
         beforeLeaveRef.current = handler
     }, [])
 
+    const ignoreBeforeLeave = useCallback(() => {
+        // 双层转场的底层页保持挂载但不拥有导航闸门；只有栈顶能注册。
+    }, [])
+
     const handleBack = useCallback(() => {
+        if (edgeBackPhase !== 'idle') return
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
         if (closeTopOverlay()) return
         if (sideDrawerOpen) {
             closeCategoryDrawer()
             return
         }
-        runBackNavigation()
-    }, [closeCategoryDrawer, runBackNavigation, sideDrawerOpen])
+        void runBackNavigation()
+    }, [closeCategoryDrawer, edgeBackPhase, runBackNavigation, sideDrawerOpen])
 
     useEffect(() => {
         const handleAndroidBack = () => {
@@ -409,6 +472,66 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         startReportDiscussion,
     }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus, startReportDiscussion])
 
+    const createLayerPageProps = useCallback((pageKey: string, interactive: boolean): PageProps => ({
+        ...navigation,
+        setBeforeLeave: interactive ? setBeforeLeave : ignoreBeforeLeave,
+        pageKey,
+        aiFocus,
+        setAiFocus,
+        startReportDiscussion,
+    }), [aiFocus, ignoreBeforeLeave, navigation, setBeforeLeave, startReportDiscussion])
+
+    const homeTransitionLayers = useMemo(
+        () => getMobilePageTransitionLayers(homeStack.entries, 'home-root'),
+        [homeStack.entries],
+    )
+    const settingsTransitionLayers = useMemo(
+        () => getMobilePageTransitionLayers(settingsStack.entries, 'settings-root'),
+        [settingsStack.entries],
+    )
+
+    const renderHomeLayer = useCallback((layer: MobilePageTransitionLayer, interactive: boolean) => {
+        const layerProps = createLayerPageProps(layer.key, interactive)
+        const page = layer.page
+        return (
+            <>
+                {!page && <MobileHome {...layerProps}/>}
+                {page?.type === 'projectList' && <MobileProjectList {...layerProps}/>}
+                {page?.type === 'projectHome' && (
+                    <MobileProjectHome
+                        {...layerProps}
+                        params={page.params}
+                        categoryDrawerOpen={interactive && sideDrawerOpen}
+                        onOpenCategoryDrawer={interactive ? openCategoryDrawer : undefined}
+                    />
+                )}
+                {page?.type === 'entryList' && (
+                    <MobileEntryList
+                        {...layerProps}
+                        params={page.params}
+                        categoryDrawerOpen={interactive && sideDrawerOpen}
+                        onOpenCategoryDrawer={interactive ? openCategoryDrawer : undefined}
+                    />
+                )}
+                {page?.type === 'entryDetail' && <MobileEntryDetail {...layerProps} params={page.params}/>}
+                {page?.type === 'typeManager' && <MobileEntryTypeManager {...layerProps} params={page.params}/>}
+                {page?.type === 'tagManager' && <MobileTagManager {...layerProps} params={page.params}/>}
+                {page?.type === 'categoryManager' && <MobileCategoryManager {...layerProps} params={page.params}/>}
+                {page?.type === 'worldCheck' && <MobileWorldCheck {...layerProps} params={page.params}/>}
+                {page?.type === 'timeline' && <MobileTimeline {...layerProps} params={page.params}/>}
+                {page?.type === 'relationGraph' && <MobileRelationGraph {...layerProps} params={page.params}/>}
+            </>
+        )
+    }, [createLayerPageProps, openCategoryDrawer, sideDrawerOpen])
+
+    const renderSettingsLayer = useCallback((layer: MobilePageTransitionLayer, interactive: boolean) => {
+        const layerProps = createLayerPageProps(layer.key, interactive)
+        return <MobileSettings {...layerProps} page={layer.page} platformOs={platformInfo.os}/>
+    }, [createLayerPageProps, platformInfo.os])
+
+    const edgeBackActive = edgeBackPhase !== 'idle'
+    const showHomeTab = activeTab === 'home' || (edgeBackActive && edgeBackTarget === 'home')
+
     if (!backendReady) {
         return (
             <div className="mobile-app" style={{
@@ -431,11 +554,15 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     return (
         <div className="mobile-app">
             <div
-                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${edgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${edgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${edgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
                     '--mobile-entry-drawer-progress': sideDrawerProgress,
+                    '--mobile-edge-back-shift': `${edgeBackOffset}px`,
+                    '--mobile-edge-back-progress': edgeBackProgress,
+                    '--mobile-edge-back-underlay-shift': `${-24 * (1 - edgeBackProgress)}px`,
+                    '--mobile-edge-back-underlay-scrim-opacity': 1 - edgeBackProgress,
                 } as CSSProperties}
             >
                 {mobileSideDrawerEnabled && (
@@ -473,86 +600,62 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     />
                     <div className="mobile-app__content">
                         {/*
-                          * 首页 Tab。外层 key 用栈内页面身份，一件事解决两个问题：
-                          * 1. 页面身份：同类型页面互相 push（词条 A→双链→词条 B）时类型不变，
-                          *    没有 key 会复用同一个实例，mode / 表单 / 滚动会串页。
-                          * 2. 转场动画：重挂载才会重放 CSS animation；动画挂在这层而不是各页的
-                          *    `.mobile-page`，因为详情/项目页要先过 loading 态才渲染 `.mobile-page`，
-                          *    挂在那里会变成「数据到了才滑」，与点击脱节。
+                          * 首页栈顶两层保持同一 React key 与挂载位置。push 时旧页只是降到底层，
+                          * 边缘 pop 时它已经渲染完成，不需要在手势中重新加载数据。
                           */}
-                        {activeTab === 'home' && (
-                            <div
-                                className="mobile-app__page"
-                                key={activeStack.currentPageKey}
-                                data-mobile-nav={activeStack.lastNavigation}
-                            >
-                                {!currentPage && <MobileHome {...pageProps}/>}
-                                {currentPage?.type === 'projectList' && (
-                                    <MobileProjectList {...pageProps}/>
-                                )}
-                                {currentPage?.type === 'projectHome' && (
-                                    <MobileProjectHome
-                                        {...pageProps}
-                                        params={currentPage.params}
-                                        categoryDrawerOpen={sideDrawerOpen}
-                                        onOpenCategoryDrawer={openCategoryDrawer}
-                                    />
-                                )}
-                                {currentPage?.type === 'entryList' && (
-                                    <MobileEntryList
-                                        {...pageProps}
-                                        params={currentPage.params}
-                                        categoryDrawerOpen={sideDrawerOpen}
-                                        onOpenCategoryDrawer={openCategoryDrawer}
-                                    />
-                                )}
-                                {currentPage?.type === 'entryDetail' && (
-                                    <MobileEntryDetail {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'typeManager' && (
-                                    <MobileEntryTypeManager {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'tagManager' && (
-                                    <MobileTagManager {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'categoryManager' && (
-                                    <MobileCategoryManager {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'worldCheck' && (
-                                    <MobileWorldCheck {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'timeline' && (
-                                    <MobileTimeline {...pageProps} params={currentPage.params}/>
-                                )}
-                                {currentPage?.type === 'relationGraph' && (
-                                    <MobileRelationGraph {...pageProps} params={currentPage.params}/>
+                        {showHomeTab && (
+                            <div className={`mobile-app__tab-view${activeTab === 'home' ? ' is-active' : ' is-cross-tab-underlay'}`}>
+                                <MobilePageTransitionHost
+                                    layers={homeTransitionLayers}
+                                    lastNavigation={homeStack.lastNavigation}
+                                    edgeBackForegroundKey={edgeBackOrigin?.tab === 'home' ? edgeBackOrigin.pageKey : null}
+                                    interactive={activeTab === 'home'}
+                                    renderLayer={renderHomeLayer}
+                                />
+                                {activeTab !== 'home' && (
+                                    <span className="mobile-page-transition-host__underlay-scrim" aria-hidden="true"/>
                                 )}
                             </div>
                         )}
 
-                        {/* AI Tab */}
-                        <MobileAiChat
-                            {...pageProps}
-                            active={activeTab === 'ai'}
-                            conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
-                            onOpenConversationDrawer={openAiConversationDrawer}
-                            onCloseConversationDrawer={closeCategoryDrawer}
-                            onStartReportDiscussionReady={registerReportDiscussion}
-                        />
+                        {/* AI Tab 原本就长期挂载，外层只负责跨 Tab 返回时的前景滑出。 */}
+                        <div
+                            className={`mobile-app__tab-view${activeTab === 'ai' ? ' is-active' : ''}${edgeBackOrigin?.tab === 'ai' ? ' is-edge-back-foreground' : ''}`}
+                            hidden={activeTab !== 'ai'}
+                        >
+                            <MobileAiChat
+                                {...pageProps}
+                                active={activeTab === 'ai'}
+                                conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
+                                onOpenConversationDrawer={openAiConversationDrawer}
+                                onCloseConversationDrawer={closeCategoryDrawer}
+                                onStartReportDiscussionReady={registerReportDiscussion}
+                            />
+                        </div>
 
                         {/* 灵感 Tab */}
                         {activeTab === 'ideas' && (
-                            <MobileIdea
-                                {...pageProps}
-                                ideaDrawerOpen={sideDrawerOpen && ideaDrawerEnabled}
-                                onOpenIdeaDrawer={openIdeaDrawer}
-                                onCloseIdeaDrawer={closeCategoryDrawer}
-                            />
+                            <div className={`mobile-app__tab-view is-active${edgeBackOrigin?.tab === 'ideas' ? ' is-edge-back-foreground' : ''}`}>
+                                <MobileIdea
+                                    {...pageProps}
+                                    ideaDrawerOpen={sideDrawerOpen && ideaDrawerEnabled}
+                                    onOpenIdeaDrawer={openIdeaDrawer}
+                                    onCloseIdeaDrawer={closeCategoryDrawer}
+                                />
+                            </div>
                         )}
 
-                        {/* 设置 Tab */}
+                        {/* 设置也使用同一双层 Host，根菜单与各设置分页之间无需单独写动画。 */}
                         {activeTab === 'settings' && (
-                            <MobileSettings {...pageProps} page={currentPage} platformOs={platformInfo.os}/>
+                            <div className="mobile-app__tab-view is-active">
+                                <MobilePageTransitionHost
+                                    layers={settingsTransitionLayers}
+                                    lastNavigation={settingsStack.lastNavigation}
+                                    edgeBackForegroundKey={edgeBackOrigin?.tab === 'settings' ? edgeBackOrigin.pageKey : null}
+                                    interactive
+                                    renderLayer={renderSettingsLayer}
+                                />
+                            </div>
                         )}
                     </div>
 
