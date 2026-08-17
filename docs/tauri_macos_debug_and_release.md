@@ -7,6 +7,7 @@
 - macOS 与 Windows/Linux 共用 React 桌面业务壳、Rust 后端、数据库与插件能力，不维护一份 SwiftUI 业务副本。
 - `src-tauri/tauri.macos.conf.json` 只在 macOS 构建时覆盖窗口与安装包配置，不影响 Windows、Linux、Android 或 iOS。
 - macOS 使用 AppKit 原生标题栏、交通灯和系统菜单。Windows/Linux 继续使用应用内的自绘窗口按钮。
+- `.fcplug` 与 `.fcworld` 的扩展名关联由共享 `tauri.conf.json` 声明；macOS 专属 UTI 和 Finder 图标由 `src-tauri/Info.macos.plist`、`src-tauri/icons/*.icns` 提供，不复用 Windows 的 NSIS 注册表钩子。
 - macOS 明确关闭透明窗口私有 API，避免给签名、公证和未来发行留下阻碍；界面内部的毛玻璃 CSS 仍可使用。
 - 当前正式发行目标是官网直接下载的已签名、公证 DMG。Mac App Store 需要 App Sandbox，而现有自定义数据目录、插件和通用文件访问必须先完成单独的沙箱兼容评估。
 
@@ -35,6 +36,7 @@ npm run macos:dev
 4. 项目、词条、聊天、插件、图片/文件导入和日志读取能够工作。
 5. API Key 重启后仍可从 Keychain 读取。
 6. 默认数据目录和桌面端自定义数据目录都能重启恢复；iOS 的移动沙箱路径策略不会覆盖 macOS 设置。
+7. Finder 中 `.fcplug` 与 `.fcworld` 显示各自图标；“打开方式”包含流云AI。图标正确只代表 Launch Services 元数据生效，不代表双击后的导入/安装业务已经接通。
 
 ## 4. 本地安装包
 
@@ -46,6 +48,7 @@ npm run macos:build:local
 - `macos:build:debug` 生成当前架构的未签名 Debug `.app`，用于快速验证打包资源。
 - `macos:build:local` 生成当前架构的 Release `.app` 与 `.dmg`，使用 ad-hoc 签名，只适合本机/内部验证，其他用户打开时仍可能看到 Gatekeeper 提示。
 - 产物位于 `src-tauri/target/<profile>/bundle/macos/` 与 `src-tauri/target/<profile>/bundle/dmg/`，不提交 Git。
+- 文件图标变更后检查 `.app/Contents/Info.plist` 的 `CFBundleDocumentTypes`、`UTExportedTypeDeclarations`，并确认两个 `.icns` 位于 `.app/Contents/Resources/`。
 
 ## 5. 正式站外发行
 

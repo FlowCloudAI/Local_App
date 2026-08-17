@@ -69,6 +69,7 @@
     "fileAssociations": [
       {
         "ext": ["fcplug"],
+        "contentTypes": ["cn.flowcloudai.fcplug"],
         "mimeType": "application/x-fcplugin",
         "description": "流云AI插件文件",
         "role": "Editor",
@@ -76,6 +77,7 @@
       },
       {
         "ext": ["fcworld"],
+        "contentTypes": ["cn.flowcloudai.fcworld"],
         "mimeType": "application/x-fcworld",
         "name": "FlowCloudAI 世界观包",
         "description": "FlowCloudAI world export",

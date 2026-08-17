@@ -26,13 +26,18 @@
     ]
   },
   "bundle": {
+    "resources": {
+      "icons/fcplug.icns": "fcplug.icns",
+      "icons/fcworld.icns": "fcworld.icns"
+    },
     "targets": [
       "app",
       "dmg"
     ],
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "infoPlist": "Info.macos.plist"
     }
   }
 }

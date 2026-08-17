@@ -25,7 +25,7 @@ exports/
 
 ## 接入 Tauri
 
-在 `tauri.conf.json` 中配置文件关联：
+共享的扩展名与打开方式在 `src-tauri/tauri.conf.json` 中配置：
 
 ```json
 {
@@ -33,16 +33,16 @@ exports/
     "fileAssociations": [
       {
         "ext": ["fcplug"],
+        "contentTypes": ["cn.flowcloudai.fcplug"],
         "name": "FlowCloudAI 插件包",
         "description": "FlowCloudAI plugin package",
-        "icon": ["icons/fcplug.icns", "icons/fcplug.ico"],
         "role": "Editor"
       },
       {
         "ext": ["fcworld"],
+        "contentTypes": ["cn.flowcloudai.fcworld"],
         "name": "FlowCloudAI 世界观包",
         "description": "FlowCloudAI world export",
-        "icon": ["icons/fcworld.icns", "icons/fcworld.ico"],
         "role": "Editor"
       }
     ]
@@ -50,4 +50,9 @@ exports/
 }
 ```
 
-`.icns` / `.ico` 需要用 `iconutil`（macOS）或 `magick convert`（跨平台）从 PNG 多分辨率合成。
+当前 Tauri 2 的 `fileAssociations` 不支持 `icon` 字段。Windows 文件图标继续由
+`src-tauri/nsis/installer-hooks.nsh` 写入注册表；macOS 文件图标由
+`src-tauri/Info.macos.plist` 的 `UTTypeIconFile` 声明，并通过
+`src-tauri/tauri.macos.conf.json` 把 `fcplug.icns`、`fcworld.icns` 放入应用资源目录。
+
+`.icns` 由本地 Tauri CLI 从本目录的 SVG 主源生成；不要直接修改生成文件后遗漏 SVG 主源。

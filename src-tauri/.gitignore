@@ -7,6 +7,8 @@
 /icons/
 !/icons/
 /icons/*
+!/icons/fcplug.icns
+!/icons/fcworld.icns
 !/icons/file-types/
 !/icons/file-types/*.svg
 /target-codex-layout/

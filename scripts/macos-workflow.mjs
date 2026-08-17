@@ -85,6 +85,9 @@ function doctor() {
   report(existsSync(tauriBinary), '本地 Tauri CLI', tauriBinary)
   report(existsSync(path.join(repositoryRoot, 'src-tauri', 'tauri.macos.conf.json')), 'macOS 平台配置', 'src-tauri/tauri.macos.conf.json')
   report(existsSync(path.join(repositoryRoot, 'src-tauri', 'icons', 'icon.icns')), 'macOS 图标', 'src-tauri/icons/icon.icns')
+  report(existsSync(path.join(repositoryRoot, 'src-tauri', 'Info.macos.plist')), 'macOS 文件类型声明', 'src-tauri/Info.macos.plist')
+  report(existsSync(path.join(repositoryRoot, 'src-tauri', 'icons', 'fcplug.icns')), '.fcplug 文件图标', 'src-tauri/icons/fcplug.icns')
+  report(existsSync(path.join(repositoryRoot, 'src-tauri', 'icons', 'fcworld.icns')), '.fcworld 文件图标', 'src-tauri/icons/fcworld.icns')
 
   const identities = capture('security', ['find-identity', '-v', '-p', 'codesigning'])
   const hasDeveloperId = identities.ok && identities.output.includes('Developer ID Application')

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeDescription</key>
+      <string>流云AI插件文件</string>
+      <key>UTTypeIconFile</key>
+      <string>fcplug.icns</string>
+      <key>UTTypeIdentifier</key>
+      <string>cn.flowcloudai.fcplug</string>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>fcplug</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-fcplugin</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeDescription</key>
+      <string>流云AI世界观包</string>
+      <key>UTTypeIconFile</key>
+      <string>fcworld.icns</string>
+      <key>UTTypeIdentifier</key>
+      <string>cn.flowcloudai.fcworld</string>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>fcworld</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-fcworld</string>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>
