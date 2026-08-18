@@ -1,12 +1,37 @@
 .mobile-nav {
     display: flex;
+    box-sizing: border-box;
     justify-content: space-around;
     align-items: stretch;
-    /* 按钮区 56px + 安全区底部间距，两者不互相覆盖 */
-    padding: 0 8px env(safe-area-inset-bottom, 0);
+    /* 按钮区与安全区底部间距不互相覆盖。 */
+    max-height: calc(var(--mobile-nav-content-height) + var(--mobile-safe-bottom));
+    padding:
+        0
+        max(var(--mobile-gap-inline), var(--mobile-safe-right))
+        var(--mobile-safe-bottom)
+        max(var(--mobile-gap-inline), var(--mobile-safe-left));
+    overflow: hidden;
     background: transparent;
     flex-shrink: 0;
-    z-index: 30;
+    z-index: var(--mobile-z-nav);
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    transition:
+        max-height var(--mobile-duration-base) var(--mobile-ease-standard),
+        padding-bottom var(--mobile-duration-base) var(--mobile-ease-standard),
+        opacity var(--mobile-duration-fast) var(--mobile-ease-standard),
+        transform var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-nav.is-suppressed {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(100%);
+    visibility: hidden;
 }
 
 .mobile-nav__item {
@@ -14,16 +39,16 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: calc(var(--mobile-gap-text) / 2);
     flex: 1;
-    min-height: 58px;
+    min-height: var(--mobile-nav-content-height);
     border: none;
     background: none;
     cursor: pointer;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    transition: color 0.15s;
-    padding: var(--fc-space-sm) var(--fc-space-xs);
+    font-size: var(--mobile-text-meta);
+    transition: color var(--mobile-duration-fast) var(--mobile-ease-standard);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-text);
     border-radius: var(--mobile-radius-card);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
@@ -33,21 +58,31 @@
     color: var(--fc-color-primary);
 }
 
+.mobile-nav__item.active .mobile-nav__label {
+    font-weight: var(--mobile-weight-strong);
+}
+
 .mobile-nav__icon {
-    width: 24px;
-    height: 24px;
+    width: var(--mobile-nav-icon-size);
+    height: var(--mobile-nav-icon-size);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .mobile-nav__icon svg {
-    width: 24px;
-    height: 24px;
+    width: var(--mobile-nav-icon-size);
+    height: var(--mobile-nav-icon-size);
 }
 
 .mobile-nav__label {
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-nav {
+        transition: none;
+    }
 }

@@ -1,9 +1,10 @@
 import {logger} from '../../shared/logger'
 import {isBrowserPreview} from '../../shared/devPreview'
-import {closeTopOverlay} from '../../shared/ui/overlay'
+import {closeTopOverlay, hasOpenOverlay} from '../../shared/ui/overlay'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
-import './mobileTypography.css'
+import './mobileTokens.css'
+import './mobileAccessibility.css'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {
@@ -55,6 +56,8 @@ import {
 } from './mobilePageTransition'
 import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
+import {useMobileInputMode} from './useMobileInputMode'
+import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -83,6 +86,7 @@ interface MobileEdgeBackOrigin {
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
+    const mobileAppRef = useRef<HTMLDivElement>(null)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
     const pendingEdgeBackTargetRef = useRef<MobileBackTarget | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
@@ -110,6 +114,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
     const reportDiscussionRef = useRef<((params: WorldCheckDiscussionParams) => Promise<void>) | null>(null)
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
+    const {
+        active: mobileInputModeActive,
+        dismissFocusedInput,
+    } = useMobileInputMode(mobileAppRef)
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -214,6 +222,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             pageKey: activeStack.currentPageKey || `${activeTab}-root`,
         })
     }, [activeStack.currentPageKey, activeTab])
+    const iosEdgeBackEnabled = platformInfo.os === 'ios'
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -228,15 +237,37 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
-        beforeEdgeBackGesture: prepareEdgeBackNavigation,
-        onEdgeBackGesture: commitPreparedEdgeBackNavigation,
-        onEdgeBackStart: handleEdgeBackStart,
+        beforeEdgeBackGesture: iosEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
+        onEdgeBackGesture: iosEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
+        onEdgeBackStart: iosEdgeBackEnabled ? handleEdgeBackStart : undefined,
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })
+    const canAnimateAndroidPredictiveBack = useCallback(() => (
+        !mobileInputModeActive
+        && !sideDrawerOpen
+        && !hasOpenOverlay()
+        && edgeBackTarget !== 'exit'
+    ), [edgeBackTarget, mobileInputModeActive, sideDrawerOpen])
+    const androidPredictiveBack = useAndroidPredictiveBack({
+        enabled: platformInfo.os === 'android',
+        canAnimate: canAnimateAndroidPredictiveBack,
+        beforeBack: prepareEdgeBackNavigation,
+        commitBack: commitPreparedEdgeBackNavigation,
+        onStart: handleEdgeBackStart,
+    })
+    const activeEdgeBackPhase = edgeBackPhase !== 'idle'
+        ? edgeBackPhase
+        : androidPredictiveBack.phase
+    const activeEdgeBackProgress = edgeBackPhase !== 'idle'
+        ? edgeBackProgress
+        : androidPredictiveBack.progress
+    const activeEdgeBackOffset = edgeBackPhase !== 'idle'
+        ? edgeBackOffset
+        : androidPredictiveBack.offset
     useEffect(() => {
-        if (edgeBackPhase === 'idle') setEdgeBackOrigin(null)
-    }, [edgeBackPhase])
+        if (activeEdgeBackPhase === 'idle') setEdgeBackOrigin(null)
+    }, [activeEdgeBackPhase])
     const sideDrawerProgress = categoryDrawerWidth > 0
         ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
         : 0
@@ -284,11 +315,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     useEffect(() => {
         if (!backendReady || !platformInfo.windowControls || mobileWindowShown) return
         mobileWindowShown = true
-        requestAnimationFrame(() => {
-            showWindow().catch((error) => {
-                mobileWindowShown = false
-                logger.error('显示移动端窗口失败', error)
-            })
+        showWindow().catch((error) => {
+            mobileWindowShown = false
+            logger.error('显示移动端窗口失败', error)
         })
     }, [backendReady, platformInfo.windowControls])
 
@@ -402,7 +431,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
-        if (edgeBackPhase !== 'idle') return
+        if (activeEdgeBackPhase !== 'idle' || mobileInputModeActive) {
+            dismissFocusedInput()
+            return
+        }
         // 再点一次当前 Tab = 回到该 Tab 根页（移动端通用约定）。
         // 深在词条详情里点「首页」原本毫无反应，用户没有快速逃生口。
         if (tab === activeTab) {
@@ -421,7 +453,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             // 切 Tab 是横向跳转，不该重放目标 Tab 上一次 push/pop 的方向动画。
             stacks[tab].resetNavigation()
         })()
-    }, [activeStack, activeTab, closeCategoryDrawer, edgeBackPhase, runLeaveGuard, stacks])
+    }, [activeEdgeBackPhase, activeStack, activeTab, closeCategoryDrawer, dismissFocusedInput, mobileInputModeActive, runLeaveGuard, stacks])
 
     const setBeforeLeave = useCallback((handler: MobileBeforeLeave | null) => {
         beforeLeaveRef.current = handler
@@ -433,6 +465,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const handleBack = useCallback(() => {
         if (edgeBackPhase !== 'idle') return
+        // 输入期间第一次返回只收起键盘；退出输入模式后才允许关闭浮层或回退页面。
+        if (dismissFocusedInput()) return
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
         if (closeTopOverlay()) return
         if (sideDrawerOpen) {
@@ -440,29 +474,26 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             return
         }
         void runBackNavigation()
-    }, [closeCategoryDrawer, edgeBackPhase, runBackNavigation, sideDrawerOpen])
+    }, [closeCategoryDrawer, dismissFocusedInput, edgeBackPhase, runBackNavigation, sideDrawerOpen])
 
     useEffect(() => {
-        const handleAndroidBack = () => {
+        const handleAndroidBackFallback = () => {
             handleBack()
         }
-        window.addEventListener('flowcloudai:android-back', handleAndroidBack)
-        return () => window.removeEventListener('flowcloudai:android-back', handleAndroidBack)
+        window.addEventListener('flowcloudai:android-back-fallback', handleAndroidBackFallback)
+        return () => window.removeEventListener('flowcloudai:android-back-fallback', handleAndroidBackFallback)
     }, [handleBack])
 
     useEffect(() => {
-        if (platformInfo.os !== 'android') return
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return
-            // Esc 仅作为开发预览/外接键盘兜底；系统返回由原生事件处理。
-            const t = e.target as HTMLElement
-            if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return
+            // iOS/iPadOS 与 Android 的外接键盘保持一致：先结束输入，再按返回栈关闭界面。
             e.preventDefault()
             handleBack()
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [handleBack, platformInfo.os])
+    }, [handleBack])
 
     const pageProps: PageProps = useMemo(() => ({
         ...navigation,
@@ -530,12 +561,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         return <MobileSettings {...layerProps} page={layer.page} platformOs={platformInfo.os}/>
     }, [createLayerPageProps, platformInfo.os])
 
-    const edgeBackActive = edgeBackPhase !== 'idle'
+    const edgeBackActive = activeEdgeBackPhase !== 'idle'
     const showHomeTab = activeTab === 'home' || (edgeBackActive && edgeBackTarget === 'home')
 
     if (!backendReady) {
         return (
-            <div className="mobile-app" style={{
+            <div ref={mobileAppRef} className="mobile-app" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 height: '100vh', background: 'var(--fc-color-bg)',
                 color: 'var(--fc-color-text-secondary)', fontSize: 'var(--fc-font-size-sm)',
@@ -553,17 +584,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }
 
     return (
-        <div className="mobile-app">
+        <div ref={mobileAppRef} className={`mobile-app${mobileInputModeActive ? ' is-input-mode' : ''}`}>
             <div
-                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${edgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${edgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${edgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging || activeEdgeBackPhase === 'tracking' ? ' is-dragging' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
                     '--mobile-entry-drawer-progress': sideDrawerProgress,
-                    '--mobile-edge-back-shift': `${edgeBackOffset}px`,
-                    '--mobile-edge-back-progress': edgeBackProgress,
-                    '--mobile-edge-back-underlay-shift': `${-24 * (1 - edgeBackProgress)}px`,
-                    '--mobile-edge-back-underlay-scrim-opacity': 1 - edgeBackProgress,
+                    '--mobile-edge-back-shift': `${activeEdgeBackOffset}px`,
+                    '--mobile-edge-back-progress': activeEdgeBackProgress,
+                    '--mobile-edge-back-underlay-shift': `calc(var(--mobile-gap-section) * -1 * ${1 - activeEdgeBackProgress})`,
+                    '--mobile-edge-back-underlay-scrim-opacity': 1 - activeEdgeBackProgress,
                 } as CSSProperties}
             >
                 {mobileSideDrawerEnabled && (
@@ -660,7 +691,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         )}
                     </div>
 
-                    <MobileNav activeTab={activeTab} onTabChange={handleTabChange}/>
+                    <MobileNav
+                        activeTab={activeTab}
+                        suppressed={mobileInputModeActive}
+                        onTabChange={handleTabChange}
+                    />
                 </div>
             </div>
 
