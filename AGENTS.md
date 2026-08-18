@@ -36,6 +36,7 @@ macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri
 
 - `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
 - `src-tauri/Info.macos.plist` 与 `src-tauri/icons/fcplug.icns`、`fcworld.icns` 是 macOS 自定义文件类型和 Finder 图标的长期来源；Windows 仍由 `tauri.conf.json` + NSIS `DefaultIcon` 使用 `.ico`。不要给 `fileAssociations` 添加当前 schema 不支持的 `icon` 字段，也不要把 macOS 文件类型配置写入生成的 `.app/Contents/Info.plist`。
+- `.fcworld` / `.fcplug` 的桌面系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列：Windows/Linux 由单实例参数转发，macOS 由 `RunEvent::Opened` 转发，再由 `src/features/desktop-file-open/DesktopFileOpenController.tsx` 串行消费并进入现有导入/安装确认。macOS 禁止在 setup 阶段启用 `tauri-plugin-single-instance`，否则新进程可能在 Launch Services 交付文件 URL 前退出并吞掉 Finder 双击事件；任何平台都不能在原生事件回调中绕过确认直接改数据。
 - `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
 - `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄，macOS 下也必须保留；原生窗口边框负责缩放不等于可以把该变量设为 `0`。
 - `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规。启用 `zoomHotkeysEnabled` 时，桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。修改共享 CSP/capability 后要回归 Windows、Linux 与移动端，不能把它们当成纯 Mac 配置。
