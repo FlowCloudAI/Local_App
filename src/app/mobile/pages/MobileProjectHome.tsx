@@ -476,6 +476,7 @@ export default function MobileProjectHome({
             >
                 <textarea
                     value={descriptionDraft}
+                    aria-label="项目描述"
                     onChange={(event) => setDescriptionDraft(event.currentTarget.value)}
                     disabled={descriptionSaving}
                     placeholder="项目描述"
