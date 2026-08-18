@@ -55,14 +55,24 @@
 
 ### 2.3 当前实现进度
 
-2026-08-17 已在独立分支 `codex/ios-hig-first-pass` 完成第一批中的 3 项：
+截至 2026-08-18，独立分支 `codex/ios-hig-first-pass` 的实现状态如下：
 
 | 问题 | 实现状态 | 验证边界 |
 |---|---|---|
 | IOS-001 | 已实现 | Tauri 配置、README、iOS 工作流均统一到 16.2；重新生成 Xcode 工程后，模拟器包以 `arm64-apple-ios16.2-simulator` 成功链接。工作流会拒绝继续使用版本过期的生成工程 |
-| IOS-002 | 默认移动字号标尺已实现，Dynamic Type 待实现 | `MobileApp` 单独加载 touch-density 字体标尺，iOS/Android 共用 12～24px 的移动语义字号；变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响。系统 Content Size Category 原生桥接与动态倍率仍待实现 |
-| IOS-018 | 已升级为双层原生式过渡，真机调优中 | iOS/Android 共用拖动进度、慢速拖动 35% 屏宽阈值（限定 120～240px）、速度提前结算、取消回弹和 Reduced Motion 降级；页面栈保留带稳定 key 的相邻两层，前景页跟手滑出时下层页同步视差显露，提交后直接由下层接管，不重新播放入场动画。纯计算测试、lint 和前端构建通过；iPhone 15 Pro 首轮真机验证暴露的固定 72px 阈值与单层切页观感均已重做，当前版本待真机复验，Android APK 亦待复验 |
+| IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
+| IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
+| IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
+| IOS-005 | 已实现，iOS 模拟器回归通过，待双端真机键盘验收 | 移动壳层同时监听文本焦点、`visualViewport` 和整页编辑态；输入期间 Tab 折叠并设置 `aria-hidden`、`inert` 与 `pointer-events: none`。壳层只观察键盘状态，不把 `visualViewport.height` 二次写回根节点；输入会话使用最近一次无键盘完整高度，覆盖“先 resize、后 focus”和系统收起键盘漏发 `resize` 的 WebView。系统收起软键盘但输入框仍保持焦点时，普通输入恢复 Tab，整页编辑态仍保持隐藏 |
+| IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
+| IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
+| IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |
+| IOS-018 | 已升级为双层原生式过渡，真机调优中 | iOS 保留左边缘自绘手势与距离/速度组合阈值；Android 接入系统预测式返回的开始、进度、取消和提交回调。两端复用相邻双层页面与 Reduced Motion 降级，提交后由已挂载下层直接接管。纯计算测试、lint、前端构建和 iOS 模拟器构建通过；iPhone 真机手感与 Android APK 仍待复验 |
+| IOS-019 | 已实现，待辅助功能真机验收 | iOS 原生桥监听降低透明度和加深系统颜色；Android 读取高对比度设置。两端统一写入 `data-mobile-high-contrast`，强制玻璃和半透明 surface 降级为不透明高对比面 |
 | IOS-020 | 已实现，待目标页视觉验收 | 相机、图库和世界地图均为原生 `disabled` 控件，原因持续可见且进入可访问名称；不再绑定失败提示操作。前端构建和 iOS 模拟器原生启动通过，目标页仍需人工进入确认最终排版 |
+| IOS-021 | 已实现，待外接键盘验收 | 移动壳层的 Esc 处理不再限定 Android；iOS/iPadOS 与 Android 均先结束文本输入，再按浮层、抽屉、页面栈顺序返回 |
+
+2026-08-18 本批次的 34 项移动壳层专项测试、完整 lint、TypeScript/Vite 生产构建与 iOS 16.2 simulator debug 原生构建均通过。输入视口又在 iPhone 17 Pro（iOS 26.5）模拟器上进入输入流程并截图；修复后的输入区没有二次收缩，系统收起软键盘且输入焦点仍保留时，底部 Tab 已在模拟器画面中恢复。应用深色主题下的 iOS 原生状态栏图标同步也已截图确认。Android 代码已实现 WindowInsets、系统字号/高对比度、系统栏主题、触觉与预测式返回，但当前 Mac 未安装或未配置 Android SDK/NDK，debug APK 命令在进入编译前被环境检查阻断，因此 Android 原生包与真机表现仍标为未验证。
 
 ## 3. 已确认的 P0 问题
 
@@ -79,31 +89,35 @@
 - **证据**：`../lib_ui/ui/src/style/index.css:143-152` 使用固定 `rem` 字号；系统从 `large` 切到 `accessibility-extra-extra-extra-large` 后，首页内容区截图仅 6 个像素发生不超过 3 级的噪声变化，排版、字高和换行完全不变。
 - **影响**：低视力用户无法通过系统字号获得更大文本；固定高度、`nowrap` 与行截断还会在未来补上缩放后产生裁切风险。
 - **已决策方案**：增加小型 iOS 原生桥接，读取 Dynamic Type category 并写入根级缩放 token；正文、标题、控件文字分别设上限，并以最大辅助字号逐页验证换行、滚动和控件高度。
-- **阶段进展**：已先完成 iOS/Android 共用的默认移动字号标尺。touch density 将辅助信息、次要正文、正文/控件和标题分别映射到 12～13px、15px、17px 和 20～24px；桌面 comfortable density 继续使用共享组件库原值。该阶段解决默认字号相对移动平台偏小的问题，但不会随系统 Content Size Category 变化，不能替代后续 Dynamic Type 原生桥接。
+- **实现状态**：已完成。touch density 使用 13/15/17/22/28px 五档移动字号；iOS 原生桥用 `UIFontMetrics` 读取 Dynamic Type 并把倍率限制在 1～2 倍后写入 `--mobile-font-scale`，监听 Content Size Category 变化。Android 使用 `Configuration.fontScale` 写入同一变量；桌面 comfortable density 继续使用共享组件库原值。仍需以最大辅助字号逐页检查换行、截断和控件可达性。
 
 ### IOS-003：15px 输入触发 iOS 自动缩放并留下“粘住的放大态”
 
 - **证据**：`../lib_ui/ui/src/style/index.css:148` 的 `--fc-font-size-md` 为 `0.9375rem`（15px），`Input.css:27,70` 直接用于输入框；`MobileAiChat.css:487` 的 AI 主 `<textarea>` 也使用同一 15px token。首页灵感输入聚焦后模拟器自动放大，关闭键盘后右侧内容仍被裁掉，底部 Tab 文字消失。
 - **影响**：核心输入流程破坏页面比例与可导航性。
 - **建议**：iOS 可编辑控件的实际字体不得低于 16px；不要用禁用页面缩放来掩盖问题。
+- **实现状态**：已完成并通过 iPhone 真机验收。touch density 将输入与操作控件字号统一为 17px，iOS 与 Android 共用，桌面不受影响。
 
 ### IOS-004：横屏未统一处理左右安全区
 
 - **证据**：`MobileApp.css:207-216` 只加顶部安全区；`MobileHome.css:3-5` 使用固定水平 padding；`MobileNav.css:5-6` 只处理底部安全区。横屏截图中内容进入 Dynamic Island 一侧的危险区域。
 - **影响**：横屏、带刘海设备以及 iPad 多任务窗口可能出现内容贴边或被遮挡。
 - **建议**：在移动壳层集中定义 `max(page-padding, env(safe-area-inset-left/right))`，页面与底栏都消费同一组逻辑方向 token。
+- **实现状态**：已完成代码实现。页面、顶栏、AI composer、底栏及侧抽屉均消费共享安全区 token；待 iPhone/Android 横屏和 edge-to-edge 实机验收。
 
 ### IOS-005：输入模式仍保留底部 Tab，横屏时还会被键盘遮挡
 
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
 - **已决策方案**：壳层统一监听 `focusin/focusout` 与 `visualViewport`，进入文本输入、键盘可见或整页编辑模式时，把 Tab 栏滑出可视区域并设置 `aria-hidden`、`inert`、`pointer-events: none`；输入区占用原底栏位置并跟随键盘。短输入在失焦且 viewport 稳定后恢复 Tab；整页编辑必须先保存/取消退出编辑模式才恢复。返回键/Esc 第一次只结束输入并收起键盘，后续操作才允许页面返回或切换 Tab。不能只靠 z-index 把 Tab 压在输入区下面，因为辅助技术仍可能访问被遮住的按钮。
+- **实现状态**：已完成代码实现。共享 hook 以文本焦点、`visualViewport` 键盘差值和 `data-mobile-editing` 三路判断输入模式；Tab 折叠后内容获得原底栏空间，词条整页编辑会持续隐藏 Tab。首次实现曾把 `visualViewport.height` 写回移动根节点，导致 WebView 自身的键盘避让与 CSS 高度发生二次收缩：模拟器中的灵感全文输入框被压成顶部短条，下方出现大面积空白。现已改为只观察 viewport 状态、不参与根节点布局；并记录每次焦点会话是否真正显示过键盘，以区分“刚聚焦、键盘尚未出现”和“系统已收起键盘但焦点未丢失”。针对部分 WebView 先缩短 viewport、后派发 `focusin` 的事件顺序，输入会话保留最近一次无键盘完整高度；聚焦期间每 250ms 低频补采样，兜底系统收起键盘却漏发 `resize` 的情况。后一状态会在 180ms 稳定期后恢复普通页面 Tab，整页编辑态不变。输入区前后截图见 `designs/audits/ios-input-viewport-2026-08-18/04-idea-editor-keyboard-regression.png`、`05-idea-editor-keyboard-fixed.png`；最终源码重建后的键盘打开/系统收起对照见 `07-home-keyboard-visible-final.png` 与 `08-home-keyboard-dismissed-tab-restored-final.png`。iOS 模拟器竖屏回归已通过，仍待 iPhone 真机以及 Android 竖横屏软键盘、返回键和输入恢复时序验收。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
 - **证据**：`../lib_ui/ui/src/style/index.css:79,246` 将三级文字设为 `#B3B3B3` / `#636158`。截图像素采样结果：浅色占位文字约 **2.10:1**，浅色数量文字约 **2.07:1**；深色占位文字约 **2.37:1**，深色数量文字约 **3.06:1**。
 - **影响**：均低于普通文本常用的 4.5:1 基线，低视力、强光和降低屏幕亮度场景下难以辨认。
 - **建议**：拆分“装饰性弱化”和“仍需阅读的三级文本”token；占位、计数、辅助说明至少达到普通文本对比度要求。
+- **实现状态**：已完成移动端覆盖。仍需阅读的三级文字与 placeholder 使用 secondary 文本基线，浅色/深色主要 surface 的计算对比度均高于 4.5:1；桌面 comfortable density 不变。
 
 ### IOS-007：底部 Tab 选中态只靠颜色，缺少可访问状态
 
@@ -117,6 +131,7 @@
 - **证据**：共享 token 已有 `--fc-control-tap-min: 2.75rem`，但移动端多处绕过它，例如 `MobileHome.css:163-166`（37.6px）、`MobileEntryList.css:56-72`（39.2px）、`MobileAiChat.css:132-146`（42.88px）、`MobileEntryDetail.css:513-525`（32px）、`MobileApp.css:560-573`（32.8px）；`MessageBox.css:1082-1095` 的消息操作仅 26×26px。Claude 复核还定位到 `MobileHome.css:284-300,364-372` 的最近词条与帮助入口缺少最小点击区。
 - **影响**：常用保存、筛选、对话、详情操作在单手和运动场景下误触率高，也不满足项目 44pt 基线。
 - **建议**：图标可以保持小，但交互盒统一 `min-inline-size/min-block-size: var(--fc-control-tap-min)`；用自动化扫描覆盖所有移动端 `button`、可点击 Card 和自定义控件。
+- **实现状态**：已完成公共 touch-density 基线。移动端 `button`、`role="button"` 与 `summary` 使用 48×48 最小命中区，Input 内部组合按钮例外；专项静态测试覆盖作用域与 token，仍需逐页视觉巡检是否出现紧凑布局重排。
 
 ### IOS-009：项目卡片和词条卡片是只有点击行为的 `<div>`
 
@@ -153,6 +168,7 @@
 - **证据**：`MobileApp.tsx:226-235` 在 rAF 中调用 `showWindow()`；项目 `AGENTS.md:47,191` 明确禁止这种写法，因为隐藏 WKWebView 在 macOS 可能暂停帧回调并形成窗口启动死锁。
 - **影响**：这是共享移动壳层对桌面小窗口/调试场景的跨平台回归风险，违反项目硬规则；虽然不是纯 HIG 问题，仍属于首屏可用性阻断项。
 - **建议**：ready/failed 后直接调用 `showWindow()`；分别验证 iOS 启动、macOS 冷启动白屏和 Windows 窗口初始化。
+- **实现状态**：已完成。`backendReady` 后直接调用 `showWindow()`；前端 lint、类型检查、生产构建与 iOS 16.2 simulator debug 原生构建通过，实际冷启动仍按平台验收清单执行。
 
 ## 4. 已确认的 P1 问题
 
@@ -179,13 +195,14 @@
 - **证据**：`useMobileSideDrawerGesture.ts:269-349` 的业务分支没有显式 `dx/dy` 比值判断，但 `410-418` 已通过 `@use-gesture/react` 的 `axis: 'x'` 提供库级方向锁，因此“完全没有方向判断”的原表述不准确。边缘返回在达到阈值前仍不更新任何可视进度，触发后直接执行返回。
 - **影响**：方向判断依赖第三方库的隐式行为且缺专项测试；更明确的问题是返回没有交互式进度和取消反馈，不像 iOS 可预测的跟手返回。
 - **已决策方案**：保留 React 手势与现有库级轴锁，不改造为原生页面栈；补充速度/距离组合阈值测试，并为返回提供跟手进度、取消区间和回弹反馈。
-- **实现状态**：已完成公共双层原生式实现。页面栈向公共 `MobilePageTransitionHost` 暴露带稳定 key 的相邻两层；手势开始时锁定原前景页，前景页随手指滑动并带右侧阴影，下层页从轻微左移位置做视差跟进，覆盖遮罩随进度消退。抬手后按距离/速度组合结算：未达阈值或离开守卫拒绝时整体回弹；通过后前景页完整滑出屏幕，再以无入场动画的 pop 提交，使已经挂载的下层页原位接管，避免空白帧、瞬间消失和重新渲染造成的跳变。底部 Tab 不参与页面位移，动画期间导航互斥；只有当前前景层可以注册离开守卫。业务页无需逐页适配，该逻辑同时用于 iOS 和 Android，并支持 Reduced Motion 降级；实际手感、复杂页面副作用和 Android 合成表现仍需两端人工验收。
+- **实现状态**：已完成公共双层原生式实现。页面栈向公共 `MobilePageTransitionHost` 暴露带稳定 key 的相邻两层；iOS 手势开始时锁定原前景页，前景页随手指滑动，下层页同步视差显露；抬手后按距离/速度组合结算并回弹或完整滑出。Android 不再注册自绘左边缘指针手势，而由 `OnBackPressedCallback` 的预测式返回开始、进度、取消和提交事件驱动同一双层转场。通过后以无入场动画的 pop 提交，使已挂载下层原位接管；底部 Tab 不参与位移，动画期间导航互斥，业务页无需逐页适配。两端均支持 Reduced Motion；iPhone 真机手感、复杂页面副作用和 Android 原生合成表现仍需人工验收。
 
 ### IOS-019：玻璃效果缺少“降低透明度/提高对比度”降级策略
 
 - **证据**：`src/glassEffect.css:17-26,110-150` 集中管理透明材质和 blur，这是正确收口；但没有 `prefers-contrast` 或原生 Reduce Transparency 映射。当前只有用户手动开关和部分 `prefers-reduced-motion`。
 - **影响**：开启玻璃后，低视力或系统已要求降低透明度的用户仍可能得到透明、低对比背景。
 - **已决策方案**：通过 iOS 原生桥接读取降低透明度/提高对比度状态，写入根属性；触发时强制使用实色、高对比 surface。该能力与 Dynamic Type 共用轻量 iOS 辅助功能桥接层，Windows/Android 保持独立。
+- **实现状态**：已完成代码实现。iOS 监听 `UIAccessibilityReduceTransparencyStatusDidChangeNotification` 与 `UIAccessibilityDarkerSystemColorsStatusDidChangeNotification`，Android 读取高对比度设置；两端统一写入 `data-mobile-high-contrast`，移动 surface token 在该状态下全部降级为不透明背景。iOS 原生构建通过，仍待真机/模拟器切换辅助功能逐页验收；Android 仍为代码分析、未运行。
 
 ### IOS-020：未开放功能以正常可用操作呈现，但实际总是失败提示
 
@@ -199,6 +216,7 @@
 - **证据**：`MobileApp.tsx:389-401` 的 Esc 监听在 `platformInfo.os !== 'android'` 时直接返回；而 `MobileTopControls.tsx:259-263` 的锚点菜单和侧抽屉只注册到返回栈，没有自己的键盘监听。对照 `Overlay.tsx:89-104` 已实现不限平台的捕获阶段 Esc 处理。
 - **影响**：iPad 妙控键盘/外接键盘用户不能用 Esc 关闭分类、AI 会话、灵感抽屉及锚点菜单，同一应用内不同浮层行为不一致。
 - **建议**：让移动壳层在所有平台处理 Esc，并保留输入框编辑时不拦截的保护；更稳妥的长期方案是让菜单和抽屉复用 Overlay 的退出与焦点策略。
+- **实现状态**：已完成公共壳层处理。Esc 在 iOS/iPadOS 与 Android 上先结束文本输入，再复用现有返回层级关闭浮层、抽屉或页面；待外接键盘人工验收。
 
 ### IOS-022：设定检测长任务的动态状态不会主动播报
 
@@ -258,7 +276,7 @@
 - Dynamic Type：从默认字号到最大辅助字号，核心任务可完成，无裁切、重叠和不可达操作。
 - VoiceOver：可识别当前 Tab/筛选/会话、项目/词条卡片、搜索框、抽屉、AI 消息作者与消息操作，并能获知设定检测进度。
 - 外接键盘：Esc 能按层级关闭锚点菜单、抽屉和对话框，关闭后焦点返回触发器。
-- 触控：所有交互命中区至少 44×44pt。
+- 触控：所有交互命中区至少 48×48，一次满足 iOS 44pt 与 Material 48dp。
 - 对比度：浅色/深色及玻璃开关两种状态下，普通文本达到 4.5:1。
 - iPad：全屏、1/2 Split View、1/3 Split View 与 Stage Manager 窗口可用。
 - 未开放功能：相机/图库以禁用态显示“即将支持”，世界地图以禁用态显示“仅桌面端”，均不会响应点击后才提示失败。
