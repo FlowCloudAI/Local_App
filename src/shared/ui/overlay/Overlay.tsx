@@ -9,7 +9,7 @@ const SHEET_TRANSITION_MS = 280
 
 type OverlayStyle = CSSProperties & {'--fc-overlay-transition-duration': string}
 
-type OverlayVariant = 'floating' | 'sheet'
+type OverlayVariant = 'floating' | 'sheet' | 'fullscreen'
 
 interface OverlayProps {
     open: boolean
