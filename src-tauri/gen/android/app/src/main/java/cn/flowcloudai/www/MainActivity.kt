@@ -118,19 +118,21 @@ class MainActivity : TauriActivity() {
     ViewCompat.setWindowInsetsAnimationCallback(
       window.decorView,
       object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+        override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+          super.onPrepare(animation)
+          if (animation.typeMask and WindowInsetsCompat.Type.ime() == 0) return
+          mobileImeAnimationDurationMs = animation.durationMillis.coerceAtLeast(0L)
+        }
+
         override fun onProgress(
           insets: WindowInsetsCompat,
+          @Suppress("UNUSED_PARAMETER")
           runningAnimations: MutableList<WindowInsetsAnimationCompat>
         ): WindowInsetsCompat {
-          val imeType = WindowInsetsCompat.Type.ime()
-          mobileImeAnimationDurationMs = runningAnimations
-            .firstOrNull { animation -> animation.typeMask and imeType != 0 }
-            ?.durationMillis
-            ?.coerceAtLeast(0L)
-            ?: 0L
-          updateMobileImeInsets(insets)
-          updateMobileWebViewKeyboardViewport()
-          pushMobileKeyboardMetrics()
+          /*
+           * 系统负责 IME 的逐帧动画。这里若同步改 WebView 高度并执行 JavaScript，
+           * 会把最终 WindowInsets 与动画中间帧交替写入页面，造成升降过程反复重排。
+           */
           return insets
         }
 

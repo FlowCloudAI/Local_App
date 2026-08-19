@@ -51,11 +51,15 @@ test('Android 通过 WindowInsets 补齐系统栏安全区并允许横屏', () =
     assert.doesNotMatch(androidManifest, /android:screenOrientation="portrait"/)
 })
 
-test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
+test('Android 原生桥只在稳定边界发布 IME 指标，不逐帧改写页面', () => {
+    const progressBody = androidBridge.match(
+        /override fun onProgress\([\s\S]*?\): WindowInsetsCompat \{([\s\S]*?)\n\s*return insets/,
+    )?.[1] ?? ''
     assert.match(androidBridge, /WindowInsetsCompat\.Type\.ime\(\)/)
     assert.match(androidBridge, /WindowInsetsAnimationCompat\.Callback/)
     assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
+    assert.doesNotMatch(progressBody, /updateMobileImeInsets|updateMobileWebViewKeyboardViewport|pushMobileKeyboardMetrics/)
     assert.match(androidManifest, /android:windowSoftInputMode="adjustResize"/)
     assert.match(androidBridge, /updateMobileWebViewKeyboardViewport\(\)/)
     assert.match(androidBridge, /layoutParams\.height = desiredHeight/)
