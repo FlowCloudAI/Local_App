@@ -76,7 +76,7 @@
 
 2026-08-19 键盘架构更新：项目负责人撤销“软键盘展开时保留 Tab”的决定，改为由原生层提供键盘几何并管理 WebView 可用区域。共享 Web 根不再读取 `visualViewport.height` 写回根高度；Android 使用 `adjustResize` 并对失效的 edge-to-edge 厂商实现补充原生 WebView 物理高度约束，iOS 仅在全宽停靠键盘与 WebView 底边相交时缩短 WebView。AI 页已改为“顶栏 / 消息滚动区 / 输入区”三行布局，灵感页已改为固定外壳与 textarea 内部滚动。22 项移动专项测试、完整 lint、前端生产构建、Android Kotlin/Manifest 编译和 iOS 16.2 simulator debug 构建均已通过，并进入双端设备验证。
 
-同日 Android 真机 24129RT7CC 验证发现，MIUI edge-to-edge 会把 `adjustResize` 退化为 visual viewport 平移：首轮指标为 `innerHeight=834`、`visualViewport.height=521.54`、`offsetTop=312.92`，composer 实际仍位于完整页面底部。原生桥因此补充了 WebView 物理高度约束。复验时键盘展开后的 `innerHeight=521`、`offsetTop=0`，composer 底边与键盘 frame 顶边同为约 521.54；顶栏保持 60，Messages 由 504 压缩到 298，Tab 高度为 0 且 `aria-hidden`/`inert` 生效。系统返回收起键盘后 `innerHeight` 恢复 834、Tab 恢复 106.25；灵感页顶栏与元信息区保持固定，正文 textarea 独占剩余 136px 并内部滚动。ADB 实屏截图与 debug WebView 边界数据一致。iPhone 当前在 CoreDevice 中为 unavailable，iOS 运行态仍待真机复验。
+同日 Android 真机 24129RT7CC 验证发现，MIUI edge-to-edge 会把 `adjustResize` 退化为 visual viewport 平移：首轮指标为 `innerHeight=834`、`visualViewport.height=521.54`、`offsetTop=312.92`，composer 实际仍位于完整页面底部。原生桥因此补充了 WebView 物理高度约束。复验时键盘展开后的 `innerHeight=521`、`offsetTop=0`，composer 底边与键盘 frame 顶边同为约 521.54；顶栏保持 60，Messages 由 504 压缩到 298，Tab 高度为 0 且 `aria-hidden`/`inert` 生效。系统返回收起键盘后 `innerHeight` 恢复 834、Tab 恢复 106.25；灵感页顶栏与元信息区保持固定，正文 textarea 独占剩余 136px 并内部滚动。ADB 实屏截图与 debug WebView 边界数据一致。iPhone 当前在 CoreDevice 中为 unavailable；最新 iOS simulator 包已在 iPhone 17 Pro / iOS 26.5 上安装、启动并保存基线截图，但主机可访问性树没有暴露 WebView 内控件，因此没有把未执行的键盘交互标为通过。
 
 ## 3. 已确认的 P0 问题
 
