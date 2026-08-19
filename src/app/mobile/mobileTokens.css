@@ -86,7 +86,7 @@
     --mobile-glass-filter: blur(8px) saturate(1.3);
     --mobile-glass-filter-soft: blur(2px);
     --mobile-nav-glass-filter: blur(16px) saturate(1.3);
-    --mobile-nav-surface: color-mix(in srgb, var(--fc-color-bg) 70%, transparent);
+    --mobile-nav-surface: color-mix(in srgb, var(--fc-color-bg) 0%, transparent);
 
     --mobile-radius-card: var(--fc-radius-xl);
     --mobile-radius-field: var(--fc-radius-xl);
