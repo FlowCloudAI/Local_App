@@ -8,7 +8,11 @@ const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), '
 const mobileNavSource = readFileSync(new URL('./MobileNav.tsx', import.meta.url), 'utf8')
 const mobileNavCss = readFileSync(new URL('./MobileNav.css', import.meta.url), 'utf8')
 const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.tsx', import.meta.url), 'utf8')
+const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', import.meta.url), 'utf8')
+const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
+const mobileTopControlsSource = readFileSync(new URL('./components/MobileTopControls.tsx', import.meta.url), 'utf8')
+const mobileTopControlsCss = readFileSync(new URL('./components/MobileTopControls.css', import.meta.url), 'utf8')
 const mobileAiConversationDrawerSource = readFileSync(new URL('./pages/MobileAiConversationDrawer.tsx', import.meta.url), 'utf8')
 const mobileSettingsSectionsSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
 const mobileWorldCheckSource = readFileSync(new URL('./pages/MobileWorldCheck.tsx', import.meta.url), 'utf8')
@@ -91,6 +95,35 @@ test('AI 输入区使用紧凑 capsule，同时保留独立的透明命中层', 
     assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send\s*\{[\s\S]*?background:\s*var\(--fc-color-primary\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send \.mobile-ai-svg\s*\{[\s\S]*?width:\s*var\(--mobile-gap-group\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send \.mobile-ai-svg :is\(path, rect\)\s*\{[\s\S]*?vector-effect:\s*non-scaling-stroke/)
+})
+
+test('AI 模型选择器与标准顶栏表面消费同一高度 Token', () => {
+    assert.match(tokensCss, /--mobile-top-surface-size:\s*2\.5rem/)
+    assert.match(mobileTopControlsCss, /\.mobile-top-action-pill\s*\{[\s\S]*?height:\s*var\(--mobile-top-surface-size\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-model-pill\s*\{[\s\S]*?--fc-control-tap-min:\s*var\(--mobile-top-surface-size\);[\s\S]*?height:\s*var\(--mobile-top-surface-size\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-model-pill::after\s*\{[\s\S]*?inset-block:\s*calc\(0px - var\(--mobile-gap-text\)\)/)
+})
+
+test('AI 模型按钮使用左对齐正文字号，菜单选中态使用 SVG', () => {
+    assert.match(mobileAiChatCss, /\.mobile-ai-model-pill\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?font-size:\s*var\(--mobile-text-body-sm\);[\s\S]*?text-align:\s*left;/)
+    assert.match(mobileTopControlsSource, /export function MobileCheckIcon\(\)[\s\S]*?<svg[\s\S]*?<path/)
+    assert.equal((mobileAiComposerSource.match(/<MobileCheckIcon\/>/g) ?? []).length, 2)
+    assert.doesNotMatch(mobileAiChatCss, /content:\s*["']✓["']/)
+})
+
+test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {
+    assert.match(mobileAiChatUiSource, /M7\.6 8h8\.8v4\.2a4\.4 4\.4 0 0 1-8\.8 0Z/)
+    assert.match(mobileAiChatUiSource, /M13\.3 3\.5 6\.9 12\.6h4\.9l-1\.1 7\.9 6\.4-9\.4h-4\.8Z/)
+    assert.match(mobileAiChatUiSource, /fill: 'currentColor', strokeWidth: 2\.1/)
+    assert.match(mobileAiChatUiSource, /M12 8\.8C10 7\.2 7\.6 6\.4 4\.7 6\.4v10\.3/)
+    assert.match(mobileAiChatUiSource, /M12 3\.6 19 6\.3v5\.2c0 4\.3-2\.8 7\.3-7 8\.9/)
+    assert.match(mobileAiChatUiSource, /m5 19 1\.2-4\.7L15\.5 5a1\.6 1\.6 0 0 1 2\.3 0/)
+})
+
+test('AI 空消息态不会被末尾滚动锚点制造伪滚动距离', () => {
+    assert.match(mobileAiMessageListSource, /const showEmptyState = messages\.length === 0 && !isStreaming/)
+    assert.match(mobileAiMessageListSource, /mobile-ai-chat__messages--empty/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{\s*gap:\s*0;/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {

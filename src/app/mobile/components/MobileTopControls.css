@@ -108,6 +108,18 @@
     stroke-width: 2.8;
 }
 
+.mobile-check-icon {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.35;
+}
+
 .mobile-top-control-svg--inline {
     width: 1em;
     height: 1em;

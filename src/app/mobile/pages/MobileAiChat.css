@@ -223,14 +223,18 @@
 }
 
 .mobile-ai-model-pill {
+    /* 视觉表面跟随标准顶栏 40px Token；透明命中层仍补足移动端 48px 触摸基线。 */
+    --fc-control-tap-min: var(--mobile-top-surface-size);
+
     display: inline-flex;
+    position: relative;
     width: fit-content;
     max-width: 100%;
     min-width: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: var(--mobile-gap-inline);
     padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
@@ -238,14 +242,22 @@
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     color: var(--fc-color-primary);
     font: inherit;
-    font-size: var(--mobile-text-meta);
+    font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-strong);
+    text-align: left;
     cursor: pointer;
     transition:
         opacity var(--mobile-duration-fast) var(--mobile-ease-standard),
         transform var(--mobile-duration-fast) var(--mobile-ease-standard);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+}
+
+.mobile-ai-model-pill::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-text));
+    inset-inline: 0;
+    content: '';
 }
 
 .mobile-ai-model-pill span {
@@ -350,14 +362,6 @@
     visibility: hidden;
 }
 
-.mobile-ai-model-menu__row.active .mobile-anchored-menu__check::before {
-    color: currentColor;
-    content: "✓";
-    font-size: var(--mobile-text-body);
-    font-weight: var(--mobile-weight-strong);
-    line-height: var(--mobile-leading-tight) ;
-}
-
 .mobile-ai-model-menu__row .mobile-ai-svg {
     width: 1.15rem;
     height: 1.15rem;
@@ -422,6 +426,11 @@
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
     display: none;
+}
+
+/* 空状态后的零高度滚动锚点不应凭 flex gap 制造一段可滚动距离。 */
+.mobile-ai-chat__messages--empty {
+    gap: 0;
 }
 
 .mobile-ai-chat__message {
