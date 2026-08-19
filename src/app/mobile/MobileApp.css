@@ -13,6 +13,8 @@
 }
 
 .mobile-app {
+    --mobile-nav-reserved-height: var(--mobile-nav-height);
+
     display: flex;
     box-sizing: border-box;
     flex-direction: column;
@@ -26,6 +28,11 @@
     /* 允许单指横纵滚动，但禁止 WebView 把双指手势解释成整页缩放。 */
     touch-action: pan-x pan-y;
     overflow: hidden;
+}
+
+/* 停靠键盘接管底部空间时，页面直接延伸到键盘上沿，不再为已隐藏的 Tab 留空。 */
+.mobile-app[data-native-keyboard='docked'] {
+    --mobile-nav-reserved-height: 0px;
 }
 
 /* 移动端普通按钮默认采用胶囊规范；显式形状、图标按钮和按钮组仍由组件调用方决定。 */
@@ -177,8 +184,10 @@
     bottom: 0;
     left: 0;
     display: flex;
+    box-sizing: border-box;
     min-height: 0;
     flex-direction: column;
+    padding-bottom: var(--mobile-nav-reserved-height);
     overflow: hidden;
     background: var(--fc-color-bg);
     visibility: hidden;

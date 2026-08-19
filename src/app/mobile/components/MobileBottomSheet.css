@@ -16,6 +16,11 @@ body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-app {
     padding-bottom: 0;
 }
 
+/* 可输入 Sheet 出场期间背景布局保持原高度，避免 Tab 改为覆盖层后背景内容突然下沉。 */
+body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-app[data-native-keyboard='docked'] {
+    --mobile-nav-reserved-height: var(--mobile-nav-height);
+}
+
 body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-nav.is-keyboard-suppressed {
     display: flex;
 }

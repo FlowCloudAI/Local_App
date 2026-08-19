@@ -14,6 +14,7 @@ const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', 
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
 const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
+const glassEffectCss = readFileSync(new URL('../../glassEffect.css', import.meta.url), 'utf8')
 const mobileTopControlsSource = readFileSync(new URL('./components/MobileTopControls.tsx', import.meta.url), 'utf8')
 const mobileTopControlsCss = readFileSync(new URL('./components/MobileTopControls.css', import.meta.url), 'utf8')
 const overlaySource = readFileSync(new URL('../../shared/ui/overlay/Overlay.tsx', import.meta.url), 'utf8')
@@ -44,6 +45,17 @@ test('页面 gutter 与底栏共同消费左右安全区', () => {
     assert.match(mobileNavCss, /var\(--mobile-safe-left\)/)
     assert.match(mobileNavCss, /var\(--mobile-safe-right\)/)
     assert.doesNotMatch(mobileAppCss, /env\(safe-area-inset-/)
+})
+
+test('底部导航覆盖到机器底部并由 Tab 视图统一保护内容', () => {
+    assert.match(tokensCss, /--mobile-nav-height:\s*calc\(var\(--mobile-nav-content-height\) \+ var\(--mobile-safe-bottom\)\)/)
+    assert.match(tokensCss, /--mobile-nav-glass-filter:\s*blur\(16px\)/)
+    assert.match(tokensCss, /--mobile-nav-surface:\s*color-mix\([^;]+transparent\)/)
+    assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*?--mobile-nav-reserved-height:\s*var\(--mobile-nav-height\)/)
+    assert.match(mobileAppCss, /\.mobile-app\[data-native-keyboard='docked'\]\s*\{\s*--mobile-nav-reserved-height:\s*0px;/)
+    assert.match(mobileAppCss, /\.mobile-app__tab-view\s*\{[\s\S]*?padding-bottom:\s*var\(--mobile-nav-reserved-height\)/)
+    assert.match(mobileNavCss, /\.mobile-nav\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*0;[\s\S]*?height:\s*var\(--mobile-nav-height\)/)
+    assert.match(glassEffectCss, /:root \.mobile-nav\s*\{[\s\S]*?background:\s*var\(--mobile-nav-surface\);[\s\S]*?backdrop-filter:\s*var\(--mobile-nav-glass-filter\)/)
 })
 
 test('Android 通过 WindowInsets 补齐系统栏安全区并允许横屏', () => {
@@ -183,6 +195,7 @@ test('含输入控件的底部菜单独占键盘遮挡空间并冻结背景布�
     assert.match(overlaySource, /const overlayStyle: OverlayStyle = \{\s*\.\.\.layerStyle,/)
     assert.match(mobileBottomSheetCss, /\.mobile-bottom-sheet-layer\.is-keyboard-aware\s*\{[^}]*padding-bottom:\s*var\(--mobile-bottom-sheet-keyboard-inset/s)
     assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-app\s*\{\s*padding-bottom:\s*0;/)
+    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-app\[data-native-keyboard='docked'\]\s*\{\s*--mobile-nav-reserved-height:\s*var\(--mobile-nav-height\)/)
     assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-nav\.is-keyboard-suppressed\s*\{\s*display:\s*flex;/)
 })
 

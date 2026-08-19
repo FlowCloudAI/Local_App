@@ -82,9 +82,11 @@
     --mobile-drawer-edge-shadow-middle: color-mix(in srgb, var(--fc-color-bg-overlay) 38%, transparent);
     --mobile-drawer-edge-shadow-end: color-mix(in srgb, var(--fc-color-bg-overlay) 24%, transparent);
 
-    /* 毛玻璃只有“遮住内容”和“仍可辨认”两档。 */
+    /* 普通玻璃面只有“遮住内容”和“仍可辨认”两档；系统级 Tab 独立使用更强的 16px 模糊。 */
     --mobile-glass-filter: blur(8px) saturate(1.3);
     --mobile-glass-filter-soft: blur(2px);
+    --mobile-nav-glass-filter: blur(16px) saturate(1.3);
+    --mobile-nav-surface: color-mix(in srgb, var(--fc-color-bg) 70%, transparent);
 
     --mobile-radius-card: var(--fc-radius-xl);
     --mobile-radius-field: var(--fc-radius-xl);
@@ -95,6 +97,7 @@
     --mobile-topbar-offset: calc(var(--mobile-gap-group) + var(--mobile-gap-text));
     /* 底栏高度同时容纳 48px 命中区、图标与标签；图标保持系统 Tab 的 24px 视觉尺寸。 */
     --mobile-nav-content-height: calc(var(--mobile-tap-min) + var(--mobile-gap-item));
+    --mobile-nav-height: calc(var(--mobile-nav-content-height) + var(--mobile-safe-bottom));
     --mobile-nav-icon-size: 1.5rem;
     /* 封面占位字属于装饰图形，不参与正文的 5 档字号标尺。 */
     --mobile-decorative-mark-size: 4.75rem;
@@ -152,6 +155,8 @@
     --mobile-surface-dialog: var(--fc-color-bg-elevated);
     --mobile-glass-filter: none;
     --mobile-glass-filter-soft: none;
+    --mobile-nav-glass-filter: none;
+    --mobile-nav-surface: var(--fc-color-bg);
 }
 
 @media (prefers-reduced-motion: reduce) {

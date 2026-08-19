@@ -1,18 +1,21 @@
 .mobile-nav {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: flex;
     box-sizing: border-box;
+    height: var(--mobile-nav-height);
     justify-content: space-around;
     align-items: stretch;
     /* 按钮区与安全区底部间距不互相覆盖。 */
-    max-height: calc(var(--mobile-nav-content-height) + var(--mobile-safe-bottom));
     padding:
         0
         max(var(--mobile-gap-inline), var(--mobile-safe-right))
         var(--mobile-safe-bottom)
         max(var(--mobile-gap-inline), var(--mobile-safe-left));
     overflow: hidden;
-    background: transparent;
-    flex-shrink: 0;
+    /* 底色与 16px 毛玻璃见 src/glassEffect.css，关闭毛玻璃/高对比度时自动降级。 */
     z-index: var(--mobile-z-nav);
 }
 
