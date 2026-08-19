@@ -47,7 +47,7 @@
 |---|---|---|
 | IOS-001 | 最低支持版本提升到 iOS 16.2+ | 不再为 iOS 14/15 维护 `color-mix()` 双套 fallback |
 | IOS-002 | 使用小型 iOS 原生桥接支持 Dynamic Type | 原生层只暴露系统字号等级；业务 UI 继续通过共享字体 token 消费 |
-| IOS-005 | 键盘展开后保留底部 Tab | Tab 持续可见可用；切换前结束输入焦点，并继续经过页面离开闸门 |
+| IOS-005 | 停靠软键盘展开时隐藏底部 Tab | 以两端原生键盘区域为唯一布局依据；浮动键盘和外接键盘不隐藏 Tab，页面只压缩明确的内部滚动区 |
 | IOS-017 | 正式实现 iPad 自适应布局 | 复用现有 store、API 和领域组件，只新增 regular-width 壳层 |
 | IOS-018 | 保留 React 手势并补跟手进度 | 不改造为原生页面栈；iOS/Android 共用进度、取消区间和专项测试 |
 | IOS-019 | 使用 iOS 原生桥接读取降低透明度/提高对比度 | 与 Dynamic Type 共用轻量辅助功能桥接层，Windows/Android 不依赖该实现 |
@@ -63,7 +63,7 @@
 | IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
 | IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
 | IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
-| IOS-005 | 已按最新决策改为键盘展开时保留 Tab，待双端真机键盘验收 | 移动壳层继续监听文本焦点、`visualViewport` 和整页编辑态，用于返回键与预测式返回协调；Tab 不再折叠或进入 `inert`。切 Tab 时先结束输入焦点，再经过页面离开闸门。壳层仍只观察键盘状态，不把 `visualViewport.height` 二次写回根节点 |
+| IOS-005 | 已完成原生键盘区域接入与页面布局准备，待双端真机键盘验收 | Android 以 `WindowInsets.Type.ime()`、iOS 以系统键盘 frame 为依据；只有与屏幕底边相接的停靠键盘会折叠并 `inert` Tab。原生层只缩放一次 WebView 可用高度，React 根保持固定；AI 仅压缩消息区，灵感页仅压缩正文 textarea |
 | IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
 | IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
 | IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |
@@ -73,6 +73,8 @@
 | IOS-021 | 已实现，待外接键盘验收 | 移动壳层的 Esc 处理不再限定 Android；iOS/iPadOS 与 Android 均先结束文本输入，再按浮层、抽屉、页面栈顺序返回 |
 
 2026-08-18 本批次的 34 项移动壳层专项测试、完整 lint、TypeScript/Vite 生产构建与 iOS 16.2 simulator debug 原生构建均通过。输入视口又在 iPhone 17 Pro（iOS 26.5）模拟器上进入输入流程并截图；修复后的输入区没有二次收缩，系统收起软键盘且输入焦点仍保留时，底部 Tab 已在模拟器画面中恢复。应用深色主题下的 iOS 原生状态栏图标同步也已截图确认。Android 代码已实现 WindowInsets、系统字号/高对比度、系统栏主题、触觉与预测式返回，但当前 Mac 未安装或未配置 Android SDK/NDK，debug APK 命令在进入编译前被环境检查阻断，因此 Android 原生包与真机表现仍标为未验证。
+
+2026-08-19 键盘架构更新：项目负责人撤销“软键盘展开时保留 Tab”的决定，改为由原生层提供键盘几何并管理 WebView 可用区域。共享 Web 根不再读取 `visualViewport.height` 写回根高度；Android 明确使用 `adjustResize`，iOS 仅在全宽停靠键盘与 WebView 底边相交时缩短 WebView。AI 页已改为“顶栏 / 消息滚动区 / 输入区”三行布局，灵感页已改为固定外壳与 textarea 内部滚动。22 项移动专项测试、完整 lint、前端生产构建、Android Kotlin/Manifest 编译和 iOS 16.2 simulator debug 构建均已通过；双端真实键盘行为仍待设备截图验收。
 
 ## 3. 已确认的 P0 问题
 
@@ -105,12 +107,12 @@
 - **建议**：在移动壳层集中定义 `max(page-padding, env(safe-area-inset-left/right))`，页面与底栏都消费同一组逻辑方向 token。
 - **实现状态**：已完成代码实现。页面、顶栏、AI composer、底栏及侧抽屉均消费共享安全区 token；待 iPhone/Android 横屏和 edge-to-edge 实机验收。
 
-### IOS-005：输入模式仍保留底部 Tab，横屏时还会被键盘遮挡
+### IOS-005：键盘布局曾依赖 WebView 推断，页面与 Tab 无法稳定分配空间
 
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
-- **最新决策方案**：保留底部 Tab，不因文本焦点、软键盘或整页编辑态折叠、隐藏或禁用。切换 Tab 时先结束当前输入焦点，再继续执行页面离开闸门；未保存内容仍由页面确认流程保护。返回键/Esc 继续优先结束输入，预测式返回在输入期间仍暂停。
-- **实现状态**：已按最新决策调整共享移动壳层。共享 hook 仍以文本焦点、`visualViewport` 键盘差值和 `data-mobile-editing` 三路判断输入状态，但只服务返回键与预测式返回，不再驱动 Tab 的 `aria-hidden`、`inert`、样式折叠或点击拦截。此前的双重收缩修复保持不变：壳层只观察 viewport，不把 `visualViewport.height` 回写根节点。输入会话仍保留最近一次无键盘完整高度，并以低频补采样处理 WebView 事件乱序。待 iPhone 与 Android 真机验证键盘展开时 Tab 的位置、点击切换、未保存确认和返回键顺序。
+- **最新决策方案**：停靠软键盘出现时隐藏并禁用底部 Tab；浮动键盘与外接键盘不隐藏。键盘区域由 iOS/Android 原生 API 提供，WebView/页面外壳只缩放一次；业务页声明自己的唯一滚动所有者，不允许浏览器把整个页面平移到键盘上方。返回键/Esc 仍优先结束输入，预测式返回在输入期间继续暂停。
+- **实现状态**：共享移动壳层已接入原生键盘指标 store。Android 从 `WindowInsets.Type.ime()` 和 insets animation 持续发布遮挡高度，使用 `adjustResize`；iOS 监听系统键盘 frame，仅为与底边相接的停靠键盘调整 WKWebView frame。Tab 只在原生指标确认 `docked` 时折叠、`aria-hidden` 并 `inert`，不再依据焦点或 `visualViewport` 猜测。Web 根固定为原生 WebView 的真实 `100%` 高度；AI 页只滚动 Messages，composer 始终在键盘上方；灵感页只滚动正文 textarea。待 iPhone 与 Android 真机验证键盘打开、系统收起、浮动/外接键盘及横屏流程。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
@@ -245,7 +247,7 @@
 ### 第一批：阻断 iOS 验收
 
 1. 将最低支持版本统一提升到 iOS 16.2，并同步配置与文档。
-2. 修复 16px 输入、Dynamic Type、左右安全区；键盘展开时保留可用 Tab，并完成键盘避让。
+2. 修复 16px 输入、Dynamic Type、左右安全区；由原生键盘区域驱动停靠键盘时的 Tab 折叠和页面内部空间压缩。
 3. 提升三级文字对比度，统一 44pt 点击区。
 
 ### 第二批：完成 VoiceOver/键盘基线
@@ -272,7 +274,7 @@
 ## 7. 验收清单
 
 - iOS 16.2 作为最老支持版本能完成冷启动、核心导航、输入和样式渲染，所有构建配置与发布文档版本一致。
-- iPhone 竖屏/横屏：输入聚焦不缩放；键盘不遮挡输入和提交操作；底部 Tab 在键盘展开时保持可见可用，切换会结束输入并遵守未保存离开确认；左右安全区正确。
+- iPhone/Android 竖屏与横屏：输入聚焦不缩放；停靠键盘不遮挡输入和提交操作，Tab 隐藏且不可交互；系统收起后 Tab 恢复；浮动键盘与外接键盘不误隐藏 Tab；AI 只滚动消息区，灵感页只滚动正文；左右安全区正确。
 - Dynamic Type：从默认字号到最大辅助字号，核心任务可完成，无裁切、重叠和不可达操作。
 - VoiceOver：可识别当前 Tab/筛选/会话、项目/词条卡片、搜索框、抽屉、AI 消息作者与消息操作，并能获知设定检测进度。
 - 外接键盘：Esc 能按层级关闭锚点菜单、抽屉和对话框，关闭后焦点返回触发器。
