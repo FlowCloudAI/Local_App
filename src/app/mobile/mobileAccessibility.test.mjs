@@ -13,6 +13,8 @@ const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageL
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
 const mobileTopControlsSource = readFileSync(new URL('./components/MobileTopControls.tsx', import.meta.url), 'utf8')
 const mobileTopControlsCss = readFileSync(new URL('./components/MobileTopControls.css', import.meta.url), 'utf8')
+const overlaySource = readFileSync(new URL('../../shared/ui/overlay/Overlay.tsx', import.meta.url), 'utf8')
+const overlayCss = readFileSync(new URL('../../shared/ui/overlay/Overlay.css', import.meta.url), 'utf8')
 const mobileAiConversationDrawerSource = readFileSync(new URL('./pages/MobileAiConversationDrawer.tsx', import.meta.url), 'utf8')
 const mobileSettingsSectionsSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
 const mobileWorldCheckSource = readFileSync(new URL('./pages/MobileWorldCheck.tsx', import.meta.url), 'utf8')
@@ -122,6 +124,16 @@ test('AI 工具模式菜单使用轻量标记选中态与紧邻标题的普通�
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\.active::before\s*\{[\s\S]*?width:\s*2px;[\s\S]*?background:\s*var\(--fc-color-primary\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__label \.mobile-check-icon\s*\{[\s\S]*?width:\s*0\.875rem;[\s\S]*?stroke-width:\s*2;/)
     assert.doesNotMatch(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row--(?:reader|writer)\.active/)
+})
+
+test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
+    assert.match(mobileAiComposerSource, /<MobileBottomSheet open=\{p\.morePanelOpen\}/)
+    assert.match(overlaySource, /if \(variant === 'sheet'\)/)
+    assert.match(overlaySource, /mountedFrame = window\.requestAnimationFrame\(\(\) => \{[\s\S]*?activeFrame = window\.requestAnimationFrame/)
+    assert.match(overlaySource, /closedFrame = window\.requestAnimationFrame\(\(\) => \{\s*unmountFrame = window\.requestAnimationFrame/)
+    assert.match(overlaySource, /data-state=\{active \? 'open' : 'closed'\}/)
+    assert.match(overlayCss, /\.fc-overlay--sheet \.fc-overlay__panel\s*\{\s*transform:\s*translateY\(100%\)/)
+    assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
 })
 
 test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {
