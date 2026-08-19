@@ -6,9 +6,11 @@
 
 ## 文档入口
 
-本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `排障` / `归档` / `失效`），先看状态再决定要不要读。`docs/`、`plans/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
+本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `归档` / `结论记录` / `失效`），先看状态再决定要不要读。`docs/`、`plans/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
 
-跨子项目文档在工作区根 `docs/README.md`。**写、移、删文档前先读根 `AGENTS.md` §9 文档规约**——状态标记、放置规则、证据要求都在那里。
+**问题排查记录（问题 → 根因 → 方案）不放本仓**，统一在工作区根 `docs/devlog/`，索引 `docs/devlog/README.md`。`app_main` 是 devlog 里条目最多的仓库——动移动端、构建链路、地图渲染前先扫一眼，多数坑已经踩过。
+
+跨子项目文档在工作区根 `docs/README.md`。**写、移、删文档前先读根 `AGENTS.md` §9 文档规约**——状态标记、放置规则、devlog 格式、证据要求都在那里。
 
 ## 构建 / 运行 / 测试 / lint
 
@@ -115,7 +117,7 @@ IOS_BUILD_NUMBER=42 npm run ios:archive
 
 ## Android 调试与打包（主要在 Windows）
 
-Android 当前的固定入口是 `package.json` 中的脚本；[`docs/tauri_android_dev_debugging.md`](docs/tauri_android_dev_debugging.md) 记录模拟器网络故障的原因与排查方式。Android Studio/SDK、Platform Tools、NDK、Rust Android targets 与至少一个 AVD 应先准备好。
+Android 当前的固定入口是 `package.json` 中的脚本；模拟器网络故障的原因与排查方式记录在工作区 `docs/devlog/2026-08-16-android-模拟器-vite-不可达.md`（该文件在根仓库，不在本仓）。Android Studio/SDK、Platform Tools、NDK、Rust Android targets 与至少一个 AVD 应先准备好。
 
 ### 调试入口
 

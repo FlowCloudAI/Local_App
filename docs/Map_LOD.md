@@ -1,5 +1,9 @@
 # 地图 Pixi LOD 实现报告
 
+> 状态：归档 ｜ 记录日期：2026-05-26
+>
+> 「旧问题」与「为什么这次能解决」两节已抽成开发记录 `docs/devlog/2026-05-26-地图-lod-固定容差失效.md`（在工作区根仓库，不在本仓）。本文保留完整实现细节。
+
 ## 背景
 
 `app_main/src/features/maps/components/MapShapeEditor/MapPixiPreview.tsx` 是当前地图预览的主渲染路径。Deck 已降为回退预览，SVG 主要承担编辑层交互。

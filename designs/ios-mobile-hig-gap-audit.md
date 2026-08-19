@@ -76,7 +76,7 @@
 
 2026-08-19 键盘架构第二次更新：物理缩短 WebView 与 WebView 自身键盘补偿会在动画期间竞争，因此两端改为固定原生 WebView，由原生只发布稳定的最终键盘遮挡，Web 根只消费一次 `occludedBottom`。Android 使用 `adjustNothing`，不在 insets animation 的 `onProgress` 中改尺寸或执行 JavaScript；iOS 不再动画或改写 `WKWebView.frame`，只监听 `UIKeyboardWillChangeFrame`。底栏改为一次性显隐，不再动画 `max-height` / `padding`；`visualViewport` 只在原生桥不可用时兜底。AI 与灵感页的内部单滚动区结构保持不变。本次重构需重新完成双端真机验收，旧物理缩放方案的通过结论不沿用。
 
-同日后续补齐了 Portal 浮层的键盘所有权：含输入控件的 AI 更多菜单显式消费键盘遮挡，背景页面在浮层存续期间保持原布局。Android 真机已验证菜单升起、系统返回收起键盘及菜单回落；iOS 仍需真机复验。当天完整的问题链、失败方案、最终约束与验证边界见 [`docs/mobile-native-ui-retrospective-2026-08-19.md`](../docs/mobile-native-ui-retrospective-2026-08-19.md)。
+同日后续补齐了 Portal 浮层的键盘所有权：含输入控件的 AI 更多菜单显式消费键盘遮挡，背景页面在浮层存续期间保持原布局。Android 真机已验证菜单升起、系统返回收起键盘及菜单回落；iOS 仍需真机复验。当天完整的问题链、失败方案、最终约束与验证边界见工作区 `docs/devlog/2026-08-19-移动端原生交互-复盘.md`（该文件在根仓库，不在本仓）。
 
 同日较早的 Android 真机数据仍用于说明问题来源：MIUI edge-to-edge 曾把 `adjustResize` 退化为 visual viewport 平移，首轮为 `innerHeight=834`、`visualViewport.height=521.54`、`offsetTop=312.92`。随后“直接约束 WebView 物理高度”的方案虽一度让 composer 与键盘边界对齐，却在键盘动画中引入最终 insets、中间帧和 WebView 自身补偿的竞争，现已撤销；当时的复验数据不能作为当前固定 WebView 方案的验收结果。
 

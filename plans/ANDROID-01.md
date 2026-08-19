@@ -41,7 +41,7 @@
 | 插件管理 | 设置页已有安装、卸载、插件库与类型筛选 | 🚧 待真实 `.fcplug` 验收 |
 | 共享浮层 | 已有 `Overlay`、`FloatingPanel`、`MobileBottomSheet`、`ActionMenu`、`RenameDialog` 等真实用例 | 🚧 待手势与安全区回归 |
 
-更细的世界观能力矩阵见根仓库 [`docs/Mobile_world.md`](../../docs/Mobile_world.md)；该文档是能力审计，不再承担总计划职责。
+更细的世界观能力矩阵见 [`docs/Mobile_world.md`](../docs/Mobile_world.md)；该文档是能力审计，不再承担总计划职责。
 
 ## 4. P0 · AI 词条编辑差异审阅
 
