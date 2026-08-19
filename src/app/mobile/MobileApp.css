@@ -229,8 +229,16 @@
     flex-direction: column;
     overflow: hidden;
     background: var(--fc-color-bg);
-    visibility: hidden;
+    /*
+     * 直接前驱必须保持可绘制。手势开始时才从 visibility:hidden 恢复会让 Android
+     * WebView 在首帧同时栅格化整页并建立 transform 层，表现为底层页面闪现。
+     */
+    visibility: visible;
     pointer-events: none;
+}
+
+.mobile-page-transition-host__layer.is-underlay {
+    z-index: 1;
 }
 
 .mobile-page-transition-host__layer.is-top {
@@ -240,8 +248,6 @@
 }
 
 .mobile-page-transition-host__layer.is-underlay.is-edge-back-underlay {
-    z-index: 1;
-    visibility: visible;
     transform: translate3d(var(--mobile-edge-back-underlay-shift, 0), 0, 0);
 }
 

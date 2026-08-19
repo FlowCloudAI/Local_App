@@ -614,8 +614,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     '--mobile-entry-drawer-progress': sideDrawerProgress,
                     '--mobile-edge-back-shift': `${activeEdgeBackOffset}px`,
                     '--mobile-edge-back-progress': activeEdgeBackProgress,
-                    '--mobile-edge-back-underlay-shift': `calc(var(--mobile-gap-section) * -1 * ${1 - activeEdgeBackProgress})`,
-                    '--mobile-edge-back-underlay-scrim-opacity': 1 - activeEdgeBackProgress,
+                    '--mobile-edge-back-underlay-shift': activeEdgeBackPhase === 'idle'
+                        ? '0px'
+                        : `calc(var(--mobile-gap-section) * -1 * ${1 - activeEdgeBackProgress})`,
+                    '--mobile-edge-back-underlay-scrim-opacity': activeEdgeBackPhase === 'idle'
+                        ? 0
+                        : 1 - activeEdgeBackProgress,
                 } as CSSProperties}
             >
                 {mobileSideDrawerEnabled && (
