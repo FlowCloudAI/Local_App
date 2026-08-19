@@ -55,12 +55,14 @@ test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
     assert.match(androidBridge, /WindowInsetsAnimationCompat\.Callback/)
     assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
+    assert.match(androidManifest, /android:windowSoftInputMode="adjustResize"/)
 })
 
 test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
     assert.match(iosBridge, /UIKeyboardWillChangeFrameNotification/)
     assert.match(iosBridge, /convertRect:FCALastKeyboardScreenFrame[\s\S]*fromCoordinateSpace:/)
-    assert.match(iosBridge, /intersection\.size\.width >= webView\.bounds\.size\.width \* 0\.8/)
+    assert.match(iosBridge, /intersection\.size\.width >= fullFrame\.size\.width \* 0\.8/)
+    assert.match(iosBridge, /webView\.frame = targetFrame/)
     assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
 })

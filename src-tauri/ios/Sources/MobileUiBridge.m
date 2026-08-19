@@ -121,18 +121,24 @@ static NSString *FCAKeyboardAnimationCurveName(UIViewAnimationCurve curve) {
 
 static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     UIWindow *window = webView.window;
-    if (window == nil) {
+    UIView *parentView = webView.superview;
+    if (window == nil || parentView == nil) {
         return;
     }
 
+    /*
+     * Wry 的主 WKWebView 以 FlexibleWidth/FlexibleHeight 填充父视图。键盘停靠时直接缩短
+     * 这块真实原生视口，Web 页面只会经历一次可用高度变化，不再靠 visualViewport 补写根高度。
+     */
+    const CGRect fullFrame = parentView.bounds;
     CGRect intersection = CGRectNull;
     if (!FCAKeyboardForceHidden
         && FCALastKeyboardScreen != nil
         && window.screen == FCALastKeyboardScreen) {
         CGRect frameInWindow = [window convertRect:FCALastKeyboardScreenFrame
                                fromCoordinateSpace:window.screen.coordinateSpace];
-        CGRect frameInWebView = [webView convertRect:frameInWindow fromView:window];
-        intersection = CGRectIntersection(webView.bounds, frameInWebView);
+        CGRect frameInParent = [parentView convertRect:frameInWindow fromView:window];
+        intersection = CGRectIntersection(fullFrame, frameInParent);
     }
 
     const BOOL visible = !CGRectIsNull(intersection)
@@ -140,17 +146,35 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
         && intersection.size.width > 0
         && intersection.size.height > 0;
     const CGFloat bottomDelta = visible
-        ? fabs(CGRectGetMaxY(intersection) - CGRectGetMaxY(webView.bounds))
+        ? fabs(CGRectGetMaxY(intersection) - CGRectGetMaxY(fullFrame))
         : CGFLOAT_MAX;
     const BOOL docked = visible
         && bottomDelta <= 1.0
-        && intersection.size.width >= webView.bounds.size.width * 0.8;
+        && intersection.size.width >= fullFrame.size.width * 0.8;
+
+    CGRect targetFrame = fullFrame;
+    if (docked) {
+        targetFrame.size.height = MAX(0, CGRectGetMinY(intersection) - CGRectGetMinY(fullFrame));
+    }
+    const UIViewAnimationOptions animationOptions =
+        ((UIViewAnimationOptions)FCALastKeyboardAnimationCurve << 16)
+        | UIViewAnimationOptionBeginFromCurrentState
+        | UIViewAnimationOptionAllowUserInteraction;
+    if (FCALastKeyboardAnimationDuration > 0) {
+        [UIView animateWithDuration:FCALastKeyboardAnimationDuration
+                              delay:0
+                            options:animationOptions
+                         animations:^{ webView.frame = targetFrame; }
+                         completion:nil];
+    } else {
+        webView.frame = targetFrame;
+    }
 
     id frame = [NSNull null];
     if (visible) {
         frame = @{
-            @"x": @(MAX(0, CGRectGetMinX(intersection))),
-            @"y": @(MAX(0, CGRectGetMinY(intersection))),
+            @"x": @(MAX(0, CGRectGetMinX(intersection) - CGRectGetMinX(fullFrame))),
+            @"y": @(MAX(0, CGRectGetMinY(intersection) - CGRectGetMinY(fullFrame))),
             @"width": @(MAX(0, intersection.size.width)),
             @"height": @(MAX(0, intersection.size.height)),
         };
