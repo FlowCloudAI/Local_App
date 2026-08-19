@@ -75,7 +75,7 @@ app_main/
 
 ## 许可证与贡献方式
 
-- 许可证：本仓库当前未发现独立 `LICENSE`，以 FlowCloudAI 顶层授权策略执行。  
+- 许可证：`app_main/LICENSE`。  
 - PR 需补充 `npm run lint`、`npm run build`、`cd src-tauri && cargo test` 结果与关键复现步骤。  
 - 提交信息默认中文，描述风险与回退策略。  
 

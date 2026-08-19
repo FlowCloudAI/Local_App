@@ -89,7 +89,7 @@ debug 构建，不等同于 release。
 
     - 不启动 Vite 时应用仍能打开。
     - 内置模板、前端 `dist`、图标等资源可访问。
-    - 日志中没有 Windows 本机路径，例如 `E:\Projects\...`。
+    - 日志中没有开发机本机绝对路径（如 `E:\Projects\...`、`/Users/<用户名>/...`）。
     - APK 体积没有异常膨胀。
 
 ## Release 测试

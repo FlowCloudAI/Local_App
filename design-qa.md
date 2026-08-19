@@ -1,6 +1,11 @@
 # 词条默认封面层级调整视觉 QA
 
-- source visual truth path: `C:\Users\f1779\AppData\Local\Temp\codex-clipboard-3c7f6afd-2ef9-42d8-b2b1-479af4ced2b2.png`
+> **状态：结论记录（视觉证据已丢失）** ｜ QA 日期：2026-08-08
+>
+> 原始截图存放在当时 Windows 工作机的 `C:\Users\...\.codex\` 下，不在本仓库内，现已不可复核。
+> 本文只保留结论与判据描述；**结论无法再被证据反驳，引用时按“当时的判断”看待，不要当作现状**。
+> 后续设计 QA 一律按 `designs/audits/<主题>-<日期>/` 的做法把截图提交进仓库。
+
 - source reference image: 同上；用户明确要求移除重复类型方框，并把首字移出下部信息区
 - implementation screenshot path: unavailable
 - viewport: unavailable
