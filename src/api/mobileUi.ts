@@ -20,13 +20,14 @@ export interface MobileKeyboardFrame {
 /**
  * 原生键盘对 WebView 的遮挡状态，全部尺寸均使用 CSS 像素。
  *
- * `occludedBottom` 只表示从 WebView 底边连续向上的遮挡；iPad 浮动键盘即使 visible，
- * 该值也应为 0，避免把整个页面错误压缩到浮动键盘上方。
+ * `occludedBottom` 只表示 Web 页面仍需预留的底部遮挡；iPad 浮动键盘即使 visible，
+ * 该值也应为 0。若原生已经调整视口，`viewportAdjusted` 必须为 true，Web 不再重复预留。
  */
 export interface MobileKeyboardMetrics {
     source: MobileKeyboardMetricsSource
     visible: boolean
     docked: boolean
+    viewportAdjusted: boolean
     occludedBottom: number
     frame: MobileKeyboardFrame | null
     animationDurationMs: number
@@ -39,6 +40,7 @@ export const DEFAULT_MOBILE_KEYBOARD_METRICS: MobileKeyboardMetrics = Object.fre
     source: 'unavailable',
     visible: false,
     docked: false,
+    viewportAdjusted: false,
     occludedBottom: 0,
     frame: null,
     animationDurationMs: 0,
@@ -87,6 +89,7 @@ function normalizeKeyboardFrame(value: unknown): MobileKeyboardFrame | null {
 export function normalizeMobileKeyboardMetrics(payload: NativeMobileKeyboardMetrics): MobileKeyboardMetrics {
     const visible = payload.visible === true
     const docked = visible && payload.docked === true
+    const viewportAdjusted = payload.viewportAdjusted === true
     const supportedCurves: MobileKeyboardAnimationCurve[] = ['ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear']
     const animationCurve = supportedCurves.includes(payload.animationCurve as MobileKeyboardAnimationCurve)
         ? payload.animationCurve as MobileKeyboardAnimationCurve
@@ -96,7 +99,8 @@ export function normalizeMobileKeyboardMetrics(payload: NativeMobileKeyboardMetr
         source: 'native',
         visible,
         docked,
-        occludedBottom: docked ? finiteNonNegative(payload.occludedBottom) : 0,
+        viewportAdjusted,
+        occludedBottom: docked && !viewportAdjusted ? finiteNonNegative(payload.occludedBottom) : 0,
         frame: visible ? normalizeKeyboardFrame(payload.frame) : null,
         animationDurationMs: finiteNonNegative(payload.animationDurationMs),
         animationCurve,
@@ -107,6 +111,7 @@ function sameKeyboardMetrics(first: MobileKeyboardMetrics, second: MobileKeyboar
     return first.source === second.source
         && first.visible === second.visible
         && first.docked === second.docked
+        && first.viewportAdjusted === second.viewportAdjusted
         && first.occludedBottom === second.occludedBottom
         && first.animationDurationMs === second.animationDurationMs
         && first.animationCurve === second.animationCurve

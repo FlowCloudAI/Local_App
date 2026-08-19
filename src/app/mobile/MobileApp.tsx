@@ -127,11 +127,18 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const mobileKeyboardMetrics = useMobileKeyboardMetrics()
     const nativeKeyboardDocked = mobileKeyboardMetrics.source === 'native'
         && mobileKeyboardMetrics.docked
-        && mobileKeyboardMetrics.occludedBottom > 0
+    const reservedKeyboardInset = nativeKeyboardDocked && !mobileKeyboardMetrics.viewportAdjusted
+        ? mobileKeyboardMetrics.occludedBottom
+        : 0
     const mobileKeyboardStyle = useMemo(() => ({
+        '--mobile-keyboard-inset': `${reservedKeyboardInset}px`,
         '--mobile-keyboard-animation-duration': `${mobileKeyboardMetrics.animationDurationMs}ms`,
         '--mobile-keyboard-animation-curve': mobileKeyboardMetrics.animationCurve,
-    }) as CSSProperties, [mobileKeyboardMetrics.animationCurve, mobileKeyboardMetrics.animationDurationMs])
+    }) as CSSProperties, [
+        mobileKeyboardMetrics.animationCurve,
+        mobileKeyboardMetrics.animationDurationMs,
+        reservedKeyboardInset,
+    ])
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage

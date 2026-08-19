@@ -60,11 +60,9 @@ test('Android 原生桥只在稳定边界发布 IME 指标，不逐帧改写页�
     assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
     assert.doesNotMatch(progressBody, /updateMobileImeInsets|updateMobileWebViewKeyboardViewport|pushMobileKeyboardMetrics/)
-    assert.match(androidManifest, /android:windowSoftInputMode="adjustResize"/)
-    assert.match(androidBridge, /updateMobileWebViewKeyboardViewport\(\)/)
-    assert.match(androidBridge, /layoutParams\.height = desiredHeight/)
-    assert.match(androidBridge, /expandedHeight - mobileImeInsets\.bottom/)
-    assert.match(androidBridge, /layoutParams\.height = ViewGroup\.LayoutParams\.MATCH_PARENT/)
+    assert.match(androidManifest, /android:windowSoftInputMode="adjustNothing"/)
+    assert.match(androidBridge, /viewportAdjusted: false/)
+    assert.doesNotMatch(androidBridge, /updateMobileWebViewKeyboardViewport|layoutParams\.height/)
 })
 
 test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
@@ -89,6 +87,7 @@ test('移动文档锁定为原生 WebView 的真实高度，页面根不再独�
     assert.match(mobileAppCss, /:root\[data-fc-density="touch"\][\s\S]*#root[\s\S]*height:\s*100%[\s\S]*overflow:\s*hidden/)
     assert.match(mobileAppCss, /:root\[data-fc-density="touch"\] body[\s\S]*position:\s*fixed/)
     assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*height:\s*100%/)
+    assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*padding-bottom:\s*var\(--mobile-keyboard-inset/)
     assert.doesNotMatch(mobileAppCss, /height:\s*100d?vh/)
 })
 

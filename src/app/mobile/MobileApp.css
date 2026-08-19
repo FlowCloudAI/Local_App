@@ -14,9 +14,11 @@
 
 .mobile-app {
     display: flex;
+    box-sizing: border-box;
     flex-direction: column;
     width: 100%;
     height: 100%;
+    padding-bottom: var(--mobile-keyboard-inset, 0px);
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     font-family: var(--fc-font-family);

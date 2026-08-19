@@ -16,7 +16,6 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.MimeTypeMap
@@ -38,7 +37,6 @@ class MainActivity : TauriActivity() {
   private var mobileImeInsets: Insets = Insets.NONE
   private var mobileImeVisible = false
   private var mobileImeAnimationDurationMs = 0L
-  private var mobileWebViewExpandedHeightPx = 0
 
   companion object {
     init {
@@ -75,14 +73,8 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     this.webView = webView
-    webView.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-      if (!mobileImeVisible && view.height > 0) {
-        mobileWebViewExpandedHeightPx = view.height
-      }
-    }
     webView.addJavascriptInterface(MobileUiJavascriptBridge(), "flowcloudaiMobileUi")
     pushMobileUiEnvironment()
-    updateMobileWebViewKeyboardViewport()
     pushMobileKeyboardMetrics()
     ViewCompat.requestApplyInsets(window.decorView)
     if (AndroidRuntimeWorkarounds.isX86_64_16KbPageEnvironment) {
@@ -110,7 +102,6 @@ class MainActivity : TauriActivity() {
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
       updateMobileImeInsets(windowInsets)
-      updateMobileWebViewKeyboardViewport()
       pushMobileUiEnvironment()
       pushMobileKeyboardMetrics()
       windowInsets
@@ -141,7 +132,6 @@ class MainActivity : TauriActivity() {
           if (animation.typeMask and WindowInsetsCompat.Type.ime() == 0) return
           mobileImeAnimationDurationMs = 0L
           ViewCompat.getRootWindowInsets(window.decorView)?.let(::updateMobileImeInsets)
-          updateMobileWebViewKeyboardViewport()
           pushMobileKeyboardMetrics()
         }
       }
@@ -155,46 +145,12 @@ class MainActivity : TauriActivity() {
       && mobileImeInsets.bottom > 0
   }
 
-  /**
-   * edge-to-edge 厂商 WebView 可能把 adjustResize 退化成 visual viewport 平移。
-   * 原生层直接约束 WebView 物理高度，确保页面坐标系保持贴顶且只缩短可用高度。
-   */
-  private fun updateMobileWebViewKeyboardViewport() {
-    val target = webView ?: return
-    val layoutParams = target.layoutParams ?: return
-
-    if (!mobileImeVisible || mobileImeInsets.bottom <= 0) {
-      if (layoutParams.height != ViewGroup.LayoutParams.MATCH_PARENT) {
-        layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
-        target.layoutParams = layoutParams
-      }
-      return
-    }
-
-    if (mobileWebViewExpandedHeightPx <= 0 && target.height > 0) {
-      mobileWebViewExpandedHeightPx = target.height
-    }
-    val expandedHeight = mobileWebViewExpandedHeightPx.takeIf { it > 0 }
-      ?: target.rootView.height.takeIf { it > 0 }
-      ?: return
-    val parentHeight = (target.parent as? View)?.height?.takeIf { it > 0 } ?: expandedHeight
-    val desiredHeight = (expandedHeight - mobileImeInsets.bottom)
-      .coerceAtLeast(1)
-      .coerceAtMost(parentHeight)
-    if (layoutParams.height != desiredHeight) {
-      layoutParams.height = desiredHeight
-      target.layoutParams = layoutParams
-    }
-  }
-
   private fun pushMobileKeyboardMetrics() {
     val target = webView ?: return
     val density = resources.displayMetrics.density.coerceAtLeast(1f)
     val bottom = if (mobileImeVisible) mobileImeInsets.bottom / density else 0f
     val viewportWidth = target.width.coerceAtLeast(0) / density
-    val viewportHeightPx = mobileWebViewExpandedHeightPx.takeIf { it > 0 }
-      ?: (target.height + if (mobileImeVisible) mobileImeInsets.bottom else 0)
-    val viewportHeight = viewportHeightPx.coerceAtLeast(0) / density
+    val viewportHeight = target.height.coerceAtLeast(0) / density
     val frameTop = (viewportHeight - bottom).coerceAtLeast(0f)
     val duration = mobileImeAnimationDurationMs.coerceAtLeast(0L)
     val visible = mobileImeVisible && bottom > 0f
@@ -203,6 +159,7 @@ class MainActivity : TauriActivity() {
         const metrics = {
           visible: $visible,
           docked: $visible,
+          viewportAdjusted: false,
           occludedBottom: ${String.format(Locale.US, "%.2f", bottom)},
           frame: ${if (visible) "{ x: 0, y: ${String.format(Locale.US, "%.2f", frameTop)}, width: ${String.format(Locale.US, "%.2f", viewportWidth)}, height: ${String.format(Locale.US, "%.2f", bottom)} }" else "null"},
           animationDurationMs: $duration,
