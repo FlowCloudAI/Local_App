@@ -57,6 +57,9 @@ test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
     assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
     assert.match(androidManifest, /android:windowSoftInputMode="adjustResize"/)
+    assert.match(androidBridge, /updateMobileWebViewKeyboardViewport\(\)/)
+    assert.match(androidBridge, /layoutParams\.height = desiredHeight/)
+    assert.match(androidBridge, /expandedHeight - mobileImeInsets\.bottom/)
 })
 
 test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
