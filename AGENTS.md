@@ -6,7 +6,7 @@
 
 ## 文档入口
 
-本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `排障` / `归档` / `失效`），先看状态再决定要不要读。`docs/`、`todo/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
+本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `排障` / `归档` / `失效`），先看状态再决定要不要读。`docs/`、`plans/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
 
 跨子项目文档在工作区根 `docs/README.md`。
 
@@ -158,7 +158,9 @@ npm run android:build:signed:apk
 
 ```text
 app_main/
-├── designs/           # 正式界面修改前的单文件 HTML 设计稿
+├── designs/           # 正式界面修改前的单文件 HTML 设计稿与设计审计包
+├── docs/              # 项目文档（索引：docs/README.md）
+├── plans/             # 开放中的计划，完成后合并进 docs/ 或删除
 ├── src/               # 页面、路由、编辑器与状态层
 ├── src-tauri/         # Tauri 命令、窗口、文件、插件桥接
 ├── public/            # 前端静态资源
