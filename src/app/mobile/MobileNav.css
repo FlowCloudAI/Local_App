@@ -14,22 +14,10 @@
     background: transparent;
     flex-shrink: 0;
     z-index: var(--mobile-z-nav);
-    opacity: 1;
-    transform: translateY(0);
-    transition:
-        max-height var(--mobile-keyboard-animation-duration, var(--mobile-duration-base)) var(--mobile-keyboard-animation-curve, var(--mobile-ease-standard)),
-        padding-bottom var(--mobile-keyboard-animation-duration, var(--mobile-duration-base)) var(--mobile-keyboard-animation-curve, var(--mobile-ease-standard)),
-        opacity var(--mobile-duration-fast) var(--mobile-ease-standard),
-        transform var(--mobile-keyboard-animation-duration, var(--mobile-duration-base)) var(--mobile-keyboard-animation-curve, var(--mobile-ease-standard));
 }
 
 .mobile-nav.is-keyboard-suppressed {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(100%);
+    display: none;
 }
 
 .mobile-nav__item {
@@ -77,10 +65,4 @@
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-medium);
     line-height: var(--mobile-leading-tight) ;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .mobile-nav {
-        transition: none;
-    }
 }

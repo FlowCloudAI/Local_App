@@ -132,13 +132,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         : 0
     const mobileKeyboardStyle = useMemo(() => ({
         '--mobile-keyboard-inset': `${reservedKeyboardInset}px`,
-        '--mobile-keyboard-animation-duration': `${mobileKeyboardMetrics.animationDurationMs}ms`,
-        '--mobile-keyboard-animation-curve': mobileKeyboardMetrics.animationCurve,
-    }) as CSSProperties, [
-        mobileKeyboardMetrics.animationCurve,
-        mobileKeyboardMetrics.animationDurationMs,
-        reservedKeyboardInset,
-    ])
+    }) as CSSProperties, [reservedKeyboardInset])
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -607,7 +601,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     return (
         <div
             ref={mobileAppRef}
-            className={`mobile-app${nativeKeyboardDocked ? ' is-native-keyboard-docked' : ''}`}
+            className="mobile-app"
             data-native-keyboard={nativeKeyboardDocked ? 'docked' : mobileKeyboardMetrics.visible ? 'floating' : 'hidden'}
             style={mobileKeyboardStyle}
         >

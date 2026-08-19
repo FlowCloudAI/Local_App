@@ -67,9 +67,11 @@ test('Android 原生桥只在稳定边界发布 IME 指标，不逐帧改写页�
 
 test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
     assert.match(iosBridge, /UIKeyboardWillChangeFrameNotification/)
+    assert.doesNotMatch(iosBridge, /UIKeyboardWillHideNotification/)
     assert.match(iosBridge, /convertRect:FCALastKeyboardScreenFrame[\s\S]*fromCoordinateSpace:/)
     assert.match(iosBridge, /intersection\.size\.width >= fullFrame\.size\.width \* 0\.8/)
-    assert.match(iosBridge, /webView\.frame = targetFrame/)
+    assert.match(iosBridge, /@"viewportAdjusted": @NO/)
+    assert.doesNotMatch(iosBridge, /webView\.frame\s*=/)
     assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
 })
@@ -80,7 +82,8 @@ test('底部导航只服从原生停靠键盘指标，不再服从焦点或 visu
     assert.doesNotMatch(mobileAppSource, /keyboardSuppressed=\{mobileInputModeActive\}/)
     assert.match(mobileNavSource, /aria-hidden=\{keyboardSuppressed \|\| undefined\}/)
     assert.match(mobileNavSource, /inert=\{keyboardSuppressed\}/)
-    assert.match(mobileNavCss, /\.mobile-nav\.is-keyboard-suppressed[\s\S]*pointer-events:\s*none/)
+    assert.match(mobileNavCss, /\.mobile-nav\.is-keyboard-suppressed\s*\{[^}]*display:\s*none/s)
+    assert.doesNotMatch(mobileNavCss, /max-height var\(--mobile-keyboard|padding-bottom var\(--mobile-keyboard/)
 })
 
 test('移动文档锁定为原生 WebView 的真实高度，页面根不再独立滚动', () => {

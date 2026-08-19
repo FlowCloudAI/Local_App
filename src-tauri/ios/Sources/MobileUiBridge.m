@@ -9,7 +9,6 @@
 static NSString *const FCAMobileUiMessageHandlerName = @"flowcloudaiMobileUi";
 static CGRect FCALastKeyboardScreenFrame;
 static __weak UIScreen *FCALastKeyboardScreen;
-static BOOL FCAKeyboardForceHidden = YES;
 static NSTimeInterval FCALastKeyboardAnimationDuration = 0;
 static UIViewAnimationCurve FCALastKeyboardAnimationCurve = UIViewAnimationCurveEaseInOut;
 
@@ -126,14 +125,10 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
         return;
     }
 
-    /*
-     * Wry 的主 WKWebView 以 FlexibleWidth/FlexibleHeight 填充父视图。键盘停靠时直接缩短
-     * 这块真实原生视口，Web 页面只会经历一次可用高度变化，不再靠 visualViewport 补写根高度。
-     */
+    /* WebView 保持父视图尺寸；共享 Web 壳只消费一次最终遮挡，不与 UIKit 重复驱动动画。 */
     const CGRect fullFrame = parentView.bounds;
     CGRect intersection = CGRectNull;
-    if (!FCAKeyboardForceHidden
-        && FCALastKeyboardScreen != nil
+    if (FCALastKeyboardScreen != nil
         && window.screen == FCALastKeyboardScreen) {
         CGRect frameInWindow = [window convertRect:FCALastKeyboardScreenFrame
                                fromCoordinateSpace:window.screen.coordinateSpace];
@@ -152,24 +147,6 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
         && bottomDelta <= 1.0
         && intersection.size.width >= fullFrame.size.width * 0.8;
 
-    CGRect targetFrame = fullFrame;
-    if (docked) {
-        targetFrame.size.height = MAX(0, CGRectGetMinY(intersection) - CGRectGetMinY(fullFrame));
-    }
-    const UIViewAnimationOptions animationOptions =
-        ((UIViewAnimationOptions)FCALastKeyboardAnimationCurve << 16)
-        | UIViewAnimationOptionBeginFromCurrentState
-        | UIViewAnimationOptionAllowUserInteraction;
-    if (FCALastKeyboardAnimationDuration > 0) {
-        [UIView animateWithDuration:FCALastKeyboardAnimationDuration
-                              delay:0
-                            options:animationOptions
-                         animations:^{ webView.frame = targetFrame; }
-                         completion:nil];
-    } else {
-        webView.frame = targetFrame;
-    }
-
     id frame = [NSNull null];
     if (visible) {
         frame = @{
@@ -182,6 +159,7 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     NSDictionary *payload = @{
         @"visible": @(visible),
         @"docked": @(docked),
+        @"viewportAdjusted": @NO,
         @"occludedBottom": @(docked ? intersection.size.height : 0),
         @"frame": frame,
         @"animationDurationMs": @(MAX(0, FCALastKeyboardAnimationDuration * 1000)),
@@ -213,9 +191,6 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
     NSValue *frameValue = userInfo[UIKeyboardFrameEndUserInfoKey];
     NSNumber *durationValue = userInfo[UIKeyboardAnimationDurationUserInfoKey];
     NSNumber *curveValue = userInfo[UIKeyboardAnimationCurveUserInfoKey];
-    const BOOL hiding = [notification.name isEqualToString:UIKeyboardWillHideNotification];
-
-    FCAKeyboardForceHidden = hiding;
     if (frameValue != nil) {
         FCALastKeyboardScreenFrame = frameValue.CGRectValue;
     }
@@ -298,12 +273,6 @@ static void FCAInstallMobileUiBridge(void) {
             }];
         }
         [center addObserverForName:UIKeyboardWillChangeFrameNotification
-                            object:nil
-                             queue:NSOperationQueue.mainQueue
-                        usingBlock:^(NSNotification *notification) {
-            FCAHandleKeyboardNotification(notification);
-        }];
-        [center addObserverForName:UIKeyboardWillHideNotification
                             object:nil
                              queue:NSOperationQueue.mainQueue
                         usingBlock:^(NSNotification *notification) {
