@@ -11,6 +11,7 @@ const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.ts
 const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', import.meta.url), 'utf8')
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
+const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
 const mobileTopControlsSource = readFileSync(new URL('./components/MobileTopControls.tsx', import.meta.url), 'utf8')
 const mobileTopControlsCss = readFileSync(new URL('./components/MobileTopControls.css', import.meta.url), 'utf8')
 const overlaySource = readFileSync(new URL('../../shared/ui/overlay/Overlay.tsx', import.meta.url), 'utf8')
@@ -183,6 +184,13 @@ test('AI 页面使用固定外壳与单一消息滚动区响应原生键盘缩�
     assert.match(composerRule, /position:\s*relative;/)
     assert.doesNotMatch(mobileAiChatCss, /--mobile-ai-(?:topbar|composer)-space/)
     assert.doesNotMatch(composerRule, /position:\s*absolute;/)
+})
+
+test('灵感页固定外壳并只允许正文输入区内部滚动', () => {
+    assert.match(mobileIdeaCss, /\.mobile-idea\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\);[\s\S]*?overflow:\s*hidden;/)
+    assert.match(mobileIdeaCss, /\.mobile-idea__editor\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\);[\s\S]*?overflow:\s*hidden;/)
+    assert.match(mobileIdeaCss, /\.mobile-idea__content\s*\{[\s\S]*?height:\s*100%;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/)
+    assert.doesNotMatch(mobileIdeaCss, /\.mobile-idea__editor\s*\{[\s\S]*?var\(--mobile-safe-bottom\)/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {
