@@ -20,6 +20,7 @@ interface UseAndroidPredictiveBackOptions {
     beforeBack: () => boolean | void | Promise<boolean | void>
     commitBack: () => boolean | void | Promise<boolean | void>
     onStart: () => void
+    onFinish: () => void
 }
 
 export interface AndroidPredictiveBackState {
@@ -51,6 +52,7 @@ export function useAndroidPredictiveBack({
     beforeBack,
     commitBack,
     onStart,
+    onFinish,
 }: UseAndroidPredictiveBackOptions): AndroidPredictiveBackState {
     const [phase, setPhase] = useState<MobileEdgeBackPhase>('idle')
     const [progress, setProgress] = useState(0)
@@ -69,7 +71,7 @@ export function useAndroidPredictiveBack({
             window.clearTimeout(settleTimerRef.current)
             settleTimerRef.current = null
         }
-        const reset = () => {
+        const reset = (notifyFinish = false) => {
             clearSettle()
             eligibleRef.current = false
             activeRef.current = false
@@ -77,6 +79,7 @@ export function useAndroidPredictiveBack({
             latestProgressRef.current = 0
             setProgress(0)
             setPhase('idle')
+            if (notifyFinish) onFinish()
         }
         const settleToIdle = (nextPhase: MobileEdgeBackPhase, nextProgress: number, done?: () => void) => {
             clearSettle()
@@ -85,7 +88,7 @@ export function useAndroidPredictiveBack({
             settleTimerRef.current = window.setTimeout(() => {
                 settleTimerRef.current = null
                 done?.()
-                reset()
+                reset(true)
             }, getSettleDuration())
         }
         const handleStart = (event: Event) => {
@@ -161,7 +164,7 @@ export function useAndroidPredictiveBack({
             window.removeEventListener('flowcloudai:android-back-cancel', handleCancel)
             window.removeEventListener('flowcloudai:android-back-invoked', handleInvoke)
         }
-    }, [beforeBack, canAnimate, commitBack, enabled, onStart])
+    }, [beforeBack, canAnimate, commitBack, enabled, onFinish, onStart])
 
     return {
         phase,

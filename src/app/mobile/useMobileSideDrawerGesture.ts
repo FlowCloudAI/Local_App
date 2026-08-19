@@ -45,6 +45,8 @@ interface UseMobileSideDrawerGestureOptions {
     beforeEdgeBackGesture?: () => boolean | void | Promise<boolean | void>
     /** 首次确认边缘右划时通知外层锁定当前页身份，避免 pop 后新栈顶继承旧页位移。 */
     onEdgeBackStart?: () => void
+    /** 动画和无过渡归零完成时，与 idle 状态同批清理外层锁定的页面身份。 */
+    onEdgeBackFinish?: () => void
     /**
      * 每帧求值的让路谓词：返回 true 时本手势立即放弃当前这一划。
      *
@@ -70,6 +72,7 @@ export interface MobileSideDrawerGesture {
     edgeBackOffset: number
     edgeBackProgress: number
     edgeBackPhase: MobileEdgeBackPhase
+    completeEdgeBackTransition: () => void
     openDrawer: () => void
     closeDrawer: () => void
     pointerHandlers: HTMLAttributes<HTMLElement>
@@ -177,6 +180,17 @@ function getTagName(target: EventTarget | null): string {
     return target instanceof HTMLElement ? target.tagName : 'unknown'
 }
 
+function getEdgeBackTransitionDurationMs(): number {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0
+    const value = getComputedStyle(document.documentElement)
+        .getPropertyValue('--mobile-duration-base')
+        .trim()
+    if (!value) return 220
+    const amount = Number.parseFloat(value)
+    if (!Number.isFinite(amount)) return 220
+    return value.endsWith('s') && !value.endsWith('ms') ? amount * 1000 : amount
+}
+
 export function useMobileSideDrawerGesture({
     enabled,
     width,
@@ -185,6 +199,7 @@ export function useMobileSideDrawerGesture({
     onEdgeBackGesture,
     beforeEdgeBackGesture,
     onEdgeBackStart,
+    onEdgeBackFinish,
     shouldSuppress,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
     // 抽屉不在的页面（词条详情、世界观列表、各管理页、设置…）仍然要能边缘右划返回，
@@ -210,6 +225,7 @@ export function useMobileSideDrawerGesture({
     const suppressClickTimerRef = useRef<number | null>(null)
     const edgeBackSettleTimerRef = useRef<number | null>(null)
     const edgeBackResetFrameRef = useRef<number | null>(null)
+    const edgeBackSettlePhaseRef = useRef<'cancelling' | 'committing' | null>(null)
     const edgeBackAttemptRef = useRef(0)
 
     const clearSuppressClickTimer = useCallback(() => {
@@ -238,26 +254,14 @@ export function useMobileSideDrawerGesture({
         }
     }, [])
 
-    const cancelEdgeBack = useCallback(() => {
+    const finishEdgeBackVisual = useCallback(() => {
         edgeBackAttemptRef.current += 1
         clearEdgeBackSettle()
-        setDragging(false)
-        setEdgeBackOffset(0)
-        setEdgeBackProgress(0)
-        setEdgeBackPhase('cancelling')
-        edgeBackSettleTimerRef.current = window.setTimeout(() => {
-            edgeBackSettleTimerRef.current = null
-            setEdgeBackPhase('idle')
-        }, MOBILE_EDGE_BACK_GESTURE_TUNING.settleDurationMs)
-    }, [clearEdgeBackSettle])
-
-    const finishCommittedEdgeBack = useCallback(() => {
-        edgeBackAttemptRef.current += 1
-        clearEdgeBackSettle()
-        // 先给 React 一帧提交新页，再禁用过渡并将外壳无动画归零。
-        // 这样屏幕外的始终是旧页，不会在动画末尾闪回一帧。
+        edgeBackSettlePhaseRef.current = null
+        // 清理页面身份与 phase 前先禁用一帧过渡，避免 transform 层回收时闪回旧页。
         setDragging(true)
         edgeBackResetFrameRef.current = window.requestAnimationFrame(() => {
+            onEdgeBackFinish?.()
             setEdgeBackOffset(0)
             setEdgeBackProgress(0)
             setEdgeBackPhase('idle')
@@ -266,7 +270,52 @@ export function useMobileSideDrawerGesture({
                 setDragging(false)
             })
         })
-    }, [clearEdgeBackSettle])
+    }, [clearEdgeBackSettle, onEdgeBackFinish])
+
+    const cancelEdgeBack = useCallback(() => {
+        edgeBackAttemptRef.current += 1
+        clearEdgeBackSettle()
+        edgeBackSettlePhaseRef.current = 'cancelling'
+        setDragging(false)
+        setEdgeBackOffset(0)
+        setEdgeBackProgress(0)
+        setEdgeBackPhase('cancelling')
+        // transitionend 是主路径；兜底防止 WebView 丢事件或系统启用减少动态效果。
+        const fallbackDuration = getEdgeBackTransitionDurationMs() + 80
+        edgeBackSettleTimerRef.current = window.setTimeout(() => {
+            edgeBackSettleTimerRef.current = null
+            if (edgeBackSettlePhaseRef.current !== 'cancelling') return
+            finishEdgeBackVisual()
+        }, fallbackDuration)
+    }, [clearEdgeBackSettle, finishEdgeBackVisual])
+
+    const completeEdgeBackTransition = useCallback(() => {
+        const settlePhase = edgeBackSettlePhaseRef.current
+        if (!settlePhase) return
+        edgeBackSettlePhaseRef.current = null
+        if (edgeBackSettleTimerRef.current !== null) {
+            window.clearTimeout(edgeBackSettleTimerRef.current)
+            edgeBackSettleTimerRef.current = null
+        }
+        if (settlePhase === 'cancelling') {
+            finishEdgeBackVisual()
+            return
+        }
+
+        const attemptId = edgeBackAttemptRef.current
+        void Promise.resolve(onEdgeBackGesture?.()).then(didNavigate => {
+            if (attemptId !== edgeBackAttemptRef.current) return
+            if (didNavigate === false) {
+                cancelEdgeBack()
+                return
+            }
+            finishEdgeBackVisual()
+        }).catch(error => {
+            if (attemptId !== edgeBackAttemptRef.current) return
+            logger.error(`${logLabel} 左边缘返回失败`, error)
+            cancelEdgeBack()
+        })
+    }, [cancelEdgeBack, finishEdgeBackVisual, logLabel, onEdgeBackGesture])
 
     const resetDrag = useCallback(() => {
         dragRuntimeRef.current = null
@@ -329,6 +378,7 @@ export function useMobileSideDrawerGesture({
         if (first) {
             edgeBackAttemptRef.current += 1
             clearEdgeBackSettle()
+            edgeBackSettlePhaseRef.current = null
             setEdgeBackOffset(0)
             setEdgeBackProgress(0)
             setEdgeBackPhase('idle')
@@ -452,8 +502,8 @@ export function useMobileSideDrawerGesture({
                     return
                 }
 
-                const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-                const completionDuration = reducedMotion ? 0 : MOBILE_EDGE_BACK_GESTURE_TUNING.settleDurationMs
+                const completionDuration = getEdgeBackTransitionDurationMs()
+                edgeBackSettlePhaseRef.current = 'committing'
                 setEdgeBackPhase('committing')
                 setEdgeBackProgress(1)
                 // 必须用 viewport 宽度而不是抽屉宽度，确保旧页完全离开右边界。
@@ -468,19 +518,8 @@ export function useMobileSideDrawerGesture({
                 edgeBackSettleTimerRef.current = window.setTimeout(() => {
                     edgeBackSettleTimerRef.current = null
                     if (attemptId !== edgeBackAttemptRef.current) return
-                    void Promise.resolve(onEdgeBackGesture?.()).then(didNavigate => {
-                        if (attemptId !== edgeBackAttemptRef.current) return
-                        if (didNavigate === false) {
-                            cancelEdgeBack()
-                            return
-                        }
-                        finishCommittedEdgeBack()
-                    }).catch(error => {
-                        if (attemptId !== edgeBackAttemptRef.current) return
-                        logger.error(`${logLabel} 左边缘返回失败`, error)
-                        cancelEdgeBack()
-                    })
-                }, completionDuration)
+                    completeEdgeBackTransition()
+                }, completionDuration + 80)
             }).catch(error => {
                 if (attemptId !== edgeBackAttemptRef.current) return
                 logger.error(`${logLabel} 左边缘返回失败`, error)
@@ -568,6 +607,7 @@ export function useMobileSideDrawerGesture({
         edgeBackOffset,
         edgeBackProgress,
         edgeBackPhase,
+        completeEdgeBackTransition,
         openDrawer,
         closeDrawer,
         pointerHandlers: {

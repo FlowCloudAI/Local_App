@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import test from 'node:test'
+import {URL} from 'node:url'
 
 import {getMobilePageTransitionLayers} from './mobilePageTransition.ts'
 
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
+const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const transitionHostSource = readFileSync(new URL('./MobilePageTransitionHost.tsx', import.meta.url), 'utf8')
+const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
 
 test('双层转场在空栈中只保留根页', () => {
     assert.deepEqual(getMobilePageTransitionLayers([], 'home-root'), [
@@ -31,4 +34,12 @@ test('直接前驱保持可绘制但不可交互，手势开始不再从 visibil
     assert.doesNotMatch(baseLayerRule, /^\s*visibility:\s*hidden/m)
     assert.match(transitionHostSource, /inert=\{!layerInteractive\}/)
     assert.match(mobileAppCss, /\.mobile-page-transition-host__layer\.is-underlay\s*\{[\s\S]*?z-index:\s*1/)
+})
+
+test('边缘返回以 transform transitionend 完成结算并原子清理页面身份', () => {
+    assert.match(sideDrawerGestureSource, /completeEdgeBackTransition/)
+    assert.match(mobileAppSource, /onTransitionEnd=\{handleEdgeBackTransitionEnd\}/)
+    assert.match(mobileAppSource, /onEdgeBackFinish:\s*pointerEdgeBackEnabled \? handleEdgeBackFinish/)
+    assert.match(mobileAppSource, /onFinish:\s*handleEdgeBackFinish/)
+    assert.doesNotMatch(mobileAppSource, /if \(activeEdgeBackPhase === 'idle'\) setEdgeBackOrigin\(null\)/)
 })

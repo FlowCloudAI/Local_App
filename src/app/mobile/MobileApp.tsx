@@ -9,6 +9,7 @@ import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {
     type CSSProperties,
+    type TransitionEvent,
     useCallback,
     useEffect,
     useMemo,
@@ -238,6 +239,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             pageKey: activeStack.currentPageKey || `${activeTab}-root`,
         })
     }, [activeStack.currentPageKey, activeTab])
+    const handleEdgeBackFinish = useCallback(() => {
+        setEdgeBackOrigin(null)
+    }, [])
     const pointerEdgeBackEnabled = platformInfo.os === 'ios'
         || (platformInfo.os === 'android' && androidNavigationMode === 'buttons')
     const {
@@ -247,6 +251,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         edgeBackOffset,
         edgeBackProgress,
         edgeBackPhase,
+        completeEdgeBackTransition,
         openDrawer: openSideDrawer,
         closeDrawer: closeSideDrawer,
         pointerHandlers: sideDrawerPointerHandlers,
@@ -257,6 +262,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         beforeEdgeBackGesture: pointerEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
         onEdgeBackGesture: pointerEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
         onEdgeBackStart: pointerEdgeBackEnabled ? handleEdgeBackStart : undefined,
+        onEdgeBackFinish: pointerEdgeBackEnabled ? handleEdgeBackFinish : undefined,
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })
@@ -272,6 +278,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         beforeBack: prepareEdgeBackNavigation,
         commitBack: commitPreparedEdgeBackNavigation,
         onStart: handleEdgeBackStart,
+        onFinish: handleEdgeBackFinish,
     })
     const activeEdgeBackPhase = edgeBackPhase !== 'idle'
         ? edgeBackPhase
@@ -282,9 +289,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const activeEdgeBackOffset = edgeBackPhase !== 'idle'
         ? edgeBackOffset
         : androidPredictiveBack.offset
-    useEffect(() => {
-        if (activeEdgeBackPhase === 'idle') setEdgeBackOrigin(null)
-    }, [activeEdgeBackPhase])
+    const handleEdgeBackTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
+        if (event.propertyName !== 'transform') return
+        if (!(event.target instanceof HTMLElement)) return
+        if (!event.target.classList.contains('is-edge-back-foreground')) return
+        completeEdgeBackTransition()
+    }, [completeEdgeBackTransition])
     const sideDrawerProgress = categoryDrawerWidth > 0
         ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
         : 0
@@ -655,7 +665,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         tabIndex={sideDrawerOpen ? 0 : -1}
                         onClick={closeCategoryDrawer}
                     />
-                    <div className="mobile-app__content">
+                    <div className="mobile-app__content" onTransitionEnd={handleEdgeBackTransitionEnd}>
                         {/*
                           * 首页栈顶两层保持同一 React key 与挂载位置。push 时旧页只是降到底层，
                           * 边缘 pop 时它已经渲染完成，不需要在手势中重新加载数据。
