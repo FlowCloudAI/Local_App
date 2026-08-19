@@ -60,6 +60,7 @@ test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
     assert.match(androidBridge, /updateMobileWebViewKeyboardViewport\(\)/)
     assert.match(androidBridge, /layoutParams\.height = desiredHeight/)
     assert.match(androidBridge, /expandedHeight - mobileImeInsets\.bottom/)
+    assert.match(androidBridge, /layoutParams\.height = ViewGroup\.LayoutParams\.MATCH_PARENT/)
 })
 
 test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {

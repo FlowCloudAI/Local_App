@@ -16,6 +16,7 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.MimeTypeMap
@@ -38,7 +39,6 @@ class MainActivity : TauriActivity() {
   private var mobileImeVisible = false
   private var mobileImeAnimationDurationMs = 0L
   private var mobileWebViewExpandedHeightPx = 0
-  private var mobileWebViewOriginalLayoutHeight: Int? = null
 
   companion object {
     init {
@@ -75,7 +75,6 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     this.webView = webView
-    mobileWebViewOriginalLayoutHeight = webView.layoutParams?.height
     webView.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
       if (!mobileImeVisible && view.height > 0) {
         mobileWebViewExpandedHeightPx = view.height
@@ -163,9 +162,8 @@ class MainActivity : TauriActivity() {
     val layoutParams = target.layoutParams ?: return
 
     if (!mobileImeVisible || mobileImeInsets.bottom <= 0) {
-      val originalHeight = mobileWebViewOriginalLayoutHeight ?: return
-      if (layoutParams.height != originalHeight) {
-        layoutParams.height = originalHeight
+      if (layoutParams.height != ViewGroup.LayoutParams.MATCH_PARENT) {
+        layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         target.layoutParams = layoutParams
       }
       return
