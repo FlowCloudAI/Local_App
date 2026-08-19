@@ -176,6 +176,15 @@ test('AI 空消息态不会被末尾滚动锚点制造伪滚动距离', () => {
     assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{\s*gap:\s*0;/)
 })
 
+test('AI 页面使用固定外壳与单一消息滚动区响应原生键盘缩放', () => {
+    const composerRule = mobileAiChatCss.match(/\.mobile-ai-chat__composer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[\s\S]*?overflow:\s*hidden;/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/)
+    assert.match(composerRule, /position:\s*relative;/)
+    assert.doesNotMatch(mobileAiChatCss, /--mobile-ai-(?:topbar|composer)-space/)
+    assert.doesNotMatch(composerRule, /position:\s*absolute;/)
+})
+
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {
     assert.match(appBootstrapSource, /setAttribute\('data-theme-preference', initialTheme\)[\s\S]*prefers-color-scheme: dark/)
     assert.match(appShellSource, /const \{theme\} = useTheme\(\)/)
