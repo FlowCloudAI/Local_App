@@ -56,7 +56,7 @@ export function getMobileFocusReferenceHeight(
 
 /**
  * 判断当前焦点是否会进入文本编辑。
- * checkbox/range 等虽然也是 input，但不会调起软键盘，不应因此隐藏底部导航。
+ * checkbox/range 等虽然也是 input，但不会调起软键盘，不应因此进入输入态。
  */
 export function isMobileTextEditingElement(element: Element | null): element is HTMLElement {
     if (!(element instanceof HTMLElement)) return false
@@ -96,12 +96,13 @@ export function getMobileViewportState(
 }
 
 /**
- * 决定底部导航是否应隐藏。
+ * 判断壳层是否仍处于输入/编辑状态。
  *
- * 聚焦后、键盘动画开始前需要立刻隐藏；但软键盘曾出现后又被系统按钮收起时，输入框通常
- * 仍保持焦点，此时必须以键盘状态为准恢复导航。整页编辑态不受该例外影响。
+ * 该状态用于让返回键先结束输入，并在输入期间禁用预测式返回动画；底部 Tab 的可见性
+ * 不再由它控制。软键盘曾出现后又被系统按钮收起时，输入框通常仍保持焦点，此时允许
+ * 退出普通输入态；整页编辑态仍保持 active，交给页面离开闸门保护未保存内容。
  */
-export function shouldSuppressMobileNavigation({
+export function isMobileInputModeActive({
     textInputFocused,
     keyboardVisible,
     keyboardSeenForFocus,

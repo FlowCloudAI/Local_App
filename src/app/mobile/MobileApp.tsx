@@ -437,10 +437,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
-        if (activeEdgeBackPhase !== 'idle' || mobileInputModeActive) {
-            dismissFocusedInput()
-            return
-        }
+        if (activeEdgeBackPhase !== 'idle') return
+        // Tab 在软键盘展开时保持可见可用；切换前主动结束焦点，避免键盘跟到目标 Tab。
+        if (mobileInputModeActive) dismissFocusedInput()
         // 再点一次当前 Tab = 回到该 Tab 根页（移动端通用约定）。
         // 深在词条详情里点「首页」原本毫无反应，用户没有快速逃生口。
         if (tab === activeTab) {
@@ -590,7 +589,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }
 
     return (
-        <div ref={mobileAppRef} className={`mobile-app${mobileInputModeActive ? ' is-input-mode' : ''}`}>
+        <div ref={mobileAppRef} className="mobile-app">
             <div
                 className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging || activeEdgeBackPhase === 'tracking' ? ' is-dragging' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
@@ -699,7 +698,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                     <MobileNav
                         activeTab={activeTab}
-                        suppressed={mobileInputModeActive}
                         onTabChange={handleTabChange}
                     />
                 </div>

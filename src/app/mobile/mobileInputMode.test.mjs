@@ -4,7 +4,7 @@ import test from 'node:test'
 import {
     getMobileFocusReferenceHeight,
     getMobileViewportState,
-    shouldSuppressMobileNavigation,
+    isMobileInputModeActive,
 } from './mobileInputMode.ts'
 import {readFileSync} from 'node:fs'
 import {URL} from 'node:url'
@@ -60,8 +60,8 @@ test('Android 先 resize 后 focus 时仍保留无键盘的完整视口基准', 
     ), 844)
 })
 
-test('输入聚焦但键盘尚未出现时立即隐藏底部导航', () => {
-    assert.equal(shouldSuppressMobileNavigation({
+test('输入聚焦但键盘尚未出现时立即进入输入态', () => {
+    assert.equal(isMobileInputModeActive({
         textInputFocused: true,
         keyboardVisible: false,
         keyboardSeenForFocus: false,
@@ -69,8 +69,8 @@ test('输入聚焦但键盘尚未出现时立即隐藏底部导航', () => {
     }), true)
 })
 
-test('系统收起键盘但输入仍有焦点时恢复底部导航', () => {
-    assert.equal(shouldSuppressMobileNavigation({
+test('系统收起键盘但输入仍有焦点时退出普通输入态', () => {
+    assert.equal(isMobileInputModeActive({
         textInputFocused: true,
         keyboardVisible: false,
         keyboardSeenForFocus: true,
@@ -78,8 +78,8 @@ test('系统收起键盘但输入仍有焦点时恢复底部导航', () => {
     }), false)
 })
 
-test('整页编辑态在键盘收起后仍隐藏底部导航', () => {
-    assert.equal(shouldSuppressMobileNavigation({
+test('整页编辑态在键盘收起后仍由离开闸门保护', () => {
+    assert.equal(isMobileInputModeActive({
         textInputFocused: true,
         keyboardVisible: false,
         keyboardSeenForFocus: true,
@@ -106,7 +106,7 @@ test('沉浸正文编辑使用全屏 Portal 隔离下层页面且不二次裁短
     assert.match(entryDetailCss, /\.mobile-entry-detail__immersive-layer\s*\{[^}]*background:\s*var\(--fc-color-bg\);/s)
 })
 
-test('聚焦期间补采样键盘可见性，系统收起未派发 resize 时仍能恢复导航', () => {
+test('聚焦期间补采样键盘可见性，系统收起未派发 resize 时仍能退出输入态', () => {
     assert.match(inputModeHookSource, /setInterval\(scheduleUpdate, 250\)/)
     assert.match(inputModeHookSource, /const scheduleUpdate = \(\) => \{\s*if \(frame\) cancelAnimationFrame\(frame\)\s*frame = requestAnimationFrame\(update\)\s*}/)
 })

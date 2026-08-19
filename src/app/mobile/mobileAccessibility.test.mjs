@@ -50,12 +50,11 @@ test('Android 通过 WindowInsets 补齐系统栏安全区并允许横屏', () =
     assert.doesNotMatch(androidManifest, /android:screenOrientation="portrait"/)
 })
 
-test('输入模式下底栏同时退出视觉、点击和辅助技术树', () => {
-    assert.match(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
-    assert.match(mobileNavSource, /aria-hidden=\{suppressed \|\| undefined\}/)
-    assert.match(mobileNavSource, /inert=\{suppressed\}/)
-    assert.match(mobileNavCss, /\.mobile-nav\.is-suppressed[\s\S]*pointer-events:\s*none/)
-    assert.match(mobileNavCss, /\.mobile-nav\.is-suppressed[\s\S]*visibility:\s*hidden/)
+test('键盘输入模式不再隐藏或禁用底部导航', () => {
+    assert.doesNotMatch(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
+    assert.doesNotMatch(mobileNavSource, /suppressed|aria-hidden=|inert=/)
+    assert.doesNotMatch(mobileNavCss, /\.mobile-nav\.is-suppressed/)
+    assert.match(mobileAppSource, /if \(mobileInputModeActive\) dismissFocusedInput\(\)/)
 })
 
 test('可读三级文字和统一 48px 命中区只覆盖 touch density', () => {

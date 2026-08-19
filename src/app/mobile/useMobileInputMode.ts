@@ -1,9 +1,10 @@
 /*
  * 移动端输入/编辑模式协调器。
  *
- * 统一监听文本焦点、visualViewport 与页面声明的整页编辑态；壳层据此隐藏底部 Tab。
- * 这里只观察键盘状态，不把 visualViewport 高度回写布局：WKWebView/Android WebView
- * 会自行处理软键盘，再手动缩短根节点会触发二次收缩和错误的焦点滚动。
+ * 统一监听文本焦点、visualViewport 与页面声明的整页编辑态；壳层据此安排返回键和
+ * 预测式返回手势。底部 Tab 不再随键盘隐藏。这里只观察键盘状态，不把
+ * visualViewport 高度回写布局：WKWebView/Android WebView 会自行处理软键盘，
+ * 再手动缩短根节点会触发二次收缩和错误的焦点滚动。
  */
 
 import {type RefObject, useCallback, useEffect, useState} from 'react'
@@ -11,7 +12,7 @@ import {
     getMobileFocusReferenceHeight,
     getMobileViewportState,
     isMobileTextEditingElement,
-    shouldSuppressMobileNavigation,
+    isMobileInputModeActive,
 } from './mobileInputMode'
 
 function isActiveEditingRegion(element: Element): boolean {
@@ -93,7 +94,7 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
             )
             if (textInputFocused && viewport.keyboardVisible) keyboardSeenForFocus = true
 
-            const nextActive = shouldSuppressMobileNavigation({
+            const nextActive = isMobileInputModeActive({
                 textInputFocused,
                 keyboardVisible: viewport.keyboardVisible,
                 keyboardSeenForFocus,
@@ -106,8 +107,8 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
                 }
                 setActive(true)
             } else if (!restoreTimer) {
-                // 软键盘收起会连续改变 visualViewport；最后一次变化稳定后才恢复 Tab，
-                // 避免 Android resize-content 或 iOS 动画尾帧让底栏提前闪回。
+                // 软键盘收起会连续改变 visualViewport；最后一次变化稳定后再退出输入态，
+                // 避免 Android resize-content 或 iOS 动画尾帧误启用预测式返回。
                 restoreTimer = window.setTimeout(() => {
                     restoreTimer = 0
                     setActive(false)

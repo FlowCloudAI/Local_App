@@ -5,7 +5,6 @@ export type MobileTab = 'home' | 'ai' | 'ideas' | 'settings'
 
 interface MobileNavProps {
     activeTab: MobileTab
-    suppressed?: boolean
     onTabChange: (tab: MobileTab) => void
 }
 
@@ -53,13 +52,11 @@ function TabIcon({tab}: { tab: MobileTab }) {
     }
 }
 
-export default function MobileNav({activeTab, suppressed = false, onTabChange}: MobileNavProps) {
+export default function MobileNav({activeTab, onTabChange}: MobileNavProps) {
     return (
         <nav
-            className={`mobile-nav${suppressed ? ' is-suppressed' : ''}`}
+            className="mobile-nav"
             aria-label="主导航"
-            aria-hidden={suppressed || undefined}
-            inert={suppressed}
         >
             {TAB_CONFIG.map(({key, label}) => (
                 <button
@@ -67,7 +64,6 @@ export default function MobileNav({activeTab, suppressed = false, onTabChange}: 
                     key={key}
                     className={`mobile-nav__item${activeTab === key ? ' active' : ''}`}
                     aria-current={activeTab === key ? 'page' : undefined}
-                    tabIndex={suppressed ? -1 : undefined}
                     onClick={() => {
                         mobile_haptic('selection')
                         onTabChange(key)

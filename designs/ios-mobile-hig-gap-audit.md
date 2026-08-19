@@ -47,7 +47,7 @@
 |---|---|---|
 | IOS-001 | 最低支持版本提升到 iOS 16.2+ | 不再为 iOS 14/15 维护 `color-mix()` 双套 fallback |
 | IOS-002 | 使用小型 iOS 原生桥接支持 Dynamic Type | 原生层只暴露系统字号等级；业务 UI 继续通过共享字体 token 消费 |
-| IOS-005 | 输入/编辑模式隐藏底部 Tab | 输入期间 Tab 不可切换；先退出输入模式，再恢复导航 |
+| IOS-005 | 键盘展开后保留底部 Tab | Tab 持续可见可用；切换前结束输入焦点，并继续经过页面离开闸门 |
 | IOS-017 | 正式实现 iPad 自适应布局 | 复用现有 store、API 和领域组件，只新增 regular-width 壳层 |
 | IOS-018 | 保留 React 手势并补跟手进度 | 不改造为原生页面栈；iOS/Android 共用进度、取消区间和专项测试 |
 | IOS-019 | 使用 iOS 原生桥接读取降低透明度/提高对比度 | 与 Dynamic Type 共用轻量辅助功能桥接层，Windows/Android 不依赖该实现 |
@@ -63,7 +63,7 @@
 | IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
 | IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
 | IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
-| IOS-005 | 已实现，iOS 模拟器回归通过，待双端真机键盘验收 | 移动壳层同时监听文本焦点、`visualViewport` 和整页编辑态；输入期间 Tab 折叠并设置 `aria-hidden`、`inert` 与 `pointer-events: none`。壳层只观察键盘状态，不把 `visualViewport.height` 二次写回根节点；输入会话使用最近一次无键盘完整高度，覆盖“先 resize、后 focus”和系统收起键盘漏发 `resize` 的 WebView。系统收起软键盘但输入框仍保持焦点时，普通输入恢复 Tab，整页编辑态仍保持隐藏 |
+| IOS-005 | 已按最新决策改为键盘展开时保留 Tab，待双端真机键盘验收 | 移动壳层继续监听文本焦点、`visualViewport` 和整页编辑态，用于返回键与预测式返回协调；Tab 不再折叠或进入 `inert`。切 Tab 时先结束输入焦点，再经过页面离开闸门。壳层仍只观察键盘状态，不把 `visualViewport.height` 二次写回根节点 |
 | IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
 | IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
 | IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |
@@ -109,8 +109,8 @@
 
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
-- **已决策方案**：壳层统一监听 `focusin/focusout` 与 `visualViewport`，进入文本输入、键盘可见或整页编辑模式时，把 Tab 栏滑出可视区域并设置 `aria-hidden`、`inert`、`pointer-events: none`；输入区占用原底栏位置并跟随键盘。短输入在失焦且 viewport 稳定后恢复 Tab；整页编辑必须先保存/取消退出编辑模式才恢复。返回键/Esc 第一次只结束输入并收起键盘，后续操作才允许页面返回或切换 Tab。不能只靠 z-index 把 Tab 压在输入区下面，因为辅助技术仍可能访问被遮住的按钮。
-- **实现状态**：已完成代码实现。共享 hook 以文本焦点、`visualViewport` 键盘差值和 `data-mobile-editing` 三路判断输入模式；Tab 折叠后内容获得原底栏空间，词条整页编辑会持续隐藏 Tab。首次实现曾把 `visualViewport.height` 写回移动根节点，导致 WebView 自身的键盘避让与 CSS 高度发生二次收缩：模拟器中的灵感全文输入框被压成顶部短条，下方出现大面积空白。现已改为只观察 viewport 状态、不参与根节点布局；并记录每次焦点会话是否真正显示过键盘，以区分“刚聚焦、键盘尚未出现”和“系统已收起键盘但焦点未丢失”。针对部分 WebView 先缩短 viewport、后派发 `focusin` 的事件顺序，输入会话保留最近一次无键盘完整高度；聚焦期间每 250ms 低频补采样，兜底系统收起键盘却漏发 `resize` 的情况。后一状态会在 180ms 稳定期后恢复普通页面 Tab，整页编辑态不变。输入区前后截图见 `designs/audits/ios-input-viewport-2026-08-18/04-idea-editor-keyboard-regression.png`、`05-idea-editor-keyboard-fixed.png`；最终源码重建后的键盘打开/系统收起对照见 `07-home-keyboard-visible-final.png` 与 `08-home-keyboard-dismissed-tab-restored-final.png`。iOS 模拟器竖屏回归已通过，仍待 iPhone 真机以及 Android 竖横屏软键盘、返回键和输入恢复时序验收。
+- **最新决策方案**：保留底部 Tab，不因文本焦点、软键盘或整页编辑态折叠、隐藏或禁用。切换 Tab 时先结束当前输入焦点，再继续执行页面离开闸门；未保存内容仍由页面确认流程保护。返回键/Esc 继续优先结束输入，预测式返回在输入期间仍暂停。
+- **实现状态**：已按最新决策调整共享移动壳层。共享 hook 仍以文本焦点、`visualViewport` 键盘差值和 `data-mobile-editing` 三路判断输入状态，但只服务返回键与预测式返回，不再驱动 Tab 的 `aria-hidden`、`inert`、样式折叠或点击拦截。此前的双重收缩修复保持不变：壳层只观察 viewport，不把 `visualViewport.height` 回写根节点。输入会话仍保留最近一次无键盘完整高度，并以低频补采样处理 WebView 事件乱序。待 iPhone 与 Android 真机验证键盘展开时 Tab 的位置、点击切换、未保存确认和返回键顺序。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
@@ -245,7 +245,7 @@
 ### 第一批：阻断 iOS 验收
 
 1. 将最低支持版本统一提升到 iOS 16.2，并同步配置与文档。
-2. 修复 16px 输入、Dynamic Type、左右安全区；输入模式隐藏底部 Tab 并完成键盘避让。
+2. 修复 16px 输入、Dynamic Type、左右安全区；键盘展开时保留可用 Tab，并完成键盘避让。
 3. 提升三级文字对比度，统一 44pt 点击区。
 
 ### 第二批：完成 VoiceOver/键盘基线
@@ -272,7 +272,7 @@
 ## 7. 验收清单
 
 - iOS 16.2 作为最老支持版本能完成冷启动、核心导航、输入和样式渲染，所有构建配置与发布文档版本一致。
-- iPhone 竖屏/横屏：输入聚焦不缩放；键盘不遮挡输入和提交操作；输入/编辑期间底部 Tab 完全隐藏且不可被辅助技术访问，退出输入后再恢复；左右安全区正确。
+- iPhone 竖屏/横屏：输入聚焦不缩放；键盘不遮挡输入和提交操作；底部 Tab 在键盘展开时保持可见可用，切换会结束输入并遵守未保存离开确认；左右安全区正确。
 - Dynamic Type：从默认字号到最大辅助字号，核心任务可完成，无裁切、重叠和不可达操作。
 - VoiceOver：可识别当前 Tab/筛选/会话、项目/词条卡片、搜索框、抽屉、AI 消息作者与消息操作，并能获知设定检测进度。
 - 外接键盘：Esc 能按层级关闭锚点菜单、抽屉和对话框，关闭后焦点返回触发器。
