@@ -59,6 +59,7 @@ import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 import {useMobileInputMode} from './useMobileInputMode'
 import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
+import {useMobileKeyboardMetrics} from './useMobileKeyboardMetrics'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -123,6 +124,14 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         active: mobileInputModeActive,
         dismissFocusedInput,
     } = useMobileInputMode(mobileAppRef)
+    const mobileKeyboardMetrics = useMobileKeyboardMetrics()
+    const nativeKeyboardDocked = mobileKeyboardMetrics.source === 'native'
+        && mobileKeyboardMetrics.docked
+        && mobileKeyboardMetrics.occludedBottom > 0
+    const mobileKeyboardStyle = useMemo(() => ({
+        '--mobile-keyboard-animation-duration': `${mobileKeyboardMetrics.animationDurationMs}ms`,
+        '--mobile-keyboard-animation-curve': mobileKeyboardMetrics.animationCurve,
+    }) as CSSProperties, [mobileKeyboardMetrics.animationCurve, mobileKeyboardMetrics.animationDurationMs])
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -589,7 +598,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }
 
     return (
-        <div ref={mobileAppRef} className="mobile-app">
+        <div
+            ref={mobileAppRef}
+            className={`mobile-app${nativeKeyboardDocked ? ' is-native-keyboard-docked' : ''}`}
+            data-native-keyboard={nativeKeyboardDocked ? 'docked' : mobileKeyboardMetrics.visible ? 'floating' : 'hidden'}
+            style={mobileKeyboardStyle}
+        >
             <div
                 className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging || activeEdgeBackPhase === 'tracking' ? ' is-dragging' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
@@ -698,6 +712,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                     <MobileNav
                         activeTab={activeTab}
+                        keyboardSuppressed={nativeKeyboardDocked}
                         onTabChange={handleTabChange}
                     />
                 </div>

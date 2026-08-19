@@ -67,11 +67,20 @@ test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () =>
     assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
 })
 
-test('键盘输入模式不再隐藏或禁用底部导航', () => {
-    assert.doesNotMatch(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
-    assert.doesNotMatch(mobileNavSource, /suppressed|aria-hidden=|inert=/)
-    assert.doesNotMatch(mobileNavCss, /\.mobile-nav\.is-suppressed/)
-    assert.match(mobileAppSource, /if \(mobileInputModeActive\) dismissFocusedInput\(\)/)
+test('底部导航只服从原生停靠键盘指标，不再服从焦点或 visualViewport 推断', () => {
+    assert.match(mobileAppSource, /mobileKeyboardMetrics\.source === 'native'[\s\S]*mobileKeyboardMetrics\.docked/)
+    assert.match(mobileAppSource, /keyboardSuppressed=\{nativeKeyboardDocked\}/)
+    assert.doesNotMatch(mobileAppSource, /keyboardSuppressed=\{mobileInputModeActive\}/)
+    assert.match(mobileNavSource, /aria-hidden=\{keyboardSuppressed \|\| undefined\}/)
+    assert.match(mobileNavSource, /inert=\{keyboardSuppressed\}/)
+    assert.match(mobileNavCss, /\.mobile-nav\.is-keyboard-suppressed[\s\S]*pointer-events:\s*none/)
+})
+
+test('移动文档锁定为原生 WebView 的真实高度，页面根不再独立滚动', () => {
+    assert.match(mobileAppCss, /:root\[data-fc-density="touch"\][\s\S]*#root[\s\S]*height:\s*100%[\s\S]*overflow:\s*hidden/)
+    assert.match(mobileAppCss, /:root\[data-fc-density="touch"\] body[\s\S]*position:\s*fixed/)
+    assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*height:\s*100%/)
+    assert.doesNotMatch(mobileAppCss, /height:\s*100d?vh/)
 })
 
 test('可读三级文字和统一 48px 命中区只覆盖 touch density', () => {
