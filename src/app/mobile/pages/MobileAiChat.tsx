@@ -698,7 +698,7 @@ export default function MobileAiChat({
 
 
     return (
-        <div ref={pageRef} className="mobile-ai-chat" hidden={!active}>
+        <div ref={pageRef} className="mobile-ai-chat mobile-nav-safe-fixed" hidden={!active}>
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
             <MobilePageTopBar
                 className="mobile-ai-chat__topbar"

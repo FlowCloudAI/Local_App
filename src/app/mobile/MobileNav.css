@@ -15,7 +15,7 @@
         var(--mobile-safe-bottom)
         max(var(--mobile-gap-inline), var(--mobile-safe-left));
     overflow: hidden;
-    /* 底色与 16px 毛玻璃见 src/glassEffect.css，关闭毛玻璃/高对比度时自动降级。 */
+    /* 底色与 24px 毛玻璃见 src/glassEffect.css，关闭毛玻璃/高对比度时自动降级。 */
     z-index: var(--mobile-z-nav);
 }
 

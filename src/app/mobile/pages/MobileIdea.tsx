@@ -174,7 +174,7 @@ export default function MobileIdea({
     ]
 
     return (
-        <div ref={pageRef} className="mobile-idea">
+        <div ref={pageRef} className="mobile-idea mobile-nav-safe-fixed">
             {drawerRoot ? createPortal(
                 <MobileIdeaDrawer controller={controller} onClose={onCloseIdeaDrawer}/>,
                 drawerRoot,

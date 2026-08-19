@@ -174,7 +174,7 @@
 
 /*
  * Tab 视图与页面栈都使用绝对叠层：底层页保持挂载，栈顶独立跟手移动。
- * safe area 收口在 Tab 视图上，避免绝对定位绕过原 .mobile-app__content padding。
+ * 这里保持完整高度，让滚动内容能经过 Tab 背后；交互安全距离由内容容器自行消费。
  */
 .mobile-app__tab-view {
     position: absolute;
@@ -187,7 +187,6 @@
     box-sizing: border-box;
     min-height: 0;
     flex-direction: column;
-    padding-bottom: var(--mobile-nav-reserved-height);
     overflow: hidden;
     background: var(--fc-color-bg);
     visibility: hidden;
@@ -320,15 +319,41 @@
 
 /* 移动端页面通用样式 */
 .mobile-page {
+    --mobile-page-local-bottom: var(--mobile-page-bottom);
+    --mobile-scroll-nav-spacer: max(
+        0px,
+        calc(var(--mobile-nav-reserved-height) - var(--mobile-safe-bottom))
+    );
+
     min-width: 0;
     max-width: 100%;
     flex: 1;
+    box-sizing: border-box;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-x: none;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+}
+
+/* 较高特异度确保各页面原有的 padding 简写不会重新截断 Tab 后方的滚动空间。 */
+.mobile-page:not(.mobile-nav-safe-fixed) {
+    padding-bottom: calc(
+        var(--mobile-page-local-bottom)
+        + var(--mobile-safe-bottom)
+        + var(--mobile-scroll-nav-spacer)
+    );
+    scroll-padding-bottom: calc(var(--mobile-page-local-bottom) + var(--mobile-nav-reserved-height));
+}
+
+/*
+ * 固定输入页和画布页不能把控件滚出 Tab 遮挡区，因此缩小它们的可用视口。
+ * 普通 .mobile-page 则只增加滚动内容尾部空间，页面本身仍延伸到机器底部。
+ */
+.mobile-nav-safe-fixed {
+    box-sizing: border-box;
+    padding-bottom: var(--mobile-nav-reserved-height);
 }
 
 .mobile-page::-webkit-scrollbar {
