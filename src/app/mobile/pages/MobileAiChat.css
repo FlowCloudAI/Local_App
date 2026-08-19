@@ -473,10 +473,34 @@
 }
 
 .mobile-ai-composer-card {
+    /*
+     * 输入区是高频紧凑工具栏：胶囊由 4px/8px 的纵横 padding 自然撑开，
+     * 圆形图标按钮与胶囊视觉高度一致；两类按钮再用透明命中层补到约 44px。
+     * 局部关闭公共 48px 控件下限，避免把这个例外扩散到其他移动端页面。
+     */
+    --mobile-ai-composer-icon-size: calc(
+        var(--mobile-tap-min) - var(--mobile-gap-item) - var(--mobile-gap-inline)
+    );
+    --mobile-ai-composer-outline-width: 0.125rem;
+    --mobile-ai-composer-more-size: calc(
+        var(--mobile-ai-composer-icon-size) - var(--mobile-ai-composer-outline-width)
+    );
+    --mobile-ai-composer-send-size: calc(
+        var(--mobile-ai-composer-icon-size) + var(--mobile-gap-text)
+    );
+    --mobile-ai-composer-card-min-height: calc(
+        var(--mobile-tap-min) + var(--mobile-tap-min) + var(--mobile-gap-item)
+    );
+    --mobile-ai-composer-icon-hit-size: calc(var(--mobile-tap-min) - var(--mobile-gap-text));
+    --mobile-ai-composer-send-stroke-width: 0.125rem;
+    --fc-control-tap-min: 0;
+
     display: flex;
+    min-height: var(--mobile-ai-composer-card-min-height);
+    box-sizing: border-box;
     flex-direction: column;
-    gap: var(--mobile-gap-inline);
-    padding: var(--mobile-gap-item);
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-sheet);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
@@ -484,6 +508,7 @@
 
 .mobile-ai-composer-card textarea {
     display: block;
+    flex: 1 1 auto;
     width: 100%;
     min-height: 1.95rem;
     max-height: 7.5rem;
@@ -510,9 +535,11 @@
 
 .mobile-ai-composer-card__bar {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
-    gap: var(--mobile-gap-item);
+    gap: var(--mobile-gap-inline);
+    margin-top: auto;
 }
 
 .mobile-ai-composer-card__chips,
@@ -523,12 +550,16 @@
     gap: var(--mobile-gap-inline);
 }
 
+.mobile-ai-composer-card__actions {
+    gap: var(--mobile-gap-group);
+}
+
 .mobile-ai-composer-card__chip {
     display: inline-flex;
-    min-height: var(--mobile-tap-min);
+    position: relative;
     align-items: center;
     gap: var(--mobile-gap-text);
-    padding: 0 var(--mobile-gap-inline);
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: transparent;
@@ -536,8 +567,26 @@
     font: inherit;
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-snug);
     cursor: pointer;
     touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__chip::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-inline));
+    inset-inline: 0;
+    content: '';
+}
+
+.mobile-ai-composer-card__icon-btn::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--mobile-ai-composer-icon-hit-size);
+    height: var(--mobile-ai-composer-icon-hit-size);
+    transform: translate(-50%, -50%);
+    content: '';
 }
 
 .mobile-ai-composer-card__chip .mobile-ai-svg {
@@ -576,19 +625,28 @@
 
 .mobile-ai-composer-card__icon-btn {
     display: inline-grid;
-    width: var(--mobile-tap-min);
-    height: var(--mobile-tap-min);
+    position: relative;
+    width: var(--mobile-ai-composer-more-size);
+    height: var(--mobile-ai-composer-more-size);
+    min-width: var(--mobile-ai-composer-more-size);
+    min-height: var(--mobile-ai-composer-more-size);
     box-sizing: border-box;
     padding: 0;
     place-items: center;
-    border: var(--mobile-border);
+    border: var(--mobile-ai-composer-outline-width) solid currentColor;
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
+    background: transparent;
     color: var(--fc-color-text);
     font: inherit;
     cursor: pointer;
     box-shadow: none;
     touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__icon-btn .mobile-top-control-svg--add {
+    width: var(--mobile-gap-group);
+    height: var(--mobile-gap-group);
+    stroke-width: 3;
 }
 
 .mobile-ai-composer-card__icon-btn .mobile-ai-svg {
@@ -598,6 +656,10 @@
 }
 
 .mobile-ai-composer-card__icon-btn--send {
+    width: var(--mobile-ai-composer-send-size);
+    height: var(--mobile-ai-composer-send-size);
+    min-width: var(--mobile-ai-composer-send-size);
+    min-height: var(--mobile-ai-composer-send-size);
     border: 0;
     border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);
@@ -606,9 +668,13 @@
 }
 
 .mobile-ai-composer-card__icon-btn--send .mobile-ai-svg {
-    width: 1.22rem;
-    height: 1.22rem;
-    stroke-width: 2.4;
+    width: var(--mobile-gap-group);
+    height: var(--mobile-gap-group);
+    stroke-width: var(--mobile-ai-composer-send-stroke-width);
+}
+
+.mobile-ai-composer-card__icon-btn--send .mobile-ai-svg :is(path, rect) {
+    vector-effect: non-scaling-stroke;
 }
 
 .mobile-ai-composer-card__icon-btn:disabled {

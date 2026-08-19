@@ -8,6 +8,7 @@ const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), '
 const mobileNavSource = readFileSync(new URL('./MobileNav.tsx', import.meta.url), 'utf8')
 const mobileNavCss = readFileSync(new URL('./MobileNav.css', import.meta.url), 'utf8')
 const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.tsx', import.meta.url), 'utf8')
+const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
 const mobileAiConversationDrawerSource = readFileSync(new URL('./pages/MobileAiConversationDrawer.tsx', import.meta.url), 'utf8')
 const mobileSettingsSectionsSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
 const mobileWorldCheckSource = readFileSync(new URL('./pages/MobileWorldCheck.tsx', import.meta.url), 'utf8')
@@ -68,6 +69,28 @@ test('可选择状态同时提供非颜色视觉提示与 ARIA 状态', () => {
     assert.match(mobileAiConversationDrawerSource, /aria-current=\{conversation\.id === props\.activeConversationId/)
     assert.match(mobileSettingsSectionsSource, /aria-pressed=\{pluginKindFilter === value\}/)
     assert.match(mobileWorldCheckSource, /role="option"[\s\S]{0,120}aria-selected=\{entry\.id === targetEntryId\}/)
+})
+
+test('AI 输入区使用紧凑 capsule，同时保留独立的透明命中层', () => {
+    const capsuleRule = mobileAiChatCss.match(/\.mobile-ai-composer-card__chip\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    assert.match(capsuleRule, /padding:\s*var\(--mobile-gap-text\) var\(--mobile-gap-inline\)/)
+    assert.match(capsuleRule, /border-radius:\s*var\(--fc-radius-full\)/)
+    assert.match(capsuleRule, /line-height:\s*var\(--mobile-leading-snug\)/)
+    assert.doesNotMatch(capsuleRule, /(?:^|\n)\s*(?:min-)?height:/)
+    assert.match(mobileAiChatCss, /--mobile-ai-composer-icon-size:\s*calc\([\s\S]*?var\(--mobile-tap-min\) - var\(--mobile-gap-item\) - var\(--mobile-gap-inline\)[\s\S]*?\)/)
+    assert.match(mobileAiChatCss, /--mobile-ai-composer-more-size:\s*calc\([\s\S]*?var\(--mobile-ai-composer-icon-size\) - var\(--mobile-ai-composer-outline-width\)/)
+    assert.match(mobileAiChatCss, /--mobile-ai-composer-send-size:\s*calc\([\s\S]*?var\(--mobile-ai-composer-icon-size\) \+ var\(--mobile-gap-text\)/)
+    assert.match(mobileAiChatCss, /--mobile-ai-composer-card-min-height:\s*calc\([\s\S]*?var\(--mobile-tap-min\) \+ var\(--mobile-tap-min\) \+ var\(--mobile-gap-item\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__chip::after\s*\{[\s\S]*?inset-block:\s*calc\(0px - var\(--mobile-gap-inline\)\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card textarea\s*\{[\s\S]*?flex:\s*1 1 auto/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__bar\s*\{[\s\S]*?margin-top:\s*auto/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__actions\s*\{\s*gap:\s*var\(--mobile-gap-group\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn::after\s*\{[\s\S]*?width:\s*var\(--mobile-ai-composer-icon-hit-size\);[\s\S]*?height:\s*var\(--mobile-ai-composer-icon-hit-size\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn\s*\{[\s\S]*?border:\s*var\(--mobile-ai-composer-outline-width\) solid currentColor;[\s\S]*?background:\s*transparent;/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn \.mobile-top-control-svg--add\s*\{[\s\S]*?stroke-width:\s*3;/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send\s*\{[\s\S]*?background:\s*var\(--fc-color-primary\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send \.mobile-ai-svg\s*\{[\s\S]*?width:\s*var\(--mobile-gap-group\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-composer-card__icon-btn--send \.mobile-ai-svg :is\(path, rect\)\s*\{[\s\S]*?vector-effect:\s*non-scaling-stroke/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {
