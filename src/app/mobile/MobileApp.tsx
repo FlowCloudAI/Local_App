@@ -246,7 +246,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         || (platformInfo.os === 'android' && androidNavigationMode === 'buttons')
     const {
         open: sideDrawerOpen,
-        dragging: sideDrawerDragging,
+        drawerDragging: sideDrawerDragging,
+        edgeBackTransitionDisabled,
         surfaceOffset: sideDrawerSurfaceOffset,
         edgeBackOffset,
         edgeBackProgress,
@@ -617,7 +618,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             style={mobileKeyboardStyle}
         >
             <div
-                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging || activeEdgeBackPhase === 'tracking' ? ' is-dragging' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,

@@ -66,7 +66,8 @@ interface MobileSideDrawerDragRuntime {
 
 export interface MobileSideDrawerGesture {
     open: boolean
-    dragging: boolean
+    drawerDragging: boolean
+    edgeBackTransitionDisabled: boolean
     offset: number | null
     surfaceOffset: number
     edgeBackOffset: number
@@ -209,7 +210,8 @@ export function useMobileSideDrawerGesture({
 
     const [open, setOpen] = useState(false)
     const [offset, setOffset] = useState<number | null>(null)
-    const [dragging, setDragging] = useState(false)
+    const [drawerDragging, setDrawerDragging] = useState(false)
+    const [edgeBackTransitionDisabled, setEdgeBackTransitionDisabled] = useState(false)
     const [edgeBackOffset, setEdgeBackOffset] = useState(0)
     const [edgeBackProgress, setEdgeBackProgress] = useState(0)
     const [edgeBackPhase, setEdgeBackPhase] = useState<MobileEdgeBackPhase>('idle')
@@ -259,7 +261,7 @@ export function useMobileSideDrawerGesture({
         clearEdgeBackSettle()
         edgeBackSettlePhaseRef.current = null
         // 清理页面身份与 phase 前先禁用一帧过渡，避免 transform 层回收时闪回旧页。
-        setDragging(true)
+        setEdgeBackTransitionDisabled(true)
         edgeBackResetFrameRef.current = window.requestAnimationFrame(() => {
             onEdgeBackFinish?.()
             setEdgeBackOffset(0)
@@ -267,7 +269,7 @@ export function useMobileSideDrawerGesture({
             setEdgeBackPhase('idle')
             edgeBackResetFrameRef.current = window.requestAnimationFrame(() => {
                 edgeBackResetFrameRef.current = null
-                setDragging(false)
+                setEdgeBackTransitionDisabled(false)
             })
         })
     }, [clearEdgeBackSettle, onEdgeBackFinish])
@@ -276,7 +278,7 @@ export function useMobileSideDrawerGesture({
         edgeBackAttemptRef.current += 1
         clearEdgeBackSettle()
         edgeBackSettlePhaseRef.current = 'cancelling'
-        setDragging(false)
+        setEdgeBackTransitionDisabled(false)
         setEdgeBackOffset(0)
         setEdgeBackProgress(0)
         setEdgeBackPhase('cancelling')
@@ -320,7 +322,7 @@ export function useMobileSideDrawerGesture({
     const resetDrag = useCallback(() => {
         dragRuntimeRef.current = null
         setOffset(null)
-        setDragging(false)
+        setDrawerDragging(false)
     }, [])
 
     const closeDrawer = useCallback(() => {
@@ -451,11 +453,11 @@ export function useMobileSideDrawerGesture({
                 return
             }
 
-            if (!runtime.started) {
-                runtime.started = true
-                onEdgeBackStart?.()
-                setDragging(true)
-                setEdgeBackPhase('tracking')
+                if (!runtime.started) {
+                    runtime.started = true
+                    onEdgeBackStart?.()
+                    setEdgeBackTransitionDisabled(true)
+                    setEdgeBackPhase('tracking')
             }
 
             if (event.cancelable) event.preventDefault()
@@ -494,7 +496,7 @@ export function useMobileSideDrawerGesture({
 
             const attemptId = edgeBackAttemptRef.current + 1
             edgeBackAttemptRef.current = attemptId
-            setDragging(false)
+            setEdgeBackTransitionDisabled(false)
             void Promise.resolve(beforeEdgeBackGesture?.()).then(canNavigate => {
                 if (attemptId !== edgeBackAttemptRef.current) return
                 if (canNavigate === false) {
@@ -542,7 +544,7 @@ export function useMobileSideDrawerGesture({
 
         if (!runtime.started) {
             runtime.started = true
-            setDragging(true)
+            setDrawerDragging(true)
             logger.info(`${logLabel} 开始识别`, {
                 pointerId,
                 open: runtime.openBefore,
@@ -601,7 +603,8 @@ export function useMobileSideDrawerGesture({
 
     return {
         open,
-        dragging,
+        drawerDragging,
+        edgeBackTransitionDisabled,
         offset,
         surfaceOffset: offset ?? (open ? width : 0),
         edgeBackOffset,

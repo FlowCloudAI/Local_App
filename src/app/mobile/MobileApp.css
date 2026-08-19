@@ -117,15 +117,15 @@
     pointer-events: none;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface {
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface {
     transition: none;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__drawer {
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__drawer {
     transition: none;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface,
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface,
 .mobile-app-side-drawer-shell.is-open .mobile-app-side-drawer-shell__surface {
     border-left-color: var(--fc-color-border);
     border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
@@ -152,7 +152,7 @@
     transition: opacity var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface-close {
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface-close {
     transition: none;
 }
 
@@ -270,8 +270,8 @@
     transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-page-transition-host__layer.is-edge-back-foreground,
-.mobile-app-side-drawer-shell.is-dragging .mobile-app__tab-view.is-edge-back-foreground {
+.mobile-app-side-drawer-shell.is-edge-back-direct .mobile-page-transition-host__layer.is-edge-back-foreground,
+.mobile-app-side-drawer-shell.is-edge-back-direct .mobile-app__tab-view.is-edge-back-foreground {
     transition: none;
 }
 
