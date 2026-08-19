@@ -7,6 +7,8 @@ const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url)
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileNavSource = readFileSync(new URL('./MobileNav.tsx', import.meta.url), 'utf8')
 const mobileNavCss = readFileSync(new URL('./MobileNav.css', import.meta.url), 'utf8')
+const mobileBottomSheetSource = readFileSync(new URL('./components/MobileBottomSheet.tsx', import.meta.url), 'utf8')
+const mobileBottomSheetCss = readFileSync(new URL('./components/MobileBottomSheet.css', import.meta.url), 'utf8')
 const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.tsx', import.meta.url), 'utf8')
 const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', import.meta.url), 'utf8')
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
@@ -170,6 +172,18 @@ test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
     assert.match(overlaySource, /data-state=\{active \? 'open' : 'closed'\}/)
     assert.match(overlayCss, /\.fc-overlay--sheet \.fc-overlay__panel\s*\{\s*transform:\s*translateY\(100%\)/)
     assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
+})
+
+test('含输入控件的底部菜单独占键盘遮挡空间并冻结背景布局', () => {
+    assert.match(mobileAiComposerSource, /<MobileBottomSheet[^>]*keyboardAware/)
+    assert.match(mobileBottomSheetSource, /getMobileReservedKeyboardInset\(keyboardMetrics\)/)
+    assert.match(mobileBottomSheetSource, /layerClassName=\{`mobile-bottom-sheet-layer\$\{keyboardAware \? ' is-keyboard-aware'/)
+    assert.match(mobileBottomSheetSource, /layerStyle=\{layerStyle\}/)
+    assert.match(overlaySource, /layerStyle\?: CSSProperties/)
+    assert.match(overlaySource, /const overlayStyle: OverlayStyle = \{\s*\.\.\.layerStyle,/)
+    assert.match(mobileBottomSheetCss, /\.mobile-bottom-sheet-layer\.is-keyboard-aware\s*\{[^}]*padding-bottom:\s*var\(--mobile-bottom-sheet-keyboard-inset/s)
+    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-app\s*\{\s*padding-bottom:\s*0;/)
+    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-nav\.is-keyboard-suppressed\s*\{\s*display:\s*flex;/)
 })
 
 test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {

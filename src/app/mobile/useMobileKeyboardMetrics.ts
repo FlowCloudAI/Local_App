@@ -12,6 +12,18 @@ import {
     type MobileKeyboardMetrics,
 } from '../../api'
 
+/**
+ * 返回 Web 层仍需消费的停靠键盘遮挡高度。
+ *
+ * 该判断必须由页面根和 Portal 浮层共同复用，否则同一份原生指标会被两个布局容器
+ * 重复消费，或错误地留在背景页面上。
+ */
+export function getMobileReservedKeyboardInset(metrics: MobileKeyboardMetrics): number {
+    return metrics.source === 'native' && metrics.docked && !metrics.viewportAdjusted
+        ? metrics.occludedBottom
+        : 0
+}
+
 export function useMobileKeyboardMetrics(): MobileKeyboardMetrics {
     return useSyncExternalStore(
         subscribeMobileKeyboardMetrics,

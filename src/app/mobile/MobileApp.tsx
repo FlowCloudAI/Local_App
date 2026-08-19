@@ -59,7 +59,10 @@ import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 import {useMobileInputMode} from './useMobileInputMode'
 import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
-import {useMobileKeyboardMetrics} from './useMobileKeyboardMetrics'
+import {
+    getMobileReservedKeyboardInset,
+    useMobileKeyboardMetrics,
+} from './useMobileKeyboardMetrics'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -127,9 +130,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const mobileKeyboardMetrics = useMobileKeyboardMetrics()
     const nativeKeyboardDocked = mobileKeyboardMetrics.source === 'native'
         && mobileKeyboardMetrics.docked
-    const reservedKeyboardInset = nativeKeyboardDocked && !mobileKeyboardMetrics.viewportAdjusted
-        ? mobileKeyboardMetrics.occludedBottom
-        : 0
+    const reservedKeyboardInset = getMobileReservedKeyboardInset(mobileKeyboardMetrics)
     const mobileKeyboardStyle = useMemo(() => ({
         '--mobile-keyboard-inset': `${reservedKeyboardInset}px`,
     }) as CSSProperties, [reservedKeyboardInset])
