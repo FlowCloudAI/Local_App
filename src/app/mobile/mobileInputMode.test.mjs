@@ -45,6 +45,13 @@ test('Android resize-content 使用聚焦前高度识别软键盘', () => {
     })
 })
 
+test('Android adjust-pan 的视口平移不能抵消键盘高度', () => {
+    assert.deepEqual(getMobileViewportState(834, {height: 522, offsetTop: 260}), {
+        keyboardInset: 312,
+        keyboardVisible: true,
+    })
+})
+
 test('Android 先 resize 后 focus 时仍保留无键盘的完整视口基准', () => {
     assert.equal(getMobileFocusReferenceHeight(
         844,

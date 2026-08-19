@@ -74,6 +74,9 @@ export function isMobileTextEditingElement(element: Element | null): element is 
  * visualViewport 比聚焦前的完整视口明显变小时视为软键盘可见。
  * 80px 阈值排除地址栏/系统栏的微小伸缩；Android resize-content 由调用方传入聚焦前
  * 高度，因此 innerHeight 与 visualViewport 同步缩短时也能得到有效差值。
+ *
+ * `offsetTop` 只表示系统为露出焦点元素而平移了可视视口。Android adjust-pan 下它可能
+ * 接近键盘高度；若从高度差中再次扣除，会把正在显示的键盘误判为系统栏伸缩。
  */
 export function getMobileViewportState(
     layoutViewportHeight: number,
@@ -84,8 +87,7 @@ export function getMobileViewportState(
     // referenceViewportHeight 才能在这类 WebView 中识别键盘，而不依赖 input 的焦点状态。
     const safeLayoutHeight = Math.max(0, layoutViewportHeight, referenceViewportHeight)
     const viewportHeight = Math.max(0, visualViewport?.height ?? safeLayoutHeight)
-    const viewportOffsetTop = Math.max(0, visualViewport?.offsetTop ?? 0)
-    const keyboardInset = Math.max(0, safeLayoutHeight - viewportHeight - viewportOffsetTop)
+    const keyboardInset = Math.max(0, safeLayoutHeight - viewportHeight)
 
     return {
         keyboardInset,
