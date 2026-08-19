@@ -7,6 +7,11 @@
 #import <WebKit/WebKit.h>
 
 static NSString *const FCAMobileUiMessageHandlerName = @"flowcloudaiMobileUi";
+static CGRect FCALastKeyboardScreenFrame;
+static __weak UIScreen *FCALastKeyboardScreen;
+static BOOL FCAKeyboardForceHidden = YES;
+static NSTimeInterval FCALastKeyboardAnimationDuration = 0;
+static UIViewAnimationCurve FCALastKeyboardAnimationCurve = UIViewAnimationCurveEaseInOut;
 
 static NSArray<WKWebView *> *FCACollectWebViews(UIView *rootView) {
     NSMutableArray<WKWebView *> *webViews = [NSMutableArray array];
@@ -100,6 +105,106 @@ static FCAMobileUiMessageHandler *FCAMobileUiHandler(void) {
     return handler;
 }
 
+static NSString *FCAKeyboardAnimationCurveName(UIViewAnimationCurve curve) {
+    switch (curve) {
+        case UIViewAnimationCurveEaseIn:
+            return @"ease-in";
+        case UIViewAnimationCurveEaseOut:
+            return @"ease-out";
+        case UIViewAnimationCurveLinear:
+            return @"linear";
+        case UIViewAnimationCurveEaseInOut:
+        default:
+            return @"ease-in-out";
+    }
+}
+
+static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
+    UIWindow *window = webView.window;
+    if (window == nil) {
+        return;
+    }
+
+    CGRect intersection = CGRectNull;
+    if (!FCAKeyboardForceHidden
+        && FCALastKeyboardScreen != nil
+        && window.screen == FCALastKeyboardScreen) {
+        CGRect frameInWindow = [window convertRect:FCALastKeyboardScreenFrame
+                               fromCoordinateSpace:window.screen.coordinateSpace];
+        CGRect frameInWebView = [webView convertRect:frameInWindow fromView:window];
+        intersection = CGRectIntersection(webView.bounds, frameInWebView);
+    }
+
+    const BOOL visible = !CGRectIsNull(intersection)
+        && !CGRectIsEmpty(intersection)
+        && intersection.size.width > 0
+        && intersection.size.height > 0;
+    const CGFloat bottomDelta = visible
+        ? fabs(CGRectGetMaxY(intersection) - CGRectGetMaxY(webView.bounds))
+        : CGFLOAT_MAX;
+    const BOOL docked = visible
+        && bottomDelta <= 1.0
+        && intersection.size.width >= webView.bounds.size.width * 0.8;
+
+    id frame = [NSNull null];
+    if (visible) {
+        frame = @{
+            @"x": @(MAX(0, CGRectGetMinX(intersection))),
+            @"y": @(MAX(0, CGRectGetMinY(intersection))),
+            @"width": @(MAX(0, intersection.size.width)),
+            @"height": @(MAX(0, intersection.size.height)),
+        };
+    }
+    NSDictionary *payload = @{
+        @"visible": @(visible),
+        @"docked": @(docked),
+        @"occludedBottom": @(docked ? intersection.size.height : 0),
+        @"frame": frame,
+        @"animationDurationMs": @(MAX(0, FCALastKeyboardAnimationDuration * 1000)),
+        @"animationCurve": FCAKeyboardAnimationCurveName(FCALastKeyboardAnimationCurve),
+    };
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    if (jsonData == nil) {
+        return;
+    }
+    NSString *json = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    NSString *script = [NSString stringWithFormat:
+        @"(() => {"
+         "const metrics = %@;"
+         "window.__flowcloudaiPendingMobileKeyboardMetrics = metrics;"
+         "window.__flowcloudaiReceiveMobileKeyboardMetrics?.(metrics);"
+         "})();",
+        json];
+    [webView evaluateJavaScript:script completionHandler:nil];
+}
+
+static void FCAPushKeyboardMetricsToAllWebViews(void) {
+    for (WKWebView *webView in FCAAllWebViews()) {
+        FCAPushKeyboardMetricsToWebView(webView);
+    }
+}
+
+static void FCAHandleKeyboardNotification(NSNotification *notification) {
+    NSDictionary *userInfo = notification.userInfo;
+    NSValue *frameValue = userInfo[UIKeyboardFrameEndUserInfoKey];
+    NSNumber *durationValue = userInfo[UIKeyboardAnimationDurationUserInfoKey];
+    NSNumber *curveValue = userInfo[UIKeyboardAnimationCurveUserInfoKey];
+    const BOOL hiding = [notification.name isEqualToString:UIKeyboardWillHideNotification];
+
+    FCAKeyboardForceHidden = hiding;
+    if (frameValue != nil) {
+        FCALastKeyboardScreenFrame = frameValue.CGRectValue;
+    }
+    FCALastKeyboardScreen = [notification.object isKindOfClass:[UIScreen class]]
+        ? (UIScreen *)notification.object
+        : UIScreen.mainScreen;
+    FCALastKeyboardAnimationDuration = durationValue != nil ? durationValue.doubleValue : 0;
+    FCALastKeyboardAnimationCurve = curveValue != nil
+        ? (UIViewAnimationCurve)curveValue.integerValue
+        : UIViewAnimationCurveEaseInOut;
+    FCAPushKeyboardMetricsToAllWebViews();
+}
+
 static void FCAApplyMobileUiEnvironment(void) {
     const CGFloat baseBodySize = 17.0;
     const CGFloat scaledBodySize = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleBody]
@@ -134,6 +239,7 @@ static void FCAApplyMobileUiEnvironment(void) {
         [controller addScriptMessageHandler:FCAMobileUiHandler()
                                      name:FCAMobileUiMessageHandlerName];
         [webView evaluateJavaScript:script completionHandler:nil];
+        FCAPushKeyboardMetricsToWebView(webView);
     }
 }
 
@@ -167,6 +273,18 @@ static void FCAInstallMobileUiBridge(void) {
                 FCAScheduleMobileUiEnvironmentRefresh();
             }];
         }
+        [center addObserverForName:UIKeyboardWillChangeFrameNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(NSNotification *notification) {
+            FCAHandleKeyboardNotification(notification);
+        }];
+        [center addObserverForName:UIKeyboardWillHideNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(NSNotification *notification) {
+            FCAHandleKeyboardNotification(notification);
+        }];
         FCAScheduleMobileUiEnvironmentRefresh();
     });
 }

@@ -57,6 +57,14 @@ test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
     assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
 })
 
+test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
+    assert.match(iosBridge, /UIKeyboardWillChangeFrameNotification/)
+    assert.match(iosBridge, /convertRect:FCALastKeyboardScreenFrame[\s\S]*fromCoordinateSpace:/)
+    assert.match(iosBridge, /intersection\.size\.width >= webView\.bounds\.size\.width \* 0\.8/)
+    assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
+    assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
+})
+
 test('键盘输入模式不再隐藏或禁用底部导航', () => {
     assert.doesNotMatch(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
     assert.doesNotMatch(mobileNavSource, /suppressed|aria-hidden=|inert=/)
