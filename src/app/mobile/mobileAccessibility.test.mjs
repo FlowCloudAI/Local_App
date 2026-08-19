@@ -50,6 +50,13 @@ test('Android 通过 WindowInsets 补齐系统栏安全区并允许横屏', () =
     assert.doesNotMatch(androidManifest, /android:screenOrientation="portrait"/)
 })
 
+test('Android 原生桥持续发布 IME 遮挡与动画指标', () => {
+    assert.match(androidBridge, /WindowInsetsCompat\.Type\.ime\(\)/)
+    assert.match(androidBridge, /WindowInsetsAnimationCompat\.Callback/)
+    assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
+    assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
+})
+
 test('键盘输入模式不再隐藏或禁用底部导航', () => {
     assert.doesNotMatch(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
     assert.doesNotMatch(mobileNavSource, /suppressed|aria-hidden=|inert=/)
