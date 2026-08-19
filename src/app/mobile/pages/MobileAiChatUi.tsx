@@ -13,7 +13,7 @@ export const CONVERSATION_LONG_PRESS_MOVE_TOLERANCE = 12
 export const AI_DOCUMENT_CONTEXT_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml', 'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less', 'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf']
 export const AI_DOCUMENT_CONTEXT_EXTENSION_SET = new Set(AI_DOCUMENT_CONTEXT_EXTENSIONS)
 export const AI_TOOL_ACCESS_LABELS: Record<AiToolAccessMode, string> = {reader: '读者模式', assistant: '助手模式', writer: '作家模式'}
-export const AI_TOOL_ACCESS_DETAILS: Record<AiToolAccessMode, string> = {reader: '只读取资料', assistant: '写入前确认', writer: '常规写入跳过确认'}
+export const AI_TOOL_ACCESS_DETAILS: Record<AiToolAccessMode, string> = {reader: '只读取资料', assistant: '写入前确认', writer: '写入免确认'}
 export const AI_TOOL_ACCESS_OPTIONS: AiToolAccessMode[] = ['reader', 'assistant', 'writer']
 export const AI_CONVERSATION_FILTER_OPTIONS: Array<{key: AiConversationFilter; label: string}> = [{key: 'all', label: '全部'}, {key: 'default', label: '通用'}, {key: 'character', label: '角色聊天'}, {key: 'report', label: '矛盾检测'}]
 export const AI_CONVERSATION_STATUS_OPTIONS: Array<{key: AiConversationStatusFilter; label: string}> = [{key: 'active', label: '当前'}, {key: 'archived', label: '归档'}]
@@ -69,10 +69,10 @@ const AI_TOOL_ACCESS_ICON_PATHS: Record<AiToolAccessMode, string[]> = {
     ],
 }
 
-export function MobileAiIcon({type}: {type: IconType}) {
+export function MobileAiIcon({type, strokeWidth}: {type: IconType; strokeWidth?: number}) {
     if (type === 'reader' || type === 'assistant' || type === 'writer') {
         return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style={{strokeWidth: 2.1}}>
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style={{strokeWidth: strokeWidth ?? 2.1}}>
                 {AI_TOOL_ACCESS_ICON_PATHS[type].map(path => <path key={path} d={path}/>)}
             </svg>
         )

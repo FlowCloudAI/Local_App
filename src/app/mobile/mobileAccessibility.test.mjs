@@ -107,8 +107,21 @@ test('AI 模型选择器与标准顶栏表面消费同一高度 Token', () => {
 test('AI 模型按钮使用左对齐正文字号，菜单选中态使用 SVG', () => {
     assert.match(mobileAiChatCss, /\.mobile-ai-model-pill\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?font-size:\s*var\(--mobile-text-body-sm\);[\s\S]*?text-align:\s*left;/)
     assert.match(mobileTopControlsSource, /export function MobileCheckIcon\(\)[\s\S]*?<svg[\s\S]*?<path/)
-    assert.equal((mobileAiComposerSource.match(/<MobileCheckIcon\/>/g) ?? []).length, 2)
+    assert.equal((mobileAiComposerSource.match(/<MobileCheckIcon\/>/g) ?? []).length, 3)
     assert.doesNotMatch(mobileAiChatCss, /content:\s*["']✓["']/)
+})
+
+test('AI 工具模式菜单使用轻量标记选中态与紧邻标题的普通对钩', () => {
+    assert.match(mobileAiComposerSource, /MobileAiIcon type=\{option\.mode\} strokeWidth=\{1\.7\}/)
+    assert.match(mobileAiComposerSource, /mobile-ai-tool-mode-menu__label[^>]*>\{option\.label\}\{active \? <MobileCheckIcon\/> : null\}/)
+    assert.match(mobileAiChatUiSource, /writer:\s*'写入免确认'/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu\s*\{[\s\S]*?--mobile-ai-tool-mode-title-size:\s*calc\(0\.875rem \* var\(--mobile-font-scale\)\);[\s\S]*?--mobile-ai-tool-mode-description-size:\s*calc\(0\.71875rem \* var\(--mobile-font-scale\)\);[\s\S]*?width:\s*min\(9\.75rem,[\s\S]*?padding:\s*var\(--mobile-gap-text\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\s*\{[\s\S]*?grid-template-columns:\s*1\.375rem minmax\(0, 1fr\);[\s\S]*?min-height:\s*calc\(var\(--mobile-tap-min\) \+ var\(--mobile-gap-text\)\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row \.mobile-ai-svg\s*\{[\s\S]*?width:\s*1\.375rem;[\s\S]*?height:\s*1\.375rem;/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\.active\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--fc-color-primary\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\.active::before\s*\{[\s\S]*?width:\s*2px;[\s\S]*?background:\s*var\(--fc-color-primary\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__label \.mobile-check-icon\s*\{[\s\S]*?width:\s*0\.875rem;[\s\S]*?stroke-width:\s*2;/)
+    assert.doesNotMatch(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row--(?:reader|writer)\.active/)
 })
 
 test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {

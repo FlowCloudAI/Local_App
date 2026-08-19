@@ -29,23 +29,23 @@
       <path d="M1 5 4.2 8.2 11 1.4"/>
     </g>
 
-    <!-- 172 × 164：真实组件尺寸。所有文字均保持可编辑。 -->
+    <!-- 156 × 164：真实组件尺寸。所有文字均保持可编辑。 -->
     <g id="mode-menu">
-      <rect width="172" height="164" rx="14" fill="#fffefc" stroke="#dce1e7" filter="url(#soft-shadow)"/>
+      <rect width="156" height="164" rx="14" fill="#fffefc" stroke="#dce1e7" filter="url(#soft-shadow)"/>
       <rect x="0" y="64" width="2" height="36" rx="1" fill="#3489e5"/>
 
-      <g transform="translate(10 17) scale(.75)" color="#24282e"><use href="#reader-icon"/></g>
-      <text x="38" y="20" fill="#24282e" font-size="14" font-weight="500">读者模式</text>
-      <text x="38" y="38" fill="#737b86" font-size="11.5">只读取资料</text>
+      <g transform="translate(8 15) scale(.9167)" color="#24282e"><use href="#reader-icon"/></g>
+      <text x="42" y="20" fill="#24282e" font-size="14" font-weight="500">读者模式</text>
+      <text x="42" y="38" fill="#737b86" font-size="11.5">只读取资料</text>
 
-      <g transform="translate(10 69) scale(.75)" color="#3489e5"><use href="#assistant-icon"/></g>
-      <text x="38" y="72" fill="#3489e5" font-size="14" font-weight="500">助手模式</text>
-      <g transform="translate(98 63)" color="#3489e5"><use href="#plain-check"/></g>
-      <text x="38" y="90" fill="#737b86" font-size="11.5">写入前确认</text>
+      <g transform="translate(8 67) scale(.9167)" color="#3489e5"><use href="#assistant-icon"/></g>
+      <text x="42" y="72" fill="#3489e5" font-size="14" font-weight="500">助手模式</text>
+      <g transform="translate(102 63)" color="#3489e5"><use href="#plain-check"/></g>
+      <text x="42" y="90" fill="#737b86" font-size="11.5">写入前确认</text>
 
-      <g transform="translate(10 121) scale(.75)" color="#24282e"><use href="#writer-icon"/></g>
-      <text x="38" y="124" fill="#24282e" font-size="14" font-weight="500">作家模式</text>
-      <text x="38" y="142" fill="#737b86" font-size="11.5">常规写入跳过确认</text>
+      <g transform="translate(8 119) scale(.9167)" color="#24282e"><use href="#writer-icon"/></g>
+      <text x="42" y="124" fill="#24282e" font-size="14" font-weight="500">作家模式</text>
+      <text x="42" y="142" fill="#737b86" font-size="11.5">写入免确认</text>
     </g>
 
     <style>
@@ -64,7 +64,7 @@
   <rect width="1600" height="1600" fill="#f3f5f8"/>
   <text x="64" y="58" class="eyebrow">FLOWCLOUDAI · MOBILE AI</text>
   <text x="64" y="96" class="title">模式选择菜单 · Marker-Only 修订稿</text>
-  <text x="1030" y="92" class="subtitle">设计状态：已选择方向 · 尚未接入代码 · 2026-08-19</text>
+  <text x="970" y="92" class="subtitle">设计状态：已接入共用移动端代码 · Android 真机验证 · 2026-08-19</text>
 
   <!-- 左：390 × 844 移动端上下文，按 0.86 缩放展示。 -->
   <rect x="64" y="132" width="430" height="884" rx="24" fill="#ffffff" stroke="#dce1e7"/>
@@ -127,10 +127,10 @@
 
   <g transform="translate(590 230) scale(2.35)"><use href="#mode-menu"/></g>
 
-  <line x1="590" y1="626" x2="994" y2="626" stroke="#9aa4b0" stroke-width="1"/>
+  <line x1="590" y1="626" x2="957" y2="626" stroke="#9aa4b0" stroke-width="1"/>
   <line x1="590" y1="620" x2="590" y2="632" stroke="#9aa4b0"/>
-  <line x1="994" y1="620" x2="994" y2="632" stroke="#9aa4b0"/>
-  <text x="792" y="646" text-anchor="middle" class="note">172px 浮层宽度</text>
+  <line x1="957" y1="620" x2="957" y2="632" stroke="#9aa4b0"/>
+  <text x="773.5" y="646" text-anchor="middle" class="note">156px 浮层宽度</text>
 
   <g transform="translate(1050 244)">
     <text class="label" y="0">对钩</text>
@@ -142,8 +142,8 @@
     <text class="note" y="142">左标记 / 主色图标与标题 / 对钩</text>
 
     <text class="label" y="188">图标</text>
-    <text class="value" y="213">18px · 1.7px 描边</text>
-    <text class="note" y="236">不随菜单字号放大视觉重量</text>
+    <text class="value" y="213">22px · 1.7px 描边</text>
+    <text class="note" y="236">放大轮廓，保持描边粗细不变</text>
 
     <text class="label" y="282">文字</text>
     <text class="value" y="307">14px / 11.5px</text>
@@ -157,7 +157,7 @@
 
   <g transform="translate(558 780)">
     <text class="label">几何</text>
-    <text x="118" class="value">172 × 164px · 14px 圆角 · 1px 边框 · 52px 行高</text>
+    <text x="118" class="value">156 × 164px · 14px 圆角 · 1px 边框 · 52px 行高</text>
     <text y="34" class="label">横向节奏</text>
     <text x="118" y="34" class="value">8px 行内边距 · 8px 图标文字间距 · 4px 标题对钩间距</text>
     <text y="68" class="label">颜色</text>
@@ -168,7 +168,7 @@
     <text x="118" y="136" class="value">可视行高 52px，满足移动端最小 48px 触摸基线</text>
     <text y="170" class="label">精确文案</text>
     <text x="118" y="170" class="value">读者模式 / 只读取资料 · 助手模式 / 写入前确认</text>
-    <text x="118" y="192" class="value">作家模式 / 常规写入跳过确认</text>
+    <text x="118" y="192" class="value">作家模式 / 写入免确认</text>
     <text y="226" class="label">禁止项</text>
     <text x="118" y="226" class="value">圆形对钩容器 · 选中行底色 · 粗体标题 · 独立尾部网格列</text>
   </g>
@@ -185,7 +185,7 @@
     <text y="112" class="value">选中行保持透明</text>
     <text y="140" class="note">不使用整行蓝色或状态色填充</text>
     <text y="182" class="value">视觉重量降低</text>
-    <text y="210" class="note">18px 图标 · 1.7px 描边 · 500 字重</text>
+    <text y="210" class="note">22px 图标 · 1.7px 描边 · 500 字重</text>
   </g>
 
   <g transform="translate(555 1160)">
