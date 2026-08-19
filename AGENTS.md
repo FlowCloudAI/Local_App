@@ -4,6 +4,12 @@
 
 `app_main` 是 FlowCloudAI 的 Tauri + React（TypeScript）主应用，同时承载 Windows、Linux、macOS、Android 与 iOS 外壳，提供世界观建模、关系图编辑、地图展示与插件入口。
 
+## 文档入口
+
+本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `排障` / `归档` / `失效`），先看状态再决定要不要读。`docs/`、`todo/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
+
+跨子项目文档在工作区根 `docs/README.md`。
+
 ## 构建 / 运行 / 测试 / lint
 
 ```bash
@@ -193,4 +199,4 @@ app_main/
 - macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
 
-文档同步时间：2026-08-16 23:33:51 +08:00
+文档同步时间：2026-08-19 19:53:42 +08:00
