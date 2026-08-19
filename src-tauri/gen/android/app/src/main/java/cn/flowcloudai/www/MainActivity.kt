@@ -157,6 +157,22 @@ class MainActivity : TauriActivity() {
 
   private inner class MobileUiJavascriptBridge {
     @JavascriptInterface
+    fun getNavigationMode(): String {
+      val resourceId = resources.getIdentifier(
+        "config_navBarInteractionMode",
+        "integer",
+        "android"
+      )
+      if (resourceId == 0) return "unknown"
+
+      return when (resources.getInteger(resourceId)) {
+        0, 1 -> "buttons"
+        2 -> "gesture"
+        else -> "unknown"
+      }
+    }
+
+    @JavascriptInterface
     fun setTheme(theme: String) {
       runOnUiThread {
         val light = theme != "dark"

@@ -6,9 +6,11 @@
  */
 
 export type MobileHapticKind = 'success' | 'warning' | 'selection'
+export type AndroidNavigationMode = 'buttons' | 'gesture' | 'unknown'
 
 interface AndroidMobileUiBridge {
     haptic: (kind: MobileHapticKind) => void
+    getNavigationMode?: () => AndroidNavigationMode
 }
 
 interface IosMessageHandler {
@@ -21,6 +23,21 @@ type MobileBridgeWindow = Window & {
         messageHandlers?: {
             flowcloudaiMobileUi?: IosMessageHandler
         }
+    }
+}
+
+/**
+ * 读取 Android 当前系统导航模式。
+ *
+ * 三键/两键导航不会从屏幕边缘产生系统返回事件，移动壳层必须补上应用内手势；手势导航
+ * 则继续交给原生预测式返回。桥尚未就绪时返回 unknown，避免同时启用两套返回手势。
+ */
+export function getAndroidNavigationMode(): AndroidNavigationMode {
+    const bridgeWindow = window as MobileBridgeWindow
+    try {
+        return bridgeWindow.flowcloudaiMobileUi?.getNavigationMode?.() ?? 'unknown'
+    } catch {
+        return 'unknown'
     }
 }
 

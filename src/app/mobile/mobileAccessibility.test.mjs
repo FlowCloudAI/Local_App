@@ -101,12 +101,15 @@ test('两端原生桥实现 success、warning、selection 三种触觉语义', (
     assert.match(mobileNavSource, /mobile_haptic\('selection'\)/)
 })
 
-test('Android 使用系统预测式返回进度，iOS 才启用自绘边缘手势', () => {
+test('Android 按系统导航模式选择预测式返回或应用内边缘手势', () => {
     assert.match(androidBridge, /handleOnBackStarted\(backEvent: BackEventCompat\)/)
     assert.match(androidBridge, /handleOnBackProgressed\(backEvent: BackEventCompat\)/)
     assert.match(androidBridge, /handleOnBackCancelled\(\)/)
     assert.match(androidBridge, /flowcloudai:android-back-invoked/)
-    assert.match(mobileAppSource, /const iosEdgeBackEnabled = platformInfo\.os === 'ios'/)
+    assert.match(androidBridge, /fun getNavigationMode\(\): String/)
+    assert.match(mobileUiApi, /getAndroidNavigationMode/)
+    assert.match(mobileAppSource, /platformInfo\.os === 'android' \? getAndroidNavigationMode\(\) : 'unknown'/)
+    assert.match(mobileAppSource, /platformInfo\.os === 'android' && androidNavigationMode === 'buttons'/)
     assert.match(mobileAppSource, /useAndroidPredictiveBack\(/)
     assert.match(androidPredictiveBackHook, /flowcloudai:android-back-progress/)
     assert.match(androidPredictiveBackHook, /setPhase\('tracking'\)/)

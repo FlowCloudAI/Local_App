@@ -21,6 +21,7 @@ import {
     exit_app,
     setting_get_backend_status,
     showWindow,
+    getAndroidNavigationMode,
     type PlatformInfo,
 } from '../../api'
 import {useProjectContextStore} from '../../features/projects/projectContextStore'
@@ -112,6 +113,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [backendError, setBackendError] = useState<string | null>(null)
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
+    const androidNavigationMode = useMemo(
+        () => platformInfo.os === 'android' ? getAndroidNavigationMode() : 'unknown',
+        [platformInfo.os],
+    )
     const reportDiscussionRef = useRef<((params: WorldCheckDiscussionParams) => Promise<void>) | null>(null)
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
     const {
@@ -222,7 +227,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             pageKey: activeStack.currentPageKey || `${activeTab}-root`,
         })
     }, [activeStack.currentPageKey, activeTab])
-    const iosEdgeBackEnabled = platformInfo.os === 'ios'
+    const pointerEdgeBackEnabled = platformInfo.os === 'ios'
+        || (platformInfo.os === 'android' && androidNavigationMode === 'buttons')
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -237,9 +243,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
-        beforeEdgeBackGesture: iosEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
-        onEdgeBackGesture: iosEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
-        onEdgeBackStart: iosEdgeBackEnabled ? handleEdgeBackStart : undefined,
+        beforeEdgeBackGesture: pointerEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
+        onEdgeBackGesture: pointerEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
+        onEdgeBackStart: pointerEdgeBackEnabled ? handleEdgeBackStart : undefined,
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })
