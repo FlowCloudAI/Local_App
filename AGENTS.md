@@ -198,6 +198,12 @@ app_main/
 
 ## 项目特有坑点
 
+- **移动端返回与抽屉拖动态必须隔离**：`useMobileSideDrawerGesture` 同时采样两类横向手势，但
+  侧边抽屉只能通过 `is-drawer-dragging` 改变 surface 圆角、边框和遮罩；页面边缘返回只能通过
+  `is-edge-back-direct` 控制前景页 transform。禁止重新引入同时命中外壳与页面层的泛化
+  `is-dragging`，否则 Android WebView 会在手势开始和取消回弹结束时各闪一次。修改这组状态或
+  selector 时必须运行 `mobilePageTransition.test.mjs`，并在真机分别慢拖与取消回弹。
+
 - `app_main/src-tauri/tauri.conf.json` 的桌面/iOS `devUrl` 与 `app_main/vite.config.ts` 必须对齐（`5175`，HMR `1421`）；Android 覆盖为 `5176`/`1422`，三处同步规则见 Android 章节。
 - Windows 无边框透明窗口与 macOS 隐藏 Overlay 窗口都对初始化顺序敏感；macOS 禁止在隐藏 WKWebView 的 `requestAnimationFrame` 中显示窗口。
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
