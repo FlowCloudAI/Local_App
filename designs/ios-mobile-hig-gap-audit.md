@@ -63,7 +63,7 @@
 | IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
 | IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
 | IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
-| IOS-005 | 已完成原生键盘区域接入与页面布局准备，待双端真机键盘验收 | Android 以 `WindowInsets.Type.ime()`、iOS 以系统键盘 frame 为依据；只有与屏幕底边相接的停靠键盘会折叠并 `inert` Tab。原生层只缩放一次 WebView 可用高度，React 根保持固定；AI 仅压缩消息区，灵感页仅压缩正文 textarea |
+| IOS-005 | Android 真机核心流程已通过，待 iPhone 真机验收 | Android 以 `WindowInsets.Type.ime()`、iOS 以系统键盘 frame 为依据；只有与屏幕底边相接的停靠键盘会折叠并 `inert` Tab。原生层只缩放一次 WebView 可用高度，React 根保持固定；AI 仅压缩消息区，灵感页仅压缩正文 textarea |
 | IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
 | IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
 | IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |
@@ -74,7 +74,9 @@
 
 2026-08-18 本批次的 34 项移动壳层专项测试、完整 lint、TypeScript/Vite 生产构建与 iOS 16.2 simulator debug 原生构建均通过。输入视口又在 iPhone 17 Pro（iOS 26.5）模拟器上进入输入流程并截图；修复后的输入区没有二次收缩，系统收起软键盘且输入焦点仍保留时，底部 Tab 已在模拟器画面中恢复。应用深色主题下的 iOS 原生状态栏图标同步也已截图确认。Android 代码已实现 WindowInsets、系统字号/高对比度、系统栏主题、触觉与预测式返回，但当前 Mac 未安装或未配置 Android SDK/NDK，debug APK 命令在进入编译前被环境检查阻断，因此 Android 原生包与真机表现仍标为未验证。
 
-2026-08-19 键盘架构更新：项目负责人撤销“软键盘展开时保留 Tab”的决定，改为由原生层提供键盘几何并管理 WebView 可用区域。共享 Web 根不再读取 `visualViewport.height` 写回根高度；Android 明确使用 `adjustResize`，iOS 仅在全宽停靠键盘与 WebView 底边相交时缩短 WebView。AI 页已改为“顶栏 / 消息滚动区 / 输入区”三行布局，灵感页已改为固定外壳与 textarea 内部滚动。22 项移动专项测试、完整 lint、前端生产构建、Android Kotlin/Manifest 编译和 iOS 16.2 simulator debug 构建均已通过；双端真实键盘行为仍待设备截图验收。
+2026-08-19 键盘架构更新：项目负责人撤销“软键盘展开时保留 Tab”的决定，改为由原生层提供键盘几何并管理 WebView 可用区域。共享 Web 根不再读取 `visualViewport.height` 写回根高度；Android 使用 `adjustResize` 并对失效的 edge-to-edge 厂商实现补充原生 WebView 物理高度约束，iOS 仅在全宽停靠键盘与 WebView 底边相交时缩短 WebView。AI 页已改为“顶栏 / 消息滚动区 / 输入区”三行布局，灵感页已改为固定外壳与 textarea 内部滚动。22 项移动专项测试、完整 lint、前端生产构建、Android Kotlin/Manifest 编译和 iOS 16.2 simulator debug 构建均已通过，并进入双端设备验证。
+
+同日 Android 真机 24129RT7CC 验证发现，MIUI edge-to-edge 会把 `adjustResize` 退化为 visual viewport 平移：首轮指标为 `innerHeight=834`、`visualViewport.height=521.54`、`offsetTop=312.92`，composer 实际仍位于完整页面底部。原生桥因此补充了 WebView 物理高度约束。复验时键盘展开后的 `innerHeight=521`、`offsetTop=0`，composer 底边与键盘 frame 顶边同为约 521.54；顶栏保持 60，Messages 由 504 压缩到 298，Tab 高度为 0 且 `aria-hidden`/`inert` 生效。系统返回收起键盘后 `innerHeight` 恢复 834、Tab 恢复 106.25；灵感页顶栏与元信息区保持固定，正文 textarea 独占剩余 136px 并内部滚动。ADB 实屏截图与 debug WebView 边界数据一致。iPhone 当前在 CoreDevice 中为 unavailable，iOS 运行态仍待真机复验。
 
 ## 3. 已确认的 P0 问题
 
@@ -112,7 +114,7 @@
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
 - **最新决策方案**：停靠软键盘出现时隐藏并禁用底部 Tab；浮动键盘与外接键盘不隐藏。键盘区域由 iOS/Android 原生 API 提供，WebView/页面外壳只缩放一次；业务页声明自己的唯一滚动所有者，不允许浏览器把整个页面平移到键盘上方。返回键/Esc 仍优先结束输入，预测式返回在输入期间继续暂停。
-- **实现状态**：共享移动壳层已接入原生键盘指标 store。Android 从 `WindowInsets.Type.ime()` 和 insets animation 持续发布遮挡高度，使用 `adjustResize`；iOS 监听系统键盘 frame，仅为与底边相接的停靠键盘调整 WKWebView frame。Tab 只在原生指标确认 `docked` 时折叠、`aria-hidden` 并 `inert`，不再依据焦点或 `visualViewport` 猜测。Web 根固定为原生 WebView 的真实 `100%` 高度；AI 页只滚动 Messages，composer 始终在键盘上方；灵感页只滚动正文 textarea。待 iPhone 与 Android 真机验证键盘打开、系统收起、浮动/外接键盘及横屏流程。
+- **实现状态**：共享移动壳层已接入原生键盘指标 store。Android 从 `WindowInsets.Type.ime()` 和 insets animation 持续发布遮挡高度，并针对 edge-to-edge 厂商 WebView 直接约束物理高度；iOS 监听系统键盘 frame，仅为与底边相接的停靠键盘调整 WKWebView frame。Tab 只在原生指标确认 `docked` 时折叠、`aria-hidden` 并 `inert`，不再依据焦点或 `visualViewport` 猜测。Web 根固定为原生 WebView 的真实 `100%` 高度；AI 页只滚动 Messages，composer 始终在键盘上方；灵感页只滚动正文 textarea。Android 真机已通过 AI/灵感页打开键盘与系统收起循环；iPhone 真机、浮动/外接键盘及横屏仍待验收。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
