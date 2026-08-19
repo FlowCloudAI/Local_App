@@ -175,6 +175,15 @@ test('AI 模型按钮使用左对齐正文字号，菜单选中态使用 SVG', (
     assert.doesNotMatch(mobileAiChatCss, /content:\s*["']✓["']/)
 })
 
+test('AI 会话抽屉使用紧凑且统一的搜索与筛选高度', () => {
+    assert.match(mobileAiConversationDrawerSource, /<Input[^\n]*aria-label="搜索对话"[^\n]*size="md"[^\n]*className="mobile-drawer-search"/)
+    assert.match(mobileAiChatCss, /--mobile-ai-drawer-control-height:\s*var\(--fc-control-height-md\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-drawer \.mobile-drawer-search \.fc-input__field\s*\{[\s\S]*?font-size:\s*var\(--mobile-text-body-sm\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-drawer \.mobile-drawer-segmented\s*\{[\s\S]*?height:\s*var\(--mobile-ai-drawer-control-height\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-drawer \.mobile-drawer-segmented button::after\s*\{[\s\S]*?inset-block:\s*calc\(0px - var\(--mobile-gap-text\) - 1px\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-model-menu__row \.mobile-ai-svg\s*\{[\s\S]*?width:\s*1\.375rem;[\s\S]*?height:\s*1\.375rem;/)
+})
+
 test('AI 工具模式菜单使用轻量标记选中态与紧邻标题的普通对钩', () => {
     assert.match(mobileAiComposerSource, /MobileAiIcon type=\{option\.mode\} strokeWidth=\{1\.7\}/)
     assert.match(mobileAiComposerSource, /mobile-ai-tool-mode-menu__label[^>]*>\{option\.label\}\{active \? <MobileCheckIcon\/> : null\}/)

@@ -1,3 +1,4 @@
+// 移动端 AI 会话抽屉：集中呈现搜索、筛选与历史会话入口。
 import type {HTMLAttributes, MouseEvent} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import type {Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
@@ -34,7 +35,7 @@ interface Props {
 
 export default function MobileAiConversationDrawer(props: Props) {
     return <aside className="mobile-ai-drawer" aria-label="对话列表">
-        <Input value={props.search} onValueChange={props.onSearch} placeholder="搜索对话..." aria-label="搜索对话" prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>} radius="full" size="lg" allowClear className="mobile-drawer-search"/>
+        <Input value={props.search} onValueChange={props.onSearch} placeholder="搜索对话..." aria-label="搜索对话" prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>} radius="full" size="md" allowClear className="mobile-drawer-search"/>
         <div className="mobile-drawer-filter-stack">
             <div className="mobile-drawer-filter-group"><span>状态</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话状态">{AI_CONVERSATION_STATUS_OPTIONS.map(option => <button key={option.key} type="button" className={props.statusFilter === option.key ? 'active' : ''} aria-pressed={props.statusFilter === option.key} onClick={() => props.onStatusFilter(option.key)}>{option.label}</button>)}</div></div>
             <div className="mobile-drawer-filter-group"><span>类型</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话类型">{AI_CONVERSATION_FILTER_OPTIONS.map(option => <button key={option.key} type="button" className={props.filter === option.key ? 'active' : ''} aria-pressed={props.filter === option.key} onClick={() => props.onFilter(option.key)}>{option.label}</button>)}</div></div>

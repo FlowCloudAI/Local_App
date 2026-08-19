@@ -42,6 +42,8 @@
 }
 
 .mobile-ai-drawer {
+    --mobile-ai-drawer-control-height: var(--fc-control-height-md);
+
     display: flex;
     box-sizing: border-box;
     height: 100%;
@@ -54,6 +56,29 @@
         max(var(--mobile-pad-sheet), var(--mobile-safe-right))
         calc(var(--mobile-safe-bottom) + var(--mobile-pad-sheet))
         max(var(--mobile-pad-sheet), var(--mobile-safe-left));
+}
+
+/* 搜索与两组筛选共用 44px 视觉表面，避免字体较小时仍保留大号控件体量。 */
+.mobile-ai-drawer .mobile-drawer-search .fc-input__field {
+    font-size: var(--mobile-text-body-sm);
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented {
+    height: var(--mobile-ai-drawer-control-height);
+    box-sizing: border-box;
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented button {
+    position: relative;
+    height: 100%;
+    min-height: 0;
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented button::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-text) - 1px);
+    inset-inline: 0;
+    content: '';
 }
 
 .mobile-ai-drawer__list {
@@ -358,8 +383,8 @@
 }
 
 .mobile-ai-model-menu__row .mobile-ai-svg {
-    width: 1.15rem;
-    height: 1.15rem;
+    width: 1.375rem;
+    height: 1.375rem;
     stroke-width: 2.3;
 }
 
